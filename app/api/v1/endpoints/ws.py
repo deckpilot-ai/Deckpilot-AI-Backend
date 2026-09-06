@@ -30,7 +30,7 @@ async def project_progress_websocket(
     auth_header = websocket.headers.get("authorization", "")
     scheme, _, header_token = auth_header.partition(" ")
     bearer_token = header_token.strip() if scheme.lower() == "bearer" else ""
-    session_token = bearer_token or websocket.cookies.get(AUTH_COOKIE_NAME)
+    session_token = bearer_token or websocket.query_params.get("token") or websocket.cookies.get(AUTH_COOKIE_NAME)
     if not session_token:
         await websocket.close(code=4401, reason="Authentication required")
         return

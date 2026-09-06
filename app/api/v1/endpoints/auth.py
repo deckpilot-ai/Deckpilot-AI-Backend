@@ -67,7 +67,7 @@ def login(
             key=AUTH_COOKIE_NAME,
             value=token,
             httponly=True,
-            samesite="lax",
+            samesite="none" if settings.is_secure_environment else "lax",
             secure=settings.is_secure_environment,
             max_age=settings.jwt_expire_minutes * 60,
             path="/",
@@ -88,7 +88,12 @@ def logout(
 ) -> dict[str, str]:
     if token:
         AuthService.logout(db, token)
-    response.delete_cookie(key=AUTH_COOKIE_NAME, path="/")
+    response.delete_cookie(
+        key=AUTH_COOKIE_NAME,
+        path="/",
+        samesite="none" if settings.is_secure_environment else "lax",
+        secure=settings.is_secure_environment,
+    )
     return {"status": "ok", "message": "Logged out"}
 
 
