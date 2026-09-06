@@ -1,0 +1,74 @@
+"""WebSocket connection manager for real-time progress streaming."""
+
+import asyncio
+import json
+import logging
+from typing import Any
+
+from fastapi import WebSocket
+
+logger = logging.getLogger(__name__)
+
+
+class WebSocketConnectionManager:
+    def __init__(self) -> None:
+        # Map of project_id -> set of active WebSocket connections
+        self._connections: dict[str, set[WebSocket]] = {}
+        self._lock = asyncio.Lock()
+
+    async def connect(self, project_id: str, websocket: WebSocket):
+        await websocket.accept()
+        async with self._lock:
+            if project_id not in self._connections:
+                self._connections[project_id] = set()
+            self._connections[project_id].add(websocket)
+        logger.info(f"[WebSocket] Client connected to project '{project_id}'. Total active: {len(self._connections[project_id])}")
+
+    async def disconnect(self, project_id: str, websocket: WebSocket):
+        async with self._lock:
+            if project_id in self._connections:
+                self._connections[project_id].discard(websocket)
+                if not self._connections[project_id]:
+                    del self._connections[project_id]
+        logger.info(f"[WebSocket] Client disconnected from project '{project_id}'.")
+
+    async def broadcast(self, project_id: str, event: dict[str, Any]):
+        """Broadcasts a JSON-serializable event to all clients connected to project_id."""
+        targets = []
+        async with self._lock:
+            if project_id in self._connections:
+                targets = list(self._connections[project_id])
+
+        if not targets:
+            return
+
+        message_str = json.dumps(event)
+        disconnected = []
+
+        for ws in targets:
+            try:
+                await ws.send_text(message_str)
+            except Exception:
+                logger.warning("WebSocket send failed for project %s", project_id, exc_info=True)
+                disconnected.append(ws)
+
+        if disconnected:
+            async with self._lock:
+                for ws in disconnected:
+                    if project_id in self._connections:
+                        self._connections[project_id].discard(ws)
+
+    def broadcast_sync(self, project_id: str, event: dict[str, Any]):
+        """Synchronous wrapper to broadcast events from sync worker contexts."""
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.broadcast(project_id, event))
+        except RuntimeError:
+            # No running event loop in current thread; execute in temporary loop
+            try:
+                asyncio.run(self.broadcast(project_id, event))
+            except Exception:
+                logger.exception("Synchronous WebSocket broadcast failed for project %s", project_id)
+
+
+ws_manager = WebSocketConnectionManager()
