@@ -33,7 +33,12 @@ class Settings(BaseSettings):
     local_storage_dir: str = "./local_storage"
 
     # Frontend
-    frontend_origin: str = "http://localhost:3000"
+    frontend_origin: str = (
+        "http://localhost:3000,"
+        "https://deckpilot-ai-frontend.aideckpilot.workers.dev,"
+        "https://deckpilot-ai-frontend.creatorpilot-ai.workers.dev,"
+        "https://deckpilot-ai-frontend.pages.dev"
+    )
     allowed_hosts: str = "localhost,127.0.0.1,testserver"
     ai_provider_allowed_hosts: str = (
         "openrouter.ai,api.openai.com,generativelanguage.googleapis.com,"
