@@ -13,12 +13,18 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.context import (
+    generate_correlation_id,
+    reset_correlation_id,
+    set_correlation_id,
+)
 from app.db.base import Base
 from app.db.engine import SessionLocal, engine
 from app.services.background_tasks import (
     background_task_registry,
     fail_interrupted_jobs,
 )
+from app.services.diagnostics_service import DiagnosticsService
 
 logger = logging.getLogger(__name__)
 
@@ -58,43 +64,82 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
-    expose_headers=["Content-Disposition"],
+    expose_headers=["Content-Disposition", "X-Correlation-ID", "X-Request-ID"],
 )
 
 
 @app.middleware("http")
 async def request_observability(request, call_next):
-    request_id = request.headers.get("x-request-id", "")
-    if not request_id or len(request_id) > 64 or not all(char.isalnum() or char in "-_" for char in request_id):
-        request_id = str(uuid.uuid4())
-    request.state.request_id = request_id
+    raw_cid = request.headers.get("x-correlation-id") or request.headers.get("x-request-id", "")
+    if raw_cid and len(raw_cid) <= 64 and all(char.isalnum() or char in "-_" for char in raw_cid):
+        correlation_id = raw_cid
+    else:
+        correlation_id = generate_correlation_id()
+
+    token = set_correlation_id(correlation_id)
+    request.state.correlation_id = correlation_id
+    request.state.request_id = correlation_id
     started = time.perf_counter()
 
     try:
         response = await call_next(request)
-    except Exception:
+    except Exception as exc:
         logger.exception(
-            "Unhandled request failure request_id=%s method=%s path=%s",
-            request_id,
+            "Unhandled request failure correlation_id=%s method=%s path=%s",
+            correlation_id,
             request.method,
             request.url.path,
         )
+        DiagnosticsService.log_exception(
+            exc=exc,
+            endpoint=request.url.path,
+            http_method=request.method,
+            status_code=500,
+            correlation_id=correlation_id,
+        )
         response = JSONResponse(
             status_code=500,
-            content={"detail": "An unexpected error occurred", "request_id": request_id},
+            content={
+                "success": False,
+                "message": "An unexpected error occurred.",
+                "error_id": correlation_id,
+                "detail": "An unexpected error occurred",
+                "request_id": correlation_id,
+            },
+        )
+    finally:
+        reset_correlation_id(token)
+
+    duration_ms = round((time.perf_counter() - started) * 1000, 2)
+
+    # Check for slow operation
+    if (
+        int(duration_ms) > settings.slow_api_threshold_ms
+        and request.url.path not in ("/api/v1/health", "/docs", "/openapi.json", "/redoc")
+    ):
+        DiagnosticsService.log_slow_operation(
+            component="api",
+            operation=f"{request.method} {request.url.path}",
+            duration_ms=int(duration_ms),
+            threshold_ms=settings.slow_api_threshold_ms,
+            correlation_id=correlation_id,
+            endpoint=request.url.path,
+            http_method=request.method,
+            status_code=response.status_code,
         )
 
-    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Correlation-ID"] = correlation_id
+    response.headers["X-Request-ID"] = correlation_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     logger.info(
-        "request_complete request_id=%s method=%s path=%s status=%s duration_ms=%s",
-        request_id,
+        "request_complete correlation_id=%s method=%s path=%s status=%s duration_ms=%s",
+        correlation_id,
         request.method,
         request.url.path,
         response.status_code,
-        round((time.perf_counter() - started) * 1000, 2),
+        duration_ms,
     )
     return response
 

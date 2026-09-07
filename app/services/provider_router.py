@@ -19,6 +19,7 @@ from app.core.encryption import (
 from app.core.network_security import validate_provider_base_url
 from app.models.audit import UsageEvent
 from app.models.provider import AgentRoute, AIKey, AIProvider
+from app.services.diagnostics_service import DiagnosticsService
 from app.services.experientiallabs_models import ExperientialLabsModelManager
 from app.services.openrouter_models import OpenRouterModelManager
 
@@ -334,6 +335,15 @@ class ProviderRouter:
                                 db.commit()
 
                             logger.info("ExperientialLabs model %s completed in %sms", model_id, latency)
+                            if latency > settings.slow_llm_threshold_ms:
+                                DiagnosticsService.log_slow_operation(
+                                    component="llm",
+                                    operation=f"chat_completions ({agent_type})",
+                                    duration_ms=latency,
+                                    threshold_ms=settings.slow_llm_threshold_ms,
+                                    provider="experientiallabs",
+                                    additional_context={"model": model_id, "user_id": user_id, "job_id": job_id},
+                                )
                             return parsed
 
                         else:
@@ -341,13 +351,30 @@ class ProviderRouter:
                             is_unpayable = resp.status_code == 429 and ("model_requires_payment" in raw_text or "free credits" in raw_text)
                             cooldown = 3600 if is_unpayable else 60
                             ExperientialLabsModelManager.mark_model_failure(model_id, status_code=resp.status_code, cooldown_seconds=cooldown)
+                            DiagnosticsService.log_external_api_failure(
+                                provider="experientiallabs",
+                                operation=f"chat_completions ({agent_type})",
+                                error=f"HTTP {resp.status_code}: {raw_text[:300]}",
+                                model_name=model_id,
+                                provider_status_code=resp.status_code,
+                                duration_ms=latency,
+                                additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
+                            )
                             logger.warning("ExperientialLabs model %s returned HTTP %s (cooldown=%ss)", model_id, resp.status_code, cooldown)
                             if is_unpayable:
                                 break  # Break immediately to fast alternative providers if credits exhausted
                             continue
 
-                    except Exception:
+                    except Exception as explabs_err:
                         ExperientialLabsModelManager.mark_model_failure(model_id, status_code=500, cooldown_seconds=300)
+                        DiagnosticsService.log_external_api_failure(
+                            provider="experientiallabs",
+                            operation=f"chat_completions ({agent_type})",
+                            error=explabs_err,
+                            model_name=model_id,
+                            duration_ms=int((time.time() - start_time) * 1000),
+                            additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
+                        )
                         logger.warning("ExperientialLabs model %s connection/timeout failed, breaking to fast providers", model_id, exc_info=True)
                         break
 
@@ -439,16 +466,44 @@ class ProviderRouter:
                                 db.commit()
 
                             logger.info("OpenRouter model %s completed in %sms", model_id, latency)
+                            if latency > settings.slow_llm_threshold_ms:
+                                DiagnosticsService.log_slow_operation(
+                                    component="llm",
+                                    operation=f"chat_completions ({agent_type})",
+                                    duration_ms=latency,
+                                    threshold_ms=settings.slow_llm_threshold_ms,
+                                    provider="openrouter",
+                                    additional_context={"model": model_id, "user_id": user_id, "job_id": job_id},
+                                )
                             return parsed
 
                         else:
                             # Model returned non-200 (e.g. 429 rate limit, 503 capacity limit, 500 error)
                             OpenRouterModelManager.mark_model_failure(model_id, status_code=resp.status_code)
+                            raw_err = resp.text[:300] if isinstance(getattr(resp, "text", None), str) else ""
+                            DiagnosticsService.log_external_api_failure(
+                                provider="openrouter",
+                                operation=f"chat_completions ({agent_type})",
+                                error=f"HTTP {resp.status_code}: {raw_err}",
+                                model_name=model_id,
+                                provider_status_code=resp.status_code,
+                                provider_request_id=resp.headers.get("x-request-id") or resp.headers.get("cf-ray"),
+                                duration_ms=latency,
+                                additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
+                            )
                             logger.warning("OpenRouter model %s returned HTTP %s", model_id, resp.status_code)
                             continue  # Hand over context to next model in quality sequence!
 
-                    except Exception:
+                    except Exception as or_err:
                         OpenRouterModelManager.mark_model_failure(model_id, status_code=500)
+                        DiagnosticsService.log_external_api_failure(
+                            provider="openrouter",
+                            operation=f"chat_completions ({agent_type})",
+                            error=or_err,
+                            model_name=model_id,
+                            duration_ms=int((time.time() - start_time) * 1000),
+                            additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
+                        )
                         logger.warning("OpenRouter model %s failed", model_id, exc_info=True)
                         continue  # Hand over context to next model in quality sequence!
 
@@ -537,9 +592,37 @@ class ProviderRouter:
                         db.commit()
 
                     logger.info("Provider %s model %s completed in %sms", provider.name, model_name, latency)
+                    if latency > settings.slow_llm_threshold_ms:
+                        DiagnosticsService.log_slow_operation(
+                            component="llm",
+                            operation=f"chat_completions ({agent_type})",
+                            duration_ms=latency,
+                            threshold_ms=settings.slow_llm_threshold_ms,
+                            provider=provider.name,
+                            additional_context={"model": model_name, "user_id": user_id, "job_id": job_id},
+                        )
                     return parsed
+
+                raw_err = resp.text[:300] if isinstance(getattr(resp, "text", None), str) else ""
+                DiagnosticsService.log_external_api_failure(
+                    provider=provider.name,
+                    operation=f"chat_completions ({agent_type})",
+                    error=f"HTTP {resp.status_code}: {raw_err}",
+                    model_name=model_name,
+                    provider_status_code=resp.status_code,
+                    duration_ms=latency,
+                    additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
+                )
                 logger.warning("Provider %s model %s returned HTTP %s", p_name, model_name, resp.status_code)
-            except Exception:
+            except Exception as other_err:
+                DiagnosticsService.log_external_api_failure(
+                    provider=provider.name,
+                    operation=f"chat_completions ({agent_type})",
+                    error=other_err,
+                    model_name=model_name,
+                    duration_ms=int((time.time() - start_time) * 1000),
+                    additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
+                )
                 logger.warning("Provider %s failed", provider.name, exc_info=True)
                 continue
 

@@ -1,5 +1,6 @@
 """SQLAlchemy models for deckpilotAI."""
 
+from app.models.application_log import ApplicationLog
 from app.models.attachment import Attachment
 from app.models.audit import AuditLog, UsageEvent
 from app.models.compaction import CompactedContext

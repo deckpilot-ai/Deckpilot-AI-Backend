@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     max_upload_bytes: int = Field(default=25 * 1024 * 1024, ge=1024, le=100 * 1024 * 1024)
     db_echo: bool = False
 
+    # Diagnostics & Observability
+    slow_api_threshold_ms: int = Field(default=3000, ge=100)
+    slow_agent_threshold_ms: int = Field(default=15000, ge=500)
+    slow_llm_threshold_ms: int = Field(default=10000, ge=500)
+    slow_render_threshold_ms: int = Field(default=15000, ge=500)
+    log_retention_error_days: int = Field(default=90, ge=1)
+    log_retention_warning_days: int = Field(default=14, ge=1)
+    log_retention_resolved_days: int = Field(default=30, ge=1)
+
     # AI Providers & API Keys
     openrouter_api_key: str = ""
     openai_api_key: str = ""
