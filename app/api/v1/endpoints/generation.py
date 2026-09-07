@@ -4,11 +4,12 @@ import re
 from typing import Annotated, Literal
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
+from starlette.responses import RedirectResponse
 
 from app.api.deps import get_current_user
 from app.core.rate_limit import action_rate_limiter
@@ -271,6 +272,7 @@ async def download_pptx(
     version: int,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    url_only: bool = Query(False, description="Return direct CDN download URL instead of file stream"),
 ):
     project = ProjectService.get_project(db, project_id, current_user.id)
     if not project:
@@ -288,15 +290,6 @@ async def download_pptx(
     art = db.scalar(select(Artifact).where(Artifact.id == deck_ver.pptx_artifact_id))
     if not art or not art.storage_key:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact storage key missing")
-
-    try:
-        file_bytes = await run_in_threadpool(storage_service.get_bytes, art.storage_key)
-    except Exception as exc:
-        logger.exception("Failed to load deck artifact %s", art.id)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Presentation storage is temporarily unavailable",
-        ) from exc
 
     # 1. Prefer meaningful deckTitle from deck JSON artifact if available
     raw_title = (project.title or "Presentation").strip()
@@ -325,6 +318,35 @@ async def download_pptx(
     # 4. RFC 5987 / RFC 6266 UTF-8 encoded filename for modern browsers
     utf8_filename = f"{sanitized}_v{version}.pptx"
     encoded_utf8 = quote(utf8_filename, safe="")
+
+    # High-speed download path via Cloudflare R2 presigned URL
+    if storage_service.use_r2:
+        presigned_url = storage_service.generate_presigned_download_url(
+            art.storage_key, expires_in=1800, filename=utf8_filename
+        )
+        if url_only:
+            return {
+                "download_url": presigned_url,
+                "filename": utf8_filename,
+            }
+        return RedirectResponse(
+            url=presigned_url,
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+            headers={
+                "Content-Disposition": f'attachment; filename="{ascii_filename}"; filename*=UTF-8\'\'{encoded_utf8}',
+                "Access-Control-Expose-Headers": "Content-Disposition, Location",
+            },
+        )
+
+    # Local storage fallback
+    try:
+        file_bytes = await run_in_threadpool(storage_service.get_bytes, art.storage_key)
+    except Exception as exc:
+        logger.exception("Failed to load deck artifact %s", art.id)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Presentation storage is temporarily unavailable",
+        ) from exc
 
     return Response(
         content=file_bytes,

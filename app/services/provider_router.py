@@ -293,17 +293,23 @@ class ProviderRouter:
                         if response_schema and "json" not in sys_prompt_final.lower():
                             sys_prompt_final += "\n\nRespond with valid JSON matching the requested structure."
 
+                        is_reasoning_model = any(m in model_id.lower() for m in ("o1", "o3", "reasoner", "r1"))
                         payload: dict[str, Any] = {
                             "model": model_id,
                             "messages": [
                                 {"role": "system", "content": sys_prompt_final},
                                 {"role": "user", "content": user_prompt},
                             ],
-                            "temperature": 0.2,
                         }
+                        if not is_reasoning_model:
+                            payload["temperature"] = 0.2
+
                         explabs_timeout = httpx.Timeout(min(float(settings.llm_read_timeout_seconds), 15.0), connect=4.0)
                         async with httpx.AsyncClient(timeout=explabs_timeout) as client:
                             resp = await client.post(url, headers=headers, json=payload)
+                            if resp.status_code == 400 and "temperature" in resp.text:
+                                payload.pop("temperature", None)
+                                resp = await client.post(url, headers=headers, json=payload)
 
                         latency = int((time.time() - start_time) * 1000)
 
@@ -318,21 +324,25 @@ class ProviderRouter:
                             db.commit()
 
                             if user_id:
-                                usage = UsageEvent(
-                                    user_id=user_id,
-                                    job_id=job_id,
-                                    provider_id=explabs_provider.id,
-                                    key_id=key_record.id,
-                                    model=model_id,
-                                    event_type="generation",
-                                    latency_ms=latency,
-                                    success=1,
-                                    created_at=now,
-                                    prompt_tokens=resp_data.get("usage", {}).get("prompt_tokens", 0),
-                                    completion_tokens=resp_data.get("usage", {}).get("completion_tokens", 0),
-                                )
-                                db.add(usage)
-                                db.commit()
+                                try:
+                                    usage = UsageEvent(
+                                        user_id=user_id,
+                                        job_id=job_id,
+                                        provider_id=explabs_provider.id,
+                                        key_id=key_record.id,
+                                        model=model_id,
+                                        event_type="generation",
+                                        latency_ms=latency,
+                                        success=1,
+                                        created_at=now,
+                                        input_units=resp_data.get("usage", {}).get("prompt_tokens", 0),
+                                        output_units=resp_data.get("usage", {}).get("completion_tokens", 0),
+                                    )
+                                    db.add(usage)
+                                    db.commit()
+                                except Exception:
+                                    db.rollback()
+                                    logger.warning("Failed to persist UsageEvent for ExperientialLabs", exc_info=True)
 
                             logger.info("ExperientialLabs model %s completed in %sms", model_id, latency)
                             if latency > settings.slow_llm_threshold_ms:
@@ -424,16 +434,22 @@ class ProviderRouter:
                         if response_schema and "json" not in sys_prompt_final.lower():
                             sys_prompt_final += "\n\nRespond with valid JSON matching the requested structure."
 
+                        is_reasoning_model = any(m in model_id.lower() for m in ("o1", "o3", "reasoner", "r1"))
                         payload: dict[str, Any] = {
                             "model": model_id,
                             "messages": [
                                 {"role": "system", "content": sys_prompt_final},
                                 {"role": "user", "content": user_prompt},
                             ],
-                            "temperature": 0.2,
                         }
+                        if not is_reasoning_model:
+                            payload["temperature"] = 0.2
+
                         async with httpx.AsyncClient(timeout=httpx.Timeout(settings.llm_read_timeout_seconds, connect=10.0)) as client:
                             resp = await client.post(url, headers=headers, json=payload)
+                            if resp.status_code == 400 and "temperature" in resp.text:
+                                payload.pop("temperature", None)
+                                resp = await client.post(url, headers=headers, json=payload)
 
                         latency = int((time.time() - start_time) * 1000)
 
@@ -451,19 +467,25 @@ class ProviderRouter:
 
                             # Record audit usage event
                             if user_id:
-                                usage = UsageEvent(
-                                    user_id=user_id,
-                                    job_id=job_id,
-                                    provider_id=openrouter_provider.id,
-                                    key_id=key_record.id,
-                                    model=model_id,
-                                    event_type="generation",
-                                    latency_ms=latency,
-                                    success=1,
-                                    created_at=now,
-                                )
-                                db.add(usage)
-                                db.commit()
+                                try:
+                                    usage = UsageEvent(
+                                        user_id=user_id,
+                                        job_id=job_id,
+                                        provider_id=openrouter_provider.id,
+                                        key_id=key_record.id,
+                                        model=model_id,
+                                        event_type="generation",
+                                        latency_ms=latency,
+                                        success=1,
+                                        created_at=now,
+                                        input_units=resp_data.get("usage", {}).get("prompt_tokens", 0),
+                                        output_units=resp_data.get("usage", {}).get("completion_tokens", 0),
+                                    )
+                                    db.add(usage)
+                                    db.commit()
+                                except Exception:
+                                    db.rollback()
+                                    logger.warning("Failed to persist UsageEvent for OpenRouter", exc_info=True)
 
                             logger.info("OpenRouter model %s completed in %sms", model_id, latency)
                             if latency > settings.slow_llm_threshold_ms:
@@ -551,19 +573,24 @@ class ProviderRouter:
                 if response_schema and "json" not in sys_prompt_final.lower():
                     sys_prompt_final += "\n\nRespond with valid JSON."
 
+                is_reasoning_model = any(m in model_name.lower() for m in ("o1", "o3", "reasoner", "r1"))
                 payload = {
                     "model": model_name,
                     "messages": [
                         {"role": "system", "content": sys_prompt_final},
                         {"role": "user", "content": user_prompt},
                     ],
-                    "temperature": 0.2,
                 }
+                if not is_reasoning_model:
+                    payload["temperature"] = 0.2
                 if response_schema:
                     payload["response_format"] = {"type": "json_object"}
 
                 async with httpx.AsyncClient(timeout=httpx.Timeout(settings.llm_read_timeout_seconds, connect=10.0)) as client:
                     resp = await client.post(url, headers=headers, json=payload)
+                    if resp.status_code == 400 and "temperature" in resp.text:
+                        payload.pop("temperature", None)
+                        resp = await client.post(url, headers=headers, json=payload)
 
                 if resp.status_code == 200:
                     resp_data = resp.json()
@@ -575,21 +602,25 @@ class ProviderRouter:
                     db.commit()
 
                     if user_id:
-                        usage = UsageEvent(
-                            user_id=user_id,
-                            job_id=job_id,
-                            provider_id=provider.id,
-                            key_id=key_rec.id,
-                            model=model_name,
-                            event_type="generation",
-                            latency_ms=latency,
-                            success=1,
-                            created_at=now,
-                            prompt_tokens=resp_data.get("usage", {}).get("prompt_tokens", 0),
-                            completion_tokens=resp_data.get("usage", {}).get("completion_tokens", 0),
-                        )
-                        db.add(usage)
-                        db.commit()
+                        try:
+                            usage = UsageEvent(
+                                user_id=user_id,
+                                job_id=job_id,
+                                provider_id=provider.id,
+                                key_id=key_rec.id,
+                                model=model_name,
+                                event_type="generation",
+                                latency_ms=latency,
+                                success=1,
+                                created_at=now,
+                                input_units=resp_data.get("usage", {}).get("prompt_tokens", 0),
+                                output_units=resp_data.get("usage", {}).get("completion_tokens", 0),
+                            )
+                            db.add(usage)
+                            db.commit()
+                        except Exception:
+                            db.rollback()
+                            logger.warning("Failed to persist UsageEvent for custom provider", exc_info=True)
 
                     logger.info("Provider %s model %s completed in %sms", provider.name, model_name, latency)
                     if latency > settings.slow_llm_threshold_ms:

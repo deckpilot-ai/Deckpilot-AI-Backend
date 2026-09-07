@@ -99,9 +99,10 @@ async def upload_attachment(
     for img in extraction.extracted_images:
         img['storage_key'] = key_map[img['storage_key']]
     extracted_storage_keys = [key for key, _data, _content_type in extraction.image_payloads]
+
     try:
         await run_in_threadpool(storage_service.put_bytes, storage_key, file_bytes, mime_type)
-        semaphore = asyncio.Semaphore(6)
+        semaphore = asyncio.Semaphore(12)
 
         async def store_image(image_key: str, image_bytes: bytes, image_content_type: str) -> None:
             async with semaphore:
@@ -140,39 +141,47 @@ async def upload_attachment(
         db.add(attachment)
         db.flush()
 
+        artifacts_to_add: list[Artifact] = []
+
         # Save text blocks as artifacts
         for tb in extraction.text_blocks:
-            artifact = Artifact(
-                project_id=project_id,
-                attachment_id=attachment.id,
-                type="text_block",
-                json_data=json.dumps(tb.get("content", "")),
-                source_locator=tb.get("source"),
+            artifacts_to_add.append(
+                Artifact(
+                    project_id=project_id,
+                    attachment_id=attachment.id,
+                    type="text_block",
+                    json_data=json.dumps(tb.get("content", "")),
+                    source_locator=tb.get("source"),
+                )
             )
-            db.add(artifact)
 
         # Save tables as artifacts
         for tbl in extraction.tables:
-            artifact = Artifact(
-                project_id=project_id,
-                attachment_id=attachment.id,
-                type="table",
-                json_data=json.dumps(tbl),
-                source_locator=tbl.get("source"),
+            artifacts_to_add.append(
+                Artifact(
+                    project_id=project_id,
+                    attachment_id=attachment.id,
+                    type="table",
+                    json_data=json.dumps(tbl),
+                    source_locator=tbl.get("source"),
+                )
             )
-            db.add(artifact)
 
         # Save images as artifacts
         for img in extraction.extracted_images:
-            artifact = Artifact(
-                project_id=project_id,
-                attachment_id=attachment.id,
-                type="image",
-                storage_key=img.get("storage_key"),
-                json_data=json.dumps(img),
-                source_locator=img.get("source") or f"{filename}#page={img.get('page', 1)}",
+            artifacts_to_add.append(
+                Artifact(
+                    project_id=project_id,
+                    attachment_id=attachment.id,
+                    type="image",
+                    storage_key=img.get("storage_key"),
+                    json_data=json.dumps(img),
+                    source_locator=img.get("source") or f"{filename}#page={img.get('page', 1)}",
+                )
             )
-            db.add(artifact)
+
+        if artifacts_to_add:
+            db.add_all(artifacts_to_add)
 
         db.commit()
         db.refresh(attachment)

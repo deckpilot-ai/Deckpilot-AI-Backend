@@ -34,6 +34,10 @@ class DocumentExtractor:
         result.metadata["title"] = metadata.get("title", "")
         result.metadata["author"] = metadata.get("author", "")
 
+        from app.services.image_quality import is_documentary_pixmap
+
+        extracted_candidates: list[dict[str, Any]] = []
+
         for page_idx in range(len(doc)):
             page = doc[page_idx]
             page_text = page.get_text("text").strip()
@@ -44,18 +48,24 @@ class DocumentExtractor:
                     "source": f"{filename}#page={page_idx + 1}",
                 })
 
-            # Extract embedded images
+            # Extract embedded figures & images
             image_list = page.get_images(full=True)
             visible = {item['xref']: pymupdf.Rect(item['bbox']) for item in page.get_image_info(xrefs=True)}
-            page_has_fig = bool(re.search(r'\b(?:fig(?:ure)?\.?\s*[\d\.]|map\b|photo\b|plate\b)', page_text, re.I))
+
             for img_idx, img_info in enumerate(image_list):
                 xref = img_info[0]
                 rect = visible.get(xref)
                 if rect is None:
                     continue
-                if rect.width * rect.height > page.rect.width * page.rect.height * .92 and not page_has_fig:
+
+                # Skip full-page background scans / page covers (> 88% of page area)
+                if rect.width * rect.height > page.rect.width * page.rect.height * 0.88:
                     continue
-                # Decode each image's actual color space and preserve its soft mask.
+
+                # Skip tiny decorative icons, border lines, and slivers
+                if rect.width < 40 or rect.height < 40:
+                    continue
+
                 try:
                     pix = pymupdf.Pixmap(doc, xref)
                     if pix.colorspace and pix.colorspace.n != 3:
@@ -64,43 +74,36 @@ class DocumentExtractor:
                     if mask_xref:
                         mask = pymupdf.Pixmap(doc, mask_xref)
                         if (mask.width, mask.height) != (pix.width, pix.height):
-                            pix = page.get_pixmap(matrix=pymupdf.Matrix(1.8, 1.8), clip=rect, alpha=False)
+                            pix = page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), clip=rect, alpha=False)
                             mask_xref = 0
                         if pix.alpha:
                             pix = pymupdf.Pixmap(pix, 0)
                         if mask_xref:
                             pix = pymupdf.Pixmap(pix, mask)
-                    image_bytes = pix.tobytes("png")
-                    ext = "png"
-                    width, height = pix.width, pix.height
-                except Exception:
-                    logger.warning("Skipping unreadable image on PDF page %s", page_idx + 1, exc_info=True)
-                    continue
 
-                # Quality filter: skip tiny icons < 40px
-                from app.services.image_quality import is_documentary_image
-                if width >= 40 and height >= 40 and is_documentary_image(image_bytes):
-                    # Nearby printed text provides evidence for image selection;
-                    # check both above and below the image, prioritizing explicit figure labels.
+                    # Quality filter: test Pixmap samples directly without intermediate PNG encode/decode
+                    if not is_documentary_pixmap(pix):
+                        continue
+
+                    # Search nearby text for captions / figure labels
                     rects = page.get_image_rects(xref)
                     caption = ""
                     if rects:
-                        rect = rects[0]
+                        r = rects[0]
                         candidates = []
                         for b in page.get_text("blocks"):
                             if len(b) > 4:
                                 b_text = str(b[4]).strip()
                                 if not b_text:
                                     continue
-                                # Check horizontal overlap / proximity
-                                if b[0] < rect.x1 + 40 and b[2] > rect.x0 - 40:
-                                    dist_below = b[1] - rect.y1
-                                    dist_above = rect.y0 - b[3]
+                                if b[0] < r.x1 + 40 and b[2] > r.x0 - 40:
+                                    dist_below = b[1] - r.y1
+                                    dist_above = r.y0 - b[3]
                                     is_fig = bool(re.search(r'\b(?:fig(?:ure)?\.?|map|photo(?:graph)?|chart|diagram|plate)\s*[\d\.]', b_text, re.IGNORECASE))
-                                    is_inside_top = (rect.y0 - 20 <= b[1] <= rect.y0 + 70)
-                                    is_inside_bottom = (rect.y1 - 70 <= b[3] <= rect.y1 + 20)
+                                    is_inside_top = (r.y0 - 20 <= b[1] <= r.y0 + 70)
+                                    is_inside_bottom = (r.y1 - 70 <= b[3] <= r.y1 + 20)
                                     if is_fig and (is_inside_top or is_inside_bottom or -30 <= dist_below < 120 or -30 <= dist_above < 100):
-                                        candidates.append((0, min(abs(b[1] - rect.y0), abs(b[3] - rect.y1)), b_text))
+                                        candidates.append((0, min(abs(b[1] - r.y0), abs(b[3] - r.y1)), b_text))
                                     elif -15 <= dist_below < 120:
                                         candidates.append((1, abs(dist_below), b_text))
                                     elif -15 <= dist_above < 90:
@@ -108,15 +111,22 @@ class DocumentExtractor:
                         if candidates:
                             candidates.sort(key=lambda c: (c[0], c[1]))
                             caption = " ".join(candidates[0][2].split())[:350]
-                        if rect.width > 20 and rect.height > 20:
-                            # Preserve overlaid map labels and vector annotations,
-                            # which are absent from the embedded raster alone.
-                            figure = page.get_pixmap(matrix=pymupdf.Matrix(1.8, 1.8), clip=rect, alpha=False)
-                            image_bytes = figure.tobytes("png")
-                            width, height = figure.width, figure.height
+
+                    # Capture rendered figure with overlay vector annotations / map details if available
+                    if rect.width > 25 and rect.height > 25:
+                        figure = page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), clip=rect, alpha=False)
+                        image_bytes = figure.tobytes("png")
+                        width, height = figure.width, figure.height
+                    else:
+                        image_bytes = pix.tobytes("png")
+                        width, height = pix.width, pix.height
+
+                    ext = "png"
                     storage_key = f"extracted/{Path(filename).stem}_p{page_idx+1}_img{img_idx}.{ext}"
-                    result.image_payloads.append((storage_key, image_bytes, f"image/{ext}"))
-                    result.extracted_images.append({
+                    has_explicit_caption = 1 if bool(re.search(r'\b(?:fig(?:ure)?\.?|map|photo|chart|diagram|plate)\b', caption, re.I)) else 0
+                    area = width * height
+
+                    extracted_candidates.append({
                         "storage_key": storage_key,
                         "width": width,
                         "height": height,
@@ -124,7 +134,30 @@ class DocumentExtractor:
                         "page": page_idx + 1,
                         "byte_size": len(image_bytes),
                         "caption": caption,
+                        "image_bytes": image_bytes,
+                        "content_type": f"image/{ext}",
+                        "priority": (has_explicit_caption, 1 if caption else 0, area),
                     })
+                except Exception:
+                    logger.warning("Skipping unreadable image on PDF page %s", page_idx + 1, exc_info=True)
+                    continue
+
+        # Cap to top 30 most relevant illustrative figures per document
+        if len(extracted_candidates) > 30:
+            extracted_candidates.sort(key=lambda c: c["priority"], reverse=True)
+            extracted_candidates = extracted_candidates[:30]
+
+        for cand in extracted_candidates:
+            result.image_payloads.append((cand["storage_key"], cand["image_bytes"], cand["content_type"]))
+            result.extracted_images.append({
+                "storage_key": cand["storage_key"],
+                "width": cand["width"],
+                "height": cand["height"],
+                "format": cand["format"],
+                "page": cand["page"],
+                "byte_size": cand["byte_size"],
+                "caption": cand["caption"],
+            })
 
         return result
 
