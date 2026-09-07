@@ -148,7 +148,7 @@ class ChatService:
 
         # 3. Direct Guardrail Responses (e.g. Greetings, Politeness, Quick Help)
         # Prevents unnecessary long LLM calls and avoids dumping walls of text on "Hi" or "Thanks"
-        if input_guardrail.direct_response and mode == "autopilot":
+        if input_guardrail.direct_response:
             output_guardrail = OutputGuardrailService.apply(
                 input_guardrail.direct_response,
                 input_guardrail,

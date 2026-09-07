@@ -642,7 +642,6 @@ class JobOrchestrator:
 
 
             # Build conversational reply from assistant via trained Copilot prompt
-            is_simple_greeting = user_prompt.strip().lower() in ("hi", "hello", "hey", "test", "hi there")
             msg_content = None
 
             try:
@@ -665,23 +664,13 @@ class JobOrchestrator:
                 msg_content = None
 
             if not msg_content:
-                if is_simple_greeting:
-                    msg_content = (
-                        f"Hello! I've created your workspace for **\"{title}\"** and set up an initial {slides_count}-slide starter deck.\n\n"
-                        f"â€¢ **Widescreen OpenXML (.pptx)** ready for download above\n"
-                        f"â€¢ You can download it now or tell me what topic you'd like to dive intoâ€”for example:\n"
-                        f"  - *\"Create a 10-slide Seed Pitch Deck highlighting our traction\"*\n"
-                        f"  - *\"Build a Quarterly Business Review with key KPIs\"*\n"
-                        f"  - Attach reference PDFs or spreadsheets to ground the deck with factual data."
-                    )
-                else:
-                    msg_content = (
-                        f"I have created your presentation **\"{title}\"** with {slides_count} executive widescreen slides.\n\n"
-                        f"â€¢ **Slide Count**: {slides_count} custom slides rendered\n"
-                        f"â€¢ **Format**: 16:9 native PowerPoint OpenXML (.pptx)\n"
-                        f"â€¢ **QA**: PPTX structure and text checks passed; full visual inspection is pending\n\n"
-                        f"You can download the PowerPoint file directly using the button above. Let me know if you would like me to adjust any slides, change the tone, or add new data!"
-                    )
+                msg_content = (
+                    f"I have created your presentation **\"{title}\"** with {slides_count} executive widescreen slides.\n\n"
+                    f"• **Slide Count**: {slides_count} custom slides rendered\n"
+                    f"• **Format**: 16:9 native PowerPoint OpenXML (.pptx)\n"
+                    f"• **QA**: PPTX structure and text checks passed; full visual inspection is pending\n\n"
+                    f"You can download the PowerPoint file directly using the button above. Let me know if you would like me to adjust any slides, change the tone, or add new data!"
+                )
 
             assistant_msg = Message(
                 project_id=job.project_id,

@@ -194,3 +194,28 @@ def test_chat_turn_endpoint_prompt_injection_safety(client: TestClient):
     assert data["should_generate"] is False
     assert data["guardrail_info"]["input"]["is_safe"] is False
     assert "security" in data["assistant_message"]["content"].lower() or "safety" in data["assistant_message"]["content"].lower()
+
+
+def test_chat_turn_greeting_in_plan_mode(client: TestClient):
+    """Sending a greeting in Plan mode must still return concise direct response without generating a deck."""
+    headers = create_auth_headers(client, "guardrail_plan_hi@deckpilot.ai")
+    proj_res = client.post(
+        "/api/v1/projects",
+        json={"title": "Plan Mode Greeting Test"},
+        headers=headers,
+    )
+    project_id = proj_res.json()["id"]
+
+    for greeting in ["Hi", "hello there", "hey copilot"]:
+        res = client.post(
+            f"/api/v1/projects/{project_id}/chat",
+            json={"content": greeting, "has_attachments": False, "mode": "plan"},
+            headers=headers,
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["should_generate"] is False
+        assert data["plan_spec"] is None
+        assert data["assistant_message"] is not None
+        assert len(data["assistant_message"]["content"].split()) <= 30
+

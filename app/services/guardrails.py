@@ -40,7 +40,7 @@ VERBOSITY_WORD_LIMITS: dict[VerbosityLevel, int] = {
 
 # Regex patterns for greetings
 GREETING_PATTERNS = [
-    r"^(hi|hello|hey|hola|sup|yo|greetings|howdy|good\s*(morning|afternoon|evening|day))(!|\.|\?|\s)*$",
+    r"^(hi|hello|hey|hola|sup|yo|greetings|howdy|good\s*(morning|afternoon|evening|day))(\s+(there|copilot|deckpilot|assistant|bot|team|all|everyone))?(!|\.|\?|\s)*$",
     r"^(how\s+are\s+you|how's\s+it\s+going|what'?s\s+up|how\s+do\s+you\s+do)(!|\.|\?|\s)*$",
 ]
 
@@ -197,7 +197,11 @@ class InputGuardrailService:
         if mode == "ask":
             return IntentCategory.ADVISORY, VerbosityLevel.STANDARD, None
         if mode == "plan":
-            return IntentCategory.DECK_GENERATION, VerbosityLevel.STANDARD, None
+            has_presentation_kw = any(kw in lower for kw in PRESENTATION_KEYWORDS)
+            words = lower.split()
+            if has_presentation_kw or (len(words) >= 4 and not lower.endswith("?")):
+                return IntentCategory.DECK_GENERATION, VerbosityLevel.STANDARD, None
+            return IntentCategory.ADVISORY, VerbosityLevel.CONCISE, None
 
         # 7. Deck generation detection
         has_presentation_kw = any(kw in lower for kw in PRESENTATION_KEYWORDS)
