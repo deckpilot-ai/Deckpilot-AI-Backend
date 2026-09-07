@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: deckpilotai-backend
+    runtime: docker
+    plan: free
+    branch: deploy-dev
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_NAME
+        value: deckpilotAI
+      - key: R2_BUCKET
+        value: deckpilotai
+      - key: JWT_SECRET
+        sync: false
+      - key: KEY_ENCRYPTION_SECRET
+        sync: false
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: R2_ENDPOINT_URL
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: EXPERIENTIALLABS_API_KEY
+        sync: false
+      - key: EXPERIENTIALLABS_BASE_URL
+        value: https://api.experientiallabs.ai/v1
+      - key: OPENROUTER_API_KEY
+        sync: false

@@ -72,7 +72,7 @@ AUTH_COOKIE_NAME = "deckpilotai_token"
 COOKIE_PARAMS = {
     "key": AUTH_COOKIE_NAME,
     "httponly": True,
-    "samesite": "lax",
+    "samesite": "none" if settings.is_secure_environment else "lax",
     "secure": settings.is_secure_environment,
     "max_age": settings.jwt_expire_minutes * 60,
     "path": "/",
