@@ -10,8 +10,20 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Curated free models for ExperientialLabs based on promotional 5 + leading free models
+# Curated free models for ExperientialLabs based on verified working models and promotional tiers
 CURATED_EXPERIENTIALLABS_FREE_MODELS: list[dict[str, Any]] = [
+    {
+        "id": "gpt-4o-mini",
+        "name": "GPT-4o Mini",
+        "context_length": 128000,
+        "description": "Fast, high-quality multimodal reasoning engine",
+    },
+    {
+        "id": "gpt-4o",
+        "name": "GPT-4o",
+        "context_length": 128000,
+        "description": "Flagship multimodal intelligence engine",
+    },
     {
         "id": "gpt-6-astra",
         "name": "GPT-6 Astra (Free)",
@@ -88,33 +100,41 @@ class ExperientialLabsModelManager:
         name = model.get("name", "").lower()
         combined = f"{model_id} {name}"
 
-        # 1. Universal dynamic free router
-        if model_id in {"openrouter-free", "openrouter/free"}:
+        # 1. Verified working models
+        if model_id == "gpt-4o-mini" or "gpt-4o-mini" in combined:
             return 100
+        if model_id == "gpt-4o" or "gpt-4o" in combined:
+            return 99
 
-        # 2. Promotional 5 frontier tiers
+        # 2. Universal dynamic free router
+        if model_id in {"openrouter-free", "openrouter/free"}:
+            return 80
+
+        # 3. Promotional frontier tiers
         if "gpt-6-astra" in combined:
-            return 98
+            return 75
         if "claude-fable-5.1" in combined or "claude-fable-5" in combined:
-            return 96
+            return 74
         if "gpt-5.6-luna" in combined:
-            return 94
+            return 73
         if "deepseek-v4-flash" in combined:
-            return 92
+            return 72
         if "qwen3.8-27b" in combined:
-            return 90
+            return 71
 
         score = 0
         ctx = int(model.get("context_length") or 0)
 
-        # 3. Model parameter scale heuristics
-        if any(w in combined for w in ("550b", "500b", "ultra")):
+        # 3. Provider pedigree
+        if model_id in ("gpt-4o-mini", "gpt-4o"):
+            score += 60
+        elif any(p in combined for p in ("anthropic", "claude")):
             score += 35
-        elif any(w in combined for w in ("120b", "70b", "72b", "super")):
-            score += 32
-        elif any(w in combined for w in ("32b", "31b", "30b", "27b", "26b")):
-            score += 28
-        elif any(w in combined for w in ("14b", "8b", "7b")):
+        elif any(p in combined for p in ("openai", "gpt")):
+            score += 30
+        elif any(p in combined for p in ("deepseek", "qwen")):
+            score += 25
+        elif any(p in combined for p in ("google", "gemini", "meta", "llama")):
             score += 20
         else:
             score += 15
@@ -169,6 +189,8 @@ class ExperientialLabsModelManager:
                     if resp.status_code == 200:
                         data = resp.json().get("data", [])
                         promotional_ids = {
+                            "gpt-4o-mini",
+                            "gpt-4o",
                             "qwen3.8-27b",
                             "deepseek-v4-flash",
                             "gpt-5.6-luna",
@@ -211,6 +233,9 @@ class ExperientialLabsModelManager:
         """Mark a model failure and trigger temporary cooldown to skip it during cascade."""
         now = time.time()
         cls._failure_counts[model_id] = cls._failure_counts.get(model_id, 0) + 1
+
+        if status_code in (429, 400, 403) and cooldown_seconds < 300:
+            cooldown_seconds = 3600
 
         factor = min(cls._failure_counts[model_id], 4)
         actual_cooldown = cooldown_seconds * factor

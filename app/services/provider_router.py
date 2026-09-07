@@ -66,8 +66,8 @@ class ProviderRouter:
         provider_configs = [
             ("experientiallabs", settings.experientiallabs_base_url, settings.effective_experientiallabs_api_key, 11),
             ("openrouter", "https://openrouter.ai/api/v1", settings.openrouter_api_key, 10),
-            ("openai", "https://api.openai.com/v1", settings.openai_api_key, 9),
-            ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 8),
+            ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 9),
+            ("openai", "https://api.openai.com/v1", settings.openai_api_key, 8),
             ("groq", "https://api.groq.com/openai/v1", settings.groq_api_key, 7),
             ("mistral", "https://api.mistral.ai/v1", settings.mistral_api_key, 6),
             ("anthropic", "https://api.anthropic.com/v1", settings.anthropic_api_key, 5),
@@ -336,12 +336,15 @@ class ProviderRouter:
                             return parsed
 
                         else:
-                            ExperientialLabsModelManager.mark_model_failure(model_id, status_code=resp.status_code)
-                            logger.warning("ExperientialLabs model %s returned HTTP %s", model_id, resp.status_code)
+                            raw_text = resp.text if isinstance(getattr(resp, "text", None), str) else ""
+                            is_unpayable = resp.status_code == 429 and ("model_requires_payment" in raw_text or "free credits" in raw_text)
+                            cooldown = 3600 if is_unpayable else 60
+                            ExperientialLabsModelManager.mark_model_failure(model_id, status_code=resp.status_code, cooldown_seconds=cooldown)
+                            logger.warning("ExperientialLabs model %s returned HTTP %s (cooldown=%ss)", model_id, resp.status_code, cooldown)
                             continue
 
                     except Exception:
-                        ExperientialLabsModelManager.mark_model_failure(model_id, status_code=500)
+                        ExperientialLabsModelManager.mark_model_failure(model_id, status_code=500, cooldown_seconds=120)
                         logger.warning("ExperientialLabs model %s failed", model_id, exc_info=True)
                         continue
 
@@ -505,6 +508,8 @@ class ProviderRouter:
                     resp = await client.post(url, headers=headers, json=payload)
 
                 if resp.status_code == 200:
+                    resp_data = resp.json()
+                    content = resp_data["choices"][0]["message"]["content"]
                     parsed = _parse_llm_response(content, response_schema)
                     latency = int((time.time() - start_time) * 1000)
                     key_rec.last_used_at = now
@@ -522,6 +527,8 @@ class ProviderRouter:
                             latency_ms=latency,
                             success=1,
                             created_at=now,
+                            prompt_tokens=resp_data.get("usage", {}).get("prompt_tokens", 0),
+                            completion_tokens=resp_data.get("usage", {}).get("completion_tokens", 0),
                         )
                         db.add(usage)
                         db.commit()

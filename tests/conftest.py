@@ -20,6 +20,8 @@ if os.getenv("RUN_LIVE_TESTS") != "1":
             "R2_ACCESS_KEY_ID": "",
             "R2_SECRET_ACCESS_KEY": "",
             "OPENROUTER_API_KEY": "",
+            "EXPERIENTIALLABS_API_KEY": "",
+            "EXPERIENTIALLABS_BASE_URL": "https://api.experientiallabs.ai/v1",
             "OPENAI_API_KEY": "",
             "ANTHROPIC_API_KEY": "",
             "GEMINI_API_KEY": "",

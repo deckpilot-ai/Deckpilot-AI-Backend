@@ -96,6 +96,7 @@ class ChatService:
             )
 
         db.commit()
+        db.expire_all()
         loaded_user_msg = db.scalar(
             select(Message)
             .options(selectinload(Message.attachments))

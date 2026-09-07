@@ -41,6 +41,7 @@ class MessageService:
             project.updated_at = int(time.time())
 
         db.commit()
+        db.expire_all()
         loaded = db.scalar(
             select(Message)
             .options(selectinload(Message.attachments))
@@ -72,6 +73,7 @@ class MessageService:
                 for att in unlinked:
                     att.message_id = first_user_msg.id
                 db.commit()
+                db.expire_all()
 
         stmt = (
             select(Message)
