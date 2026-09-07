@@ -17,6 +17,7 @@ from app.models.deck import Artifact, DeckVersion
 from app.models.job import AgentTask, GenerationJob
 from app.models.message import Message
 from app.models.project import Project
+from app.services.attachment_pipeline import wait_for_pending_attachments
 from app.services.compaction import ContextCompactionService
 from app.services.design_system import fallback_plan, normalize_brand, prepare_deck
 from app.services.image_quality import is_documentary_image, source_figure
@@ -211,6 +212,10 @@ class JobOrchestrator:
                 t_intake.started_at = int(time.time())
                 db.commit()
                 _emit("reference_intake", "running", "Reviewing requirements and analyzing reference files...")
+                # Ensure any upload whose background extraction is still in
+                # flight (or was orphaned by a worker restart) finishes before
+                # grounding data is collected.
+                await wait_for_pending_attachments(db, job.project_id, emit=_emit)
                 existing_artifacts = db.scalars(
                     select(Artifact).where(Artifact.project_id == job.project_id)
                 ).all()

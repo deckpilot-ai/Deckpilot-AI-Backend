@@ -1,8 +1,6 @@
 """Attachment upload and extraction endpoints."""
 
-import asyncio
 import hashlib
-import json
 import logging
 from typing import Annotated
 
@@ -19,7 +17,8 @@ from app.models.attachment import Attachment
 from app.models.deck import Artifact
 from app.models.user import User
 from app.schemas.attachment import AttachmentOut
-from app.services.extraction import DocumentExtractor
+from app.services.attachment_pipeline import PENDING_STATUSES, process_attachment
+from app.services.background_tasks import background_task_registry
 from app.services.project_service import ProjectService
 from app.services.storage import storage_service
 from app.services.upload_validation import (
@@ -76,51 +75,19 @@ async def upload_attachment(
     existing = db.scalar(select(Attachment).where(
         Attachment.project_id == project_id,
         Attachment.sha256 == sha256,
-        Attachment.status == "ready",
+        Attachment.status.in_(("ready", *PENDING_STATUSES)),
     ))
     if existing:
         return AttachmentOut.model_validate(existing)
 
-    try:
-        extraction = await run_in_threadpool(DocumentExtractor.extract_document, file_bytes, filename, mime_type)
-    except (OSError, ValueError, RuntimeError) as exc:
-        logger.info("Attachment extraction rejected filename=%s: %s", filename, type(exc).__name__)
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="The uploaded file could not be parsed",
-        ) from exc
-
-    # Store original file in storage
+    # Store the original file only; extraction runs detached (see
+    # attachment_pipeline) so this request returns before hosting proxies
+    # such as Render's ~100s timeout cut the connection on large PDFs.
     storage_key = f"projects/{project_id}/attachments/{sha256[:16]}_{filename}"
-    key_map = {key: f"projects/{project_id}/attachments/{sha256[:16]}/assets/{key.rsplit('/', 1)[-1]}"
-               for key, _, _ in extraction.image_payloads}
-    extraction.image_payloads = [(key_map[key], data, content_type)
-                                 for key, data, content_type in extraction.image_payloads]
-    for img in extraction.extracted_images:
-        img['storage_key'] = key_map[img['storage_key']]
-    extracted_storage_keys = [key for key, _data, _content_type in extraction.image_payloads]
-
     try:
         await run_in_threadpool(storage_service.put_bytes, storage_key, file_bytes, mime_type)
-        semaphore = asyncio.Semaphore(12)
-
-        async def store_image(image_key: str, image_bytes: bytes, image_content_type: str) -> None:
-            async with semaphore:
-                await run_in_threadpool(storage_service.put_bytes, image_key, image_bytes, image_content_type)
-
-        results = await asyncio.gather(
-            *(store_image(*payload) for payload in extraction.image_payloads), return_exceptions=True,
-        )
-        for result in results:
-            if isinstance(result, BaseException):
-                raise result
     except Exception as exc:
         logger.exception("Failed to store attachment for project %s", project_id)
-        for stored_key in [storage_key, *extracted_storage_keys]:
-            try:
-                await run_in_threadpool(storage_service.delete_object, stored_key)
-            except Exception:
-                logger.warning("Failed to clean up partially stored attachment object", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="File storage is temporarily unavailable",
@@ -134,69 +101,26 @@ async def upload_attachment(
         byte_size=byte_size,
         storage_key=storage_key,
         sha256=sha256,
-        status="ready",
+        status="pending",
         ownership_flag="unknown",
     )
     try:
         db.add(attachment)
-        db.flush()
-
-        artifacts_to_add: list[Artifact] = []
-
-        # Save text blocks as artifacts
-        for tb in extraction.text_blocks:
-            artifacts_to_add.append(
-                Artifact(
-                    project_id=project_id,
-                    attachment_id=attachment.id,
-                    type="text_block",
-                    json_data=json.dumps(tb.get("content", "")),
-                    source_locator=tb.get("source"),
-                )
-            )
-
-        # Save tables as artifacts
-        for tbl in extraction.tables:
-            artifacts_to_add.append(
-                Artifact(
-                    project_id=project_id,
-                    attachment_id=attachment.id,
-                    type="table",
-                    json_data=json.dumps(tbl),
-                    source_locator=tbl.get("source"),
-                )
-            )
-
-        # Save images as artifacts
-        for img in extraction.extracted_images:
-            artifacts_to_add.append(
-                Artifact(
-                    project_id=project_id,
-                    attachment_id=attachment.id,
-                    type="image",
-                    storage_key=img.get("storage_key"),
-                    json_data=json.dumps(img),
-                    source_locator=img.get("source") or f"{filename}#page={img.get('page', 1)}",
-                )
-            )
-
-        if artifacts_to_add:
-            db.add_all(artifacts_to_add)
-
         db.commit()
         db.refresh(attachment)
     except Exception as exc:
         db.rollback()
-        for stored_key in [storage_key, *extracted_storage_keys]:
-            try:
-                await run_in_threadpool(storage_service.delete_object, stored_key)
-            except Exception:
-                logger.exception("Failed to clean up attachment after database error")
+        try:
+            await run_in_threadpool(storage_service.delete_object, storage_key)
+        except Exception:
+            logger.warning("Failed to clean up attachment object after database error", exc_info=True)
         logger.exception("Failed to persist attachment metadata for project %s", project_id)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Attachment metadata could not be saved",
         ) from exc
+
+    background_task_registry.create(process_attachment(attachment.id))
 
     return AttachmentOut.model_validate(attachment)
 

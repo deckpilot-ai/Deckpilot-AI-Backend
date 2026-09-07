@@ -1,5 +1,7 @@
 """Tests for multi-agent generation job and PPTX export."""
 
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
@@ -11,12 +13,13 @@ from app.db.base import Base
 from app.models.job import AgentTask, GenerationJob
 from app.models.project import Project
 from app.models.user import User
+from app.services.attachment_pipeline import process_attachment
 from app.services.orchestrator import GenerationAlreadyRunningError, JobOrchestrator
 from app.services.renderer import PPTXRenderer
 from tests.test_projects import create_authenticated_user
 
 
-def test_generation_pipeline_and_pptx_export(client: TestClient):
+def test_generation_pipeline_and_pptx_export(client: TestClient, db_session: Session):
     headers = create_authenticated_user(client, "orchestrator@deckpilot.ai")
 
     # 1. Create project
@@ -36,8 +39,14 @@ def test_generation_pipeline_and_pptx_export(client: TestClient):
     )
     assert upload_resp.status_code == 201
     att_data = upload_resp.json()
-    assert att_data["status"] == "ready"
+    assert att_data["status"] == "pending"
     assert att_data["file_name"] == "brief.txt"
+
+    # Extraction runs detached in production; drive it inline for the test.
+    asyncio.run(process_attachment(att_data["id"], db=db_session))
+    refreshed = client.get(f"/api/v1/projects/{proj_id}/attachments/{att_data['id']}", headers=headers)
+    assert refreshed.status_code == 200
+    assert refreshed.json()["status"] == "ready"
 
     # 3. Start generation job
     job_resp = client.post(

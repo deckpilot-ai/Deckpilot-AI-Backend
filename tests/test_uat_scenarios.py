@@ -1,6 +1,11 @@
 """User Acceptance Testing (UAT) Scenarios for deckpilotAI."""
 
+import asyncio
+
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.services.attachment_pipeline import process_attachment
 
 
 def test_uat_01_first_time_user_pitch_deck(client: TestClient):
@@ -46,7 +51,7 @@ def test_uat_01_first_time_user_pitch_deck(client: TestClient):
     assert pptx.content.startswith(b"PK\x03\x04")
 
 
-def test_uat_02_document_grounded_executive_review(client: TestClient):
+def test_uat_02_document_grounded_executive_review(client: TestClient, db_session: Session):
     """UAT-02: User attaches financial document and generates grounded PowerPoint deck."""
     # Register & Login
     client.post("/api/v1/auth/register", json={"email": "cfo@enterprise.com", "password": "EnterprisePassword!2026"})
@@ -63,7 +68,12 @@ def test_uat_02_document_grounded_executive_review(client: TestClient):
         files={"file": ("q3_financial_model.txt", doc_bytes, "text/plain")},
         headers=auth,
     ).json()
-    assert att["status"] == "ready"
+    assert att["status"] == "pending"
+
+    # Extraction runs detached in production; drive it inline for the test.
+    asyncio.run(process_attachment(att["id"], db=db_session))
+    refreshed = client.get(f"/api/v1/projects/{proj_id}/attachments/{att['id']}", headers=auth).json()
+    assert refreshed["status"] == "ready"
 
     # Generate
     job = client.post(

@@ -4,10 +4,13 @@ Tests complete API flows, database persistence, live Cloudflare R2 file storage,
 multi-agent generation DAG, and admin key management.
 """
 
+import asyncio
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.user import User
+from app.services.attachment_pipeline import process_attachment
 
 
 def test_sit_complete_system_flow(client: TestClient, db_session: Session):
@@ -116,9 +119,15 @@ def test_sit_complete_system_flow(client: TestClient, db_session: Session):
     )
     assert att_resp.status_code == 201
     att = att_resp.json()
-    assert att["status"] == "ready"
+    assert att["status"] == "pending"
     assert att["file_name"] == "q3_performance.md"
     att_id = att["id"]
+
+    # Extraction runs detached in production; drive it inline for the test.
+    asyncio.run(process_attachment(att_id, db=db_session))
+    refreshed = client.get(f"/api/v1/projects/{project_id}/attachments/{att_id}", headers=headers)
+    assert refreshed.status_code == 200
+    assert refreshed.json()["status"] == "ready"
 
     # Verify attachment retrieval
     get_att_resp = client.get(f"/api/v1/projects/{project_id}/attachments/{att_id}", headers=headers)
