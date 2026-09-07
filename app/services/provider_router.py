@@ -300,7 +300,8 @@ class ProviderRouter:
                             ],
                             "temperature": 0.2,
                         }
-                        async with httpx.AsyncClient(timeout=httpx.Timeout(settings.llm_read_timeout_seconds, connect=10.0)) as client:
+                        explabs_timeout = httpx.Timeout(min(float(settings.llm_read_timeout_seconds), 15.0), connect=4.0)
+                        async with httpx.AsyncClient(timeout=explabs_timeout) as client:
                             resp = await client.post(url, headers=headers, json=payload)
 
                         latency = int((time.time() - start_time) * 1000)
@@ -341,12 +342,14 @@ class ProviderRouter:
                             cooldown = 3600 if is_unpayable else 60
                             ExperientialLabsModelManager.mark_model_failure(model_id, status_code=resp.status_code, cooldown_seconds=cooldown)
                             logger.warning("ExperientialLabs model %s returned HTTP %s (cooldown=%ss)", model_id, resp.status_code, cooldown)
+                            if is_unpayable:
+                                break  # Break immediately to fast alternative providers if credits exhausted
                             continue
 
                     except Exception:
-                        ExperientialLabsModelManager.mark_model_failure(model_id, status_code=500, cooldown_seconds=120)
-                        logger.warning("ExperientialLabs model %s failed", model_id, exc_info=True)
-                        continue
+                        ExperientialLabsModelManager.mark_model_failure(model_id, status_code=500, cooldown_seconds=300)
+                        logger.warning("ExperientialLabs model %s connection/timeout failed, breaking to fast providers", model_id, exc_info=True)
+                        break
 
         # 4. Check for OpenRouter provider
         openrouter_provider = db.scalar(
