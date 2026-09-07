@@ -2,6 +2,7 @@ import json
 import logging
 import re
 from typing import Annotated, Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -297,10 +298,39 @@ async def download_pptx(
             detail="Presentation storage is temporarily unavailable",
         ) from exc
 
-    safe_title = re.sub(r"[^A-Za-z0-9._-]+", "_", project.title).strip("._") or "presentation"
-    filename = f"{safe_title[:100]}_v{version}.pptx"
+    # 1. Prefer meaningful deckTitle from deck JSON artifact if available
+    raw_title = (project.title or "Presentation").strip()
+    if deck_ver.deck_json_artifact_id:
+        json_art = db.scalar(select(Artifact).where(Artifact.id == deck_ver.deck_json_artifact_id))
+        if json_art and json_art.json_data:
+            try:
+                deck_spec = json.loads(json_art.json_data)
+                candidate_title = deck_spec.get("deckTitle")
+                if candidate_title and isinstance(candidate_title, str) and len(candidate_title.strip()) > 2:
+                    raw_title = candidate_title.strip()
+            except Exception:
+                pass
+
+    # 2. Sanitize title: remove illegal filesystem characters (\/:*?"<>|), trailing periods/spaces
+    sanitized = re.sub(r'[\/\\:\*\?"<>|\r\n\t]+', "", raw_title)
+    sanitized = re.sub(r"\s+", " ", sanitized).strip(". ")
+    if not sanitized or len(sanitized) < 2:
+        sanitized = "Presentation"
+    sanitized = sanitized[:60].strip(". ")
+
+    # 3. ASCII slug for legacy HTTP header compliance (RFC 2616)
+    ascii_slug = re.sub(r"[^A-Za-z0-9_\-]+", "_", sanitized).strip("._") or "Presentation"
+    ascii_filename = f"{ascii_slug}_v{version}.pptx"
+
+    # 4. RFC 5987 / RFC 6266 UTF-8 encoded filename for modern browsers
+    utf8_filename = f"{sanitized}_v{version}.pptx"
+    encoded_utf8 = quote(utf8_filename, safe="")
+
     return Response(
         content=file_bytes,
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{ascii_filename}"; filename*=UTF-8\'\'{encoded_utf8}',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
     )

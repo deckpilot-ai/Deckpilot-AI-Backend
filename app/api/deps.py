@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import Cookie, Depends, Header, HTTPException, status
+from fastapi import Cookie, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.security import AUTH_COOKIE_NAME
@@ -14,11 +14,14 @@ from app.services.auth_service import AuthService
 def get_token(
     authorization: Annotated[str | None, Header()] = None,
     deckpilotai_token: Annotated[str | None, Cookie(alias=AUTH_COOKIE_NAME)] = None,
+    token: Annotated[str | None, Query()] = None,
 ) -> str | None:
     if authorization:
         scheme, _, credentials = authorization.partition(" ")
         if scheme.lower() == "bearer" and credentials.strip():
             return credentials.strip()
+    if token and token.strip():
+        return token.strip()
     if deckpilotai_token:
         return deckpilotai_token
     return None

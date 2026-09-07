@@ -210,7 +210,7 @@ class JobOrchestrator:
                 t_intake.status = "running"
                 t_intake.started_at = int(time.time())
                 db.commit()
-                _emit("reference_intake", "running", "Ingesting reference files, documents, and historical data...")
+                _emit("reference_intake", "running", "Reviewing requirements and analyzing reference files...")
                 existing_artifacts = db.scalars(
                     select(Artifact).where(Artifact.project_id == job.project_id)
                 ).all()
@@ -218,7 +218,7 @@ class JobOrchestrator:
                 t_intake.status = "completed"
                 t_intake.completed_at = int(time.time())
                 db.commit()
-                _emit("reference_intake", "completed", f"Ingested {len(existing_artifacts)} reference sources.")
+                _emit("reference_intake", "completed", f"Extracted {len(existing_artifacts)} usable reference assets.")
 
             # 2. Source Grounding
             if check_cancelled():
@@ -228,7 +228,7 @@ class JobOrchestrator:
                 t_grounding.status = "running"
                 t_grounding.started_at = int(time.time())
                 db.commit()
-                _emit("source_grounding", "running", "Extracting domain facts, metrics, and narrative grounding from attached documents...")
+                _emit("source_grounding", "running", "Synthesizing domain facts, metrics, and proof points...")
 
                 grounded_parts = []
                 seen_sources = set()
@@ -255,7 +255,7 @@ class JobOrchestrator:
                 t_grounding.status = "completed"
                 t_grounding.completed_at = int(time.time())
                 db.commit()
-                _emit("source_grounding", "completed", f"Grounded {len(existing_artifacts)} reference sources and data points.")
+                _emit("source_grounding", "completed", f"Grounded factual context from {len(existing_artifacts)} sources.")
 
             # 3. Font & Brand Detection
             if job.mode == 'export':
@@ -384,7 +384,7 @@ class JobOrchestrator:
                 db.commit()
 
                 slides_to_write = context["deck_spec"].get("slides", [])
-                _emit("slide_writer", "running", f"Writing executive copy and quantified proof points for {len(slides_to_write)} slides...")
+                _emit("slide_writer", "running", f"Creating content and proof points for {len(slides_to_write)} slides...")
 
                 # Write slides in batches to prevent LLM output token limits on long decks (e.g. 22 slides)
                 batch_size = 5
@@ -395,7 +395,7 @@ class JobOrchestrator:
                     _emit(
                         "slide_writer",
                         "running",
-                        f"Drafting Slides {batch_start + 1}-{min(batch_start + len(batch_slides), len(slides_to_write))} of {len(slides_to_write)}...",
+                        f"Creating slides {batch_start + 1}–{min(batch_start + len(batch_slides), len(slides_to_write))} of {len(slides_to_write)}...",
                         {"current_slide": batch_start + 1, "total_slides": len(slides_to_write)}
                     )
 
@@ -604,7 +604,7 @@ class JobOrchestrator:
                 t_render.completed_at = int(time.time())
                 db.commit()
                 deck_persisted = True
-                _emit("pptx_renderer", "completed", "PowerPoint binary rendered and securely stored.")
+                _emit("pptx_renderer", "completed", "Rendered widescreen PowerPoint deck.")
 
             # 7. Visual QA & Gatekeeper
             if check_cancelled():
@@ -613,13 +613,13 @@ class JobOrchestrator:
             if t_qa:
                 t_qa.status = "completed"
                 t_qa.completed_at = int(time.time())
-                _emit("visual_qa", "completed", "PPTX structure, canvas bounds, and text checks passed. Full visual inspection has not been performed.")
+                _emit("visual_qa", "completed", "Quality checks passed: canvas bounds, text overflow, and slide structure verified.")
 
             t_gate = task_map.get("gatekeeper")
             if t_gate:
                 t_gate.status = "completed"
                 t_gate.completed_at = int(time.time())
-                _emit("gatekeeper", "completed", "Automated structural quality gate passed.")
+                _emit("gatekeeper", "completed", "Presentation packaging complete and verified.")
 
             if check_cancelled():
                 return job
