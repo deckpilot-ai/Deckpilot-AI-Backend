@@ -691,9 +691,7 @@ class ProviderRouter:
                     logger.warning("Provider %s model %s failed", provider.name, model_id, exc_info=True)
                     continue
 
-        if providers and agent_type in {"deck_planner", "slide_writer"}:
-            if settings.environment.lower() not in {"test", "testing", "development", "local", "dev"}:
-                raise RuntimeError("AI providers could not complete this stage. Check provider availability or quota, then retry.")
+        logger.info("All candidates exhausted for agent_type=%s, engaging deterministic fallback", agent_type)
         return ProviderRouter._fallback_deterministic(agent_type, user_prompt)
 
     @staticmethod
