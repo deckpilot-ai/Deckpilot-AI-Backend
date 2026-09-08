@@ -58,7 +58,28 @@ def main():
     )
     t_up0 = time.perf_counter()
     att = api_call(upload_req, timeout=60)
-    print(f"Uploaded PDF in {time.perf_counter()-t_up0:.1f}s! Attachment ID: {att['id']}, status: {att['status']}")
+    att_id = att['id']
+    print(f"Uploaded PDF in {time.perf_counter()-t_up0:.1f}s! Attachment ID: {att_id}, status: {att['status']}")
+
+    # Wait for detached extraction pipeline to finish
+    print("Waiting for background document extraction to complete...")
+    for _ in range(30):
+        get_att_req = urllib.request.Request(
+            f'https://deckpilot-ai-backend.onrender.com/api/v1/projects/{project_id}/attachments/{att_id}',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        try:
+            curr_att = api_call(get_att_req, timeout=15)
+            print(f"  Attachment status: {curr_att.get('status')}")
+            if curr_att.get('status') == 'ready':
+                print("  Document extraction complete and all artifacts indexed in DB!")
+                break
+            elif curr_att.get('status') == 'failed':
+                print("  Extraction failed!")
+                break
+        except Exception as e:
+            print(f"  Polling attachment error: {e}")
+        time.sleep(3)
 
     # 4. Trigger 22-slide presentation generation
     print("4. Starting 22-slide presentation generation job...")

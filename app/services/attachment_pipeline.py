@@ -156,8 +156,9 @@ async def _process_with_session(db: Session, attachment_id: str) -> None:
             raise
 
         try:
+            artifacts_to_add = []
             for tb in extraction.text_blocks:
-                db.add(
+                artifacts_to_add.append(
                     Artifact(
                         project_id=project_id,
                         attachment_id=attachment.id,
@@ -167,7 +168,7 @@ async def _process_with_session(db: Session, attachment_id: str) -> None:
                     )
                 )
             for tbl in extraction.tables:
-                db.add(
+                artifacts_to_add.append(
                     Artifact(
                         project_id=project_id,
                         attachment_id=attachment.id,
@@ -177,7 +178,7 @@ async def _process_with_session(db: Session, attachment_id: str) -> None:
                     )
                 )
             for img in extraction.extracted_images:
-                db.add(
+                artifacts_to_add.append(
                     Artifact(
                         project_id=project_id,
                         attachment_id=attachment.id,
@@ -187,6 +188,8 @@ async def _process_with_session(db: Session, attachment_id: str) -> None:
                         source_locator=img.get("source") or f"{filename}#page={img.get('page', 1)}",
                     )
                 )
+            if artifacts_to_add:
+                db.add_all(artifacts_to_add)
             attachment.status = "ready"
             db.commit()
 

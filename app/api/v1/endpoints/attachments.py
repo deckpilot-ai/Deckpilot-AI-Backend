@@ -126,7 +126,7 @@ async def upload_attachment(
 
 
 @router.get("", response_model=list[AttachmentOut])
-def list_attachments(
+async def list_attachments(
     project_id: str,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
@@ -141,7 +141,7 @@ def list_attachments(
 
 
 @router.get("/{attachment_id}", response_model=AttachmentOut)
-def get_attachment(
+async def get_attachment(
     project_id: str,
     attachment_id: str,
     current_user: Annotated[User, Depends(get_current_user)],
