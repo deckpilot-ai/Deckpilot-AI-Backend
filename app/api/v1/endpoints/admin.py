@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Annotated, Any
 
@@ -22,6 +23,8 @@ from app.services.diagnostics_service import DiagnosticsService
 from app.services.experientiallabs_models import ExperientialLabsModelManager
 from app.services.openrouter_models import OpenRouterModelManager
 from app.services.provider_router import ProviderRouter
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -95,7 +98,11 @@ def list_providers(
     db: Annotated[Session, Depends(get_db)],
 ):
     # Synchronize environment providers first
-    ProviderRouter.sync_environment_providers(db)
+    try:
+        ProviderRouter.sync_environment_providers(db)
+    except Exception:
+        db.rollback()
+        logger.warning("sync_environment_providers failed during list_providers", exc_info=True)
 
     providers = db.scalars(select(AIProvider).order_by(AIProvider.priority.desc())).all()
     result = []
@@ -146,7 +153,12 @@ def get_providers_status(
     db: Annotated[Session, Depends(get_db)],
 ):
     """High-level status of AI providers and active free model cascade."""
-    ProviderRouter.sync_environment_providers(db)
+    try:
+        ProviderRouter.sync_environment_providers(db)
+    except Exception:
+        db.rollback()
+        logger.warning("sync_environment_providers failed during get_providers_status", exc_info=True)
+
     providers = db.scalars(select(AIProvider).order_by(AIProvider.priority.desc())).all()
 
     openrouter_active = False

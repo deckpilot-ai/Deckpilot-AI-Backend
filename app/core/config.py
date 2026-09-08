@@ -83,6 +83,10 @@ class Settings(BaseSettings):
         return self.sqlite_database_url
 
     @property
+    def environment(self) -> str:
+        return self.app_env
+
+    @property
     def is_secure_environment(self) -> bool:
         return self.app_env in {"staging", "production"}
 
