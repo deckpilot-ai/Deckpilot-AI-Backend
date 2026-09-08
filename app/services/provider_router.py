@@ -1,4 +1,4 @@
-"""AI Provider Router, Key Security, and OpenRouter Free Model Cascade Engine."""
+"""AI Provider Router, Key Security, and Dynamic Model Priority Routing Engine."""
 
 import json
 import logging
@@ -18,7 +18,7 @@ from app.core.encryption import (
 )
 from app.core.network_security import validate_provider_base_url
 from app.models.audit import UsageEvent
-from app.models.provider import AgentRoute, AIKey, AIProvider
+from app.models.provider import AgentRoute, AIKey, AIProvider, AIProviderModel
 from app.services.diagnostics_service import DiagnosticsService
 from app.services.experientiallabs_models import ExperientialLabsModelManager
 from app.services.openrouter_models import OpenRouterModelManager
@@ -57,7 +57,6 @@ def _parse_llm_response(content: str, response_schema: Any | None) -> dict[str, 
 
     # If all JSON parsing attempts fail, return text wrapped in dict
     return {"text": cleaned}
-
 
 
 class ProviderRouter:
@@ -148,6 +147,46 @@ class ProviderRouter:
         return provider
 
     @staticmethod
+    def update_provider(
+        db: Session,
+        provider_id: str,
+        name: str | None = None,
+        base_url: str | None = None,
+        provider_type: str | None = None,
+        priority: int | None = None,
+        enabled: int | None = None,
+    ) -> AIProvider:
+        provider = db.scalar(select(AIProvider).where(AIProvider.id == provider_id))
+        if not provider:
+            raise ValueError("Provider not found")
+        if name is not None and name.strip():
+            # Check unique constraint if name changes
+            if name.strip() != provider.name:
+                conflict = db.scalar(select(AIProvider).where(AIProvider.name == name.strip()))
+                if conflict:
+                    raise ValueError(f"Provider with name '{name.strip()}' already exists")
+                provider.name = name.strip()
+        if base_url is not None and base_url.strip():
+            provider.base_url = validate_provider_base_url(base_url.strip())
+        if provider_type is not None and provider_type.strip():
+            provider.provider_type = provider_type.strip()
+        if priority is not None:
+            provider.priority = int(priority)
+        if enabled is not None:
+            provider.enabled = 1 if enabled in (1, True, "1") else 0
+
+        db.commit()
+        db.refresh(provider)
+        return provider
+
+    @staticmethod
+    def delete_provider(db: Session, provider_id: str) -> None:
+        provider = db.scalar(select(AIProvider).where(AIProvider.id == provider_id))
+        if provider:
+            db.delete(provider)
+            db.commit()
+
+    @staticmethod
     def add_key(
         db: Session,
         provider_id: str,
@@ -228,6 +267,159 @@ class ProviderRouter:
         return key, decrypted
 
     @staticmethod
+    async def fetch_provider_models(
+        base_url: str,
+        api_key: str | None = None,
+        provider_type: str = "openai_compatible",
+    ) -> list[dict[str, Any]]:
+        """Fetch available models dynamically from any OpenAI-compatible or standard AI provider endpoint."""
+        cleaned_url = base_url.strip().rstrip("/")
+        if cleaned_url.endswith("/chat/completions"):
+            cleaned_url = cleaned_url[:-len("/chat/completions")].rstrip("/")
+
+        candidate_urls = [f"{cleaned_url}/models"]
+        if not cleaned_url.endswith("/v1"):
+            candidate_urls.append(f"{cleaned_url}/v1/models")
+
+        headers: dict[str, str] = {
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://deckpilot.ai",
+            "X-Title": "deckpilotAI",
+        }
+        if api_key and api_key.strip():
+            headers["Authorization"] = f"Bearer {api_key.strip()}"
+
+        last_error = "Unable to connect to models endpoint"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(12.0, connect=5.0)) as client:
+            for url in candidate_urls:
+                try:
+                    resp = await client.get(url, headers=headers)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        models_raw = []
+                        if isinstance(data, dict):
+                            if "data" in data and isinstance(data["data"], list):
+                                models_raw = data["data"]
+                            elif "models" in data and isinstance(data["models"], list):
+                                models_raw = data["models"]
+                            elif "items" in data and isinstance(data["items"], list):
+                                models_raw = data["items"]
+                        elif isinstance(data, list):
+                            models_raw = data
+
+                        discovered: list[dict[str, Any]] = []
+                        for idx, item in enumerate(models_raw):
+                            if isinstance(item, str):
+                                m_id = item.strip()
+                                discovered.append({
+                                    "id": m_id,
+                                    "name": m_id,
+                                    "context_length": None,
+                                    "description": None,
+                                    "default_priority": max(100 - (idx * 5), 1),
+                                })
+                            elif isinstance(item, dict) and "id" in item:
+                                m_id = str(item["id"]).strip()
+                                name = str(item.get("name") or m_id)
+                                ctx = item.get("context_length") or item.get("context_window") or item.get("max_tokens")
+                                desc_str = item.get("description")
+                                discovered.append({
+                                    "id": m_id,
+                                    "name": name,
+                                    "context_length": int(ctx) if ctx and str(ctx).isdigit() else None,
+                                    "description": str(desc_str) if desc_str else None,
+                                    "default_priority": max(100 - (idx * 5), 1),
+                                })
+                        if discovered:
+                            return discovered
+                    else:
+                        last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                except Exception as err:
+                    last_error = str(err)
+
+        raise ValueError(f"Failed to fetch models: {last_error}")
+
+    @staticmethod
+    def save_provider_models(
+        db: Session,
+        provider_id: str,
+        models_data: list[dict[str, Any]],
+    ) -> list[AIProviderModel]:
+        """Upsert models and their priorities for a provider."""
+        provider = db.scalar(select(AIProvider).where(AIProvider.id == provider_id))
+        if not provider:
+            raise ValueError("Provider not found")
+
+        saved_models: list[AIProviderModel] = []
+        for item in models_data:
+            model_id = str(item.get("model_id") or item.get("id") or "").strip()
+            if not model_id:
+                continue
+            priority = int(item.get("priority", 1))
+            enabled = 1 if item.get("enabled", True) in (True, 1, "1") else 0
+            display_name = item.get("display_name") or item.get("name")
+            ctx_len = item.get("context_length")
+
+            existing = db.scalar(
+                select(AIProviderModel).where(
+                    AIProviderModel.provider_id == provider_id,
+                    AIProviderModel.model_id == model_id,
+                )
+            )
+            if existing:
+                existing.priority = priority
+                existing.enabled = enabled
+                if display_name:
+                    existing.display_name = str(display_name)
+                if ctx_len is not None:
+                    existing.context_length = int(ctx_len) if str(ctx_len).isdigit() else None
+                saved_models.append(existing)
+            else:
+                new_model = AIProviderModel(
+                    provider_id=provider_id,
+                    model_id=model_id,
+                    display_name=str(display_name) if display_name else None,
+                    priority=priority,
+                    enabled=enabled,
+                    context_length=int(ctx_len) if ctx_len and str(ctx_len).isdigit() else None,
+                )
+                db.add(new_model)
+                saved_models.append(new_model)
+
+        db.commit()
+        for m in saved_models:
+            db.refresh(m)
+        return saved_models
+
+    @staticmethod
+    def update_provider_model(
+        db: Session,
+        model_db_id: str,
+        priority: int | None = None,
+        enabled: int | None = None,
+        display_name: str | None = None,
+    ) -> AIProviderModel:
+        model = db.scalar(select(AIProviderModel).where(AIProviderModel.id == model_db_id))
+        if not model:
+            raise ValueError("Model configuration not found")
+        if priority is not None:
+            model.priority = int(priority)
+        if enabled is not None:
+            model.enabled = 1 if enabled in (1, True, "1") else 0
+        if display_name is not None:
+            model.display_name = display_name
+        db.commit()
+        db.refresh(model)
+        return model
+
+    @staticmethod
+    def delete_provider_model(db: Session, model_db_id: str) -> None:
+        model = db.scalar(select(AIProviderModel).where(AIProviderModel.id == model_db_id))
+        if model:
+            db.delete(model)
+            db.commit()
+
+    @staticmethod
     async def call_llm(
         db: Session,
         agent_type: str,
@@ -238,428 +430,194 @@ class ProviderRouter:
         job_id: str | None = None,
     ) -> dict[str, Any]:
         """
-        Executes an LLM call through the quality-sequenced cascade.
-        Automatically tries highest quality free model first; if it fails, passes the exact context
-        to the next free model in sequence.
+        Executes an LLM call through configured providers in descending priority order.
+        For each provider, tries configured models in descending model-priority sequence.
         """
         now = int(time.time())
 
         # 1. Ensure providers from environment are synchronized
         ProviderRouter.sync_environment_providers(db)
 
-        # 2. Check for ExperientialLabs provider
-        explabs_provider = db.scalar(
-            select(AIProvider).where(AIProvider.name == "experientiallabs", AIProvider.enabled == 1)
-        )
-
-        # 3. If ExperientialLabs is available, execute ExperientialLabs Free Model Cascade
-        if explabs_provider:
-            try:
-                explabs_base_url = validate_provider_base_url(explabs_provider.base_url)
-            except ValueError:
-                logger.error("Disabled unsafe ExperientialLabs provider URL for provider %s", explabs_provider.id)
-                explabs_provider.enabled = 0
-                db.commit()
-                explabs_provider = None
-
-        if explabs_provider:
-            active_key_tuple = ProviderRouter.select_active_key(db, explabs_provider.id)
-            if active_key_tuple:
-                key_record, secret_key = active_key_tuple
-                ranked_free_models = await ExperientialLabsModelManager.get_ranked_candidates(
-                    api_key=secret_key,
-                    base_url=explabs_base_url,
-                )
-
-                for candidate in ranked_free_models[:5]:
-                    model_id = candidate["id"]
-                    start_time = time.time()
-                    logger.info(
-                        "Trying ExperientialLabs model %s for agent %s (quality_score=%s)",
-                        model_id,
-                        agent_type,
-                        candidate.get("quality_score"),
-                    )
-
-                    try:
-                        url = f"{explabs_base_url}/chat/completions"
-                        headers = {
-                            "Authorization": f"Bearer {secret_key}",
-                            "Content-Type": "application/json",
-                            "HTTP-Referer": "https://deckpilot.ai",
-                            "X-Title": "deckpilotAI",
-                        }
-                        sys_prompt_final = system_prompt
-                        if response_schema and "json" not in sys_prompt_final.lower():
-                            sys_prompt_final += "\n\nRespond with valid JSON matching the requested structure."
-
-                        is_reasoning_model = any(m in model_id.lower() for m in ("o1", "o3", "reasoner", "r1"))
-                        payload: dict[str, Any] = {
-                            "model": model_id,
-                            "messages": [
-                                {"role": "system", "content": sys_prompt_final},
-                                {"role": "user", "content": user_prompt},
-                            ],
-                        }
-                        if not is_reasoning_model:
-                            payload["temperature"] = 0.2
-
-                        explabs_timeout = httpx.Timeout(min(float(settings.llm_read_timeout_seconds), 15.0), connect=4.0)
-                        async with httpx.AsyncClient(timeout=explabs_timeout) as client:
-                            resp = await client.post(url, headers=headers, json=payload)
-                            if resp.status_code == 400 and "temperature" in resp.text:
-                                payload.pop("temperature", None)
-                                resp = await client.post(url, headers=headers, json=payload)
-
-                        latency = int((time.time() - start_time) * 1000)
-
-                        if resp.status_code == 200:
-                            resp_data = resp.json()
-                            content = resp_data["choices"][0]["message"]["content"]
-                            parsed = _parse_llm_response(content, response_schema)
-
-                            ExperientialLabsModelManager.mark_model_success(model_id)
-                            key_record.last_used_at = now
-                            key_record.failure_count = 0
-                            db.commit()
-
-                            if user_id:
-                                try:
-                                    usage = UsageEvent(
-                                        user_id=user_id,
-                                        job_id=job_id,
-                                        provider_id=explabs_provider.id,
-                                        key_id=key_record.id,
-                                        model=model_id,
-                                        event_type="generation",
-                                        latency_ms=latency,
-                                        success=1,
-                                        created_at=now,
-                                        input_units=resp_data.get("usage", {}).get("prompt_tokens", 0),
-                                        output_units=resp_data.get("usage", {}).get("completion_tokens", 0),
-                                    )
-                                    db.add(usage)
-                                    db.commit()
-                                except Exception:
-                                    db.rollback()
-                                    logger.warning("Failed to persist UsageEvent for ExperientialLabs", exc_info=True)
-
-                            logger.info("ExperientialLabs model %s completed in %sms", model_id, latency)
-                            if latency > settings.slow_llm_threshold_ms:
-                                DiagnosticsService.log_slow_operation(
-                                    component="llm",
-                                    operation=f"chat_completions ({agent_type})",
-                                    duration_ms=latency,
-                                    threshold_ms=settings.slow_llm_threshold_ms,
-                                    provider="experientiallabs",
-                                    additional_context={"model": model_id, "user_id": user_id, "job_id": job_id},
-                                )
-                            return parsed
-
-                        else:
-                            raw_text = resp.text if isinstance(getattr(resp, "text", None), str) else ""
-                            is_unpayable = resp.status_code == 429 and ("model_requires_payment" in raw_text or "free credits" in raw_text)
-                            cooldown = 3600 if is_unpayable else 60
-                            ExperientialLabsModelManager.mark_model_failure(model_id, status_code=resp.status_code, cooldown_seconds=cooldown)
-                            DiagnosticsService.log_external_api_failure(
-                                provider="experientiallabs",
-                                operation=f"chat_completions ({agent_type})",
-                                error=f"HTTP {resp.status_code}: {raw_text[:300]}",
-                                model_name=model_id,
-                                provider_status_code=resp.status_code,
-                                duration_ms=latency,
-                                additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
-                            )
-                            logger.warning("ExperientialLabs model %s returned HTTP %s (cooldown=%ss)", model_id, resp.status_code, cooldown)
-                            if is_unpayable:
-                                break  # Break immediately to fast alternative providers if credits exhausted
-                            continue
-
-                    except Exception as explabs_err:
-                        ExperientialLabsModelManager.mark_model_failure(model_id, status_code=500, cooldown_seconds=300)
-                        DiagnosticsService.log_external_api_failure(
-                            provider="experientiallabs",
-                            operation=f"chat_completions ({agent_type})",
-                            error=explabs_err,
-                            model_name=model_id,
-                            duration_ms=int((time.time() - start_time) * 1000),
-                            additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
-                        )
-                        logger.warning("ExperientialLabs model %s connection/timeout failed, breaking to fast providers", model_id, exc_info=True)
-                        break
-
-        # 4. Check for OpenRouter provider
-        openrouter_provider = db.scalar(
-            select(AIProvider).where(AIProvider.name == "openrouter", AIProvider.enabled == 1)
-        )
-
-        # 5. If OpenRouter is available, execute dynamic Free Model Quality Cascade
-        if openrouter_provider:
-            try:
-                openrouter_base_url = validate_provider_base_url(openrouter_provider.base_url)
-            except ValueError:
-                logger.error("Disabled unsafe OpenRouter provider URL for provider %s", openrouter_provider.id)
-                openrouter_provider.enabled = 0
-                db.commit()
-                openrouter_provider = None
-
-        if openrouter_provider:
-            active_key_tuple = ProviderRouter.select_active_key(db, openrouter_provider.id)
-            if active_key_tuple:
-                key_record, secret_key = active_key_tuple
-                
-                # Fetch free models sorted by quality score descending (highest quality first)
-                ranked_free_models = await OpenRouterModelManager.get_ranked_candidates()
-
-                # Try top 4 highest-quality candidates with snappy timeout (prevents long hangs)
-                for candidate in ranked_free_models[:4]:
-                    model_id = candidate["id"]
-                    start_time = time.time()
-                    logger.info(
-                        "Trying OpenRouter model %s for agent %s (quality_score=%s)",
-                        model_id,
-                        agent_type,
-                        candidate.get("quality_score"),
-                    )
-
-                    try:
-                        url = f"{openrouter_base_url}/chat/completions"
-                        headers = {
-                            "Authorization": f"Bearer {secret_key}",
-                            "Content-Type": "application/json",
-                            "HTTP-Referer": "https://deckpilot.ai",
-                            "X-Title": "deckpilotAI",
-                        }
-                        sys_prompt_final = system_prompt
-                        if response_schema and "json" not in sys_prompt_final.lower():
-                            sys_prompt_final += "\n\nRespond with valid JSON matching the requested structure."
-
-                        is_reasoning_model = any(m in model_id.lower() for m in ("o1", "o3", "reasoner", "r1"))
-                        payload: dict[str, Any] = {
-                            "model": model_id,
-                            "messages": [
-                                {"role": "system", "content": sys_prompt_final},
-                                {"role": "user", "content": user_prompt},
-                            ],
-                        }
-                        if not is_reasoning_model:
-                            payload["temperature"] = 0.2
-
-                        async with httpx.AsyncClient(timeout=httpx.Timeout(settings.llm_read_timeout_seconds, connect=10.0)) as client:
-                            resp = await client.post(url, headers=headers, json=payload)
-                            if resp.status_code == 400 and "temperature" in resp.text:
-                                payload.pop("temperature", None)
-                                resp = await client.post(url, headers=headers, json=payload)
-
-                        latency = int((time.time() - start_time) * 1000)
-
-                        if resp.status_code == 200:
-                            resp_data = resp.json()
-                            content = resp_data["choices"][0]["message"]["content"]
-                            
-                            parsed = _parse_llm_response(content, response_schema)
-
-                            # Mark success on model and key
-                            OpenRouterModelManager.mark_model_success(model_id)
-                            key_record.last_used_at = now
-                            key_record.failure_count = 0
-                            db.commit()
-
-                            # Record audit usage event
-                            if user_id:
-                                try:
-                                    usage = UsageEvent(
-                                        user_id=user_id,
-                                        job_id=job_id,
-                                        provider_id=openrouter_provider.id,
-                                        key_id=key_record.id,
-                                        model=model_id,
-                                        event_type="generation",
-                                        latency_ms=latency,
-                                        success=1,
-                                        created_at=now,
-                                        input_units=resp_data.get("usage", {}).get("prompt_tokens", 0),
-                                        output_units=resp_data.get("usage", {}).get("completion_tokens", 0),
-                                    )
-                                    db.add(usage)
-                                    db.commit()
-                                except Exception:
-                                    db.rollback()
-                                    logger.warning("Failed to persist UsageEvent for OpenRouter", exc_info=True)
-
-                            logger.info("OpenRouter model %s completed in %sms", model_id, latency)
-                            if latency > settings.slow_llm_threshold_ms:
-                                DiagnosticsService.log_slow_operation(
-                                    component="llm",
-                                    operation=f"chat_completions ({agent_type})",
-                                    duration_ms=latency,
-                                    threshold_ms=settings.slow_llm_threshold_ms,
-                                    provider="openrouter",
-                                    additional_context={"model": model_id, "user_id": user_id, "job_id": job_id},
-                                )
-                            return parsed
-
-                        else:
-                            # Model returned non-200 (e.g. 429 rate limit, 503 capacity limit, 500 error)
-                            OpenRouterModelManager.mark_model_failure(model_id, status_code=resp.status_code)
-                            raw_err = resp.text[:300] if isinstance(getattr(resp, "text", None), str) else ""
-                            DiagnosticsService.log_external_api_failure(
-                                provider="openrouter",
-                                operation=f"chat_completions ({agent_type})",
-                                error=f"HTTP {resp.status_code}: {raw_err}",
-                                model_name=model_id,
-                                provider_status_code=resp.status_code,
-                                provider_request_id=resp.headers.get("x-request-id") or resp.headers.get("cf-ray"),
-                                duration_ms=latency,
-                                additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
-                            )
-                            logger.warning("OpenRouter model %s returned HTTP %s", model_id, resp.status_code)
-                            continue  # Hand over context to next model in quality sequence!
-
-                    except Exception as or_err:
-                        OpenRouterModelManager.mark_model_failure(model_id, status_code=500)
-                        DiagnosticsService.log_external_api_failure(
-                            provider="openrouter",
-                            operation=f"chat_completions ({agent_type})",
-                            error=or_err,
-                            model_name=model_id,
-                            duration_ms=int((time.time() - start_time) * 1000),
-                            additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
-                        )
-                        logger.warning("OpenRouter model %s failed", model_id, exc_info=True)
-                        continue  # Hand over context to next model in quality sequence!
-
-        # 6. Fallback to other providers configured in database (Groq, Gemini, OpenAI, etc.)
-        other_providers = db.scalars(
+        # 2. Get all enabled providers sorted by provider priority (descending)
+        providers = db.scalars(
             select(AIProvider)
-            .where(AIProvider.name.notin_(["openrouter", "experientiallabs"]), AIProvider.enabled == 1)
+            .where(AIProvider.enabled == 1)
             .order_by(desc(AIProvider.priority))
         ).all()
 
-        for provider in other_providers:
+        for provider in providers:
             try:
                 provider_base_url = validate_provider_base_url(provider.base_url)
             except ValueError:
-                logger.error("Skipping unsafe provider URL for provider %s", provider.id)
+                logger.error("Disabled unsafe provider URL for provider %s (%s)", provider.name, provider.id)
                 provider.enabled = 0
                 db.commit()
                 continue
 
-            key_tuple = ProviderRouter.select_active_key(db, provider.id)
-            if not key_tuple:
+            active_key_tuple = ProviderRouter.select_active_key(db, provider.id)
+            if not active_key_tuple:
                 continue
+            key_record, secret_key = active_key_tuple
 
-            key_rec, secret_val = key_tuple
-            p_name = provider.name.lower()
-            if "groq" in p_name:
-                model_name = "openai/gpt-oss-120b"
-            elif "gemini" in p_name:
-                model_name = settings.gemini_model
-            elif "openai" in p_name:
-                model_name = "gpt-4o-mini"
-            elif "mistral" in p_name:
-                model_name = "mistral-small-latest"
+            # Check if this provider has configured custom models
+            configured_models = db.scalars(
+                select(AIProviderModel)
+                .where(AIProviderModel.provider_id == provider.id, AIProviderModel.enabled == 1)
+                .order_by(desc(AIProviderModel.priority))
+            ).all()
+
+            # Determine list of candidate model IDs to attempt
+            model_candidates: list[str] = []
+            if configured_models:
+                model_candidates = [m.model_id for m in configured_models]
+            elif provider.name == "experientiallabs":
+                ranked = await ExperientialLabsModelManager.get_ranked_candidates(
+                    api_key=secret_key, base_url=provider_base_url
+                )
+                model_candidates = [m["id"] for m in ranked[:5]]
+            elif provider.name == "openrouter":
+                ranked = await OpenRouterModelManager.get_ranked_candidates()
+                model_candidates = [m["id"] for m in ranked[:4]]
             else:
-                model_name = "default"
+                p_name = provider.name.lower()
+                if "groq" in p_name:
+                    model_candidates = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
+                elif "gemini" in p_name:
+                    model_candidates = [settings.gemini_model, "gemini-1.5-flash"]
+                elif "openai" in p_name:
+                    model_candidates = ["gpt-4o-mini", "gpt-4o"]
+                elif "mistral" in p_name:
+                    model_candidates = ["mistral-small-latest", "mistral-large-latest"]
+                else:
+                    model_candidates = ["default"]
 
-            start_time = time.time()
-            try:
-                url = f"{provider_base_url}/chat/completions"
-                headers = {
-                    "Authorization": f"Bearer {secret_val}",
-                    "Content-Type": "application/json",
-                }
-                sys_prompt_final = system_prompt
-                if response_schema and "json" not in sys_prompt_final.lower():
-                    sys_prompt_final += "\n\nRespond with valid JSON."
+            for model_id in model_candidates:
+                start_time = time.time()
+                logger.info(
+                    "Trying Provider %s model %s for agent %s",
+                    provider.name,
+                    model_id,
+                    agent_type,
+                )
 
-                is_reasoning_model = any(m in model_name.lower() for m in ("o1", "o3", "reasoner", "r1"))
-                payload = {
-                    "model": model_name,
-                    "messages": [
-                        {"role": "system", "content": sys_prompt_final},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                }
-                if not is_reasoning_model:
-                    payload["temperature"] = 0.2
-                if response_schema:
-                    payload["response_format"] = {"type": "json_object"}
+                try:
+                    url = f"{provider_base_url}/chat/completions"
+                    headers = {
+                        "Authorization": f"Bearer {secret_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://deckpilot.ai",
+                        "X-Title": "deckpilotAI",
+                    }
+                    sys_prompt_final = system_prompt
+                    if response_schema and "json" not in sys_prompt_final.lower():
+                        sys_prompt_final += "\n\nRespond with valid JSON matching the requested structure."
 
-                async with httpx.AsyncClient(timeout=httpx.Timeout(settings.llm_read_timeout_seconds, connect=10.0)) as client:
-                    resp = await client.post(url, headers=headers, json=payload)
-                    if resp.status_code == 400 and "temperature" in resp.text:
-                        payload.pop("temperature", None)
+                    is_reasoning_model = any(m in model_id.lower() for m in ("o1", "o3", "reasoner", "r1"))
+                    payload: dict[str, Any] = {
+                        "model": model_id,
+                        "messages": [
+                            {"role": "system", "content": sys_prompt_final},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                    }
+                    if not is_reasoning_model:
+                        payload["temperature"] = 0.2
+
+                    req_timeout = httpx.Timeout(min(float(settings.llm_read_timeout_seconds), 25.0), connect=5.0)
+                    async with httpx.AsyncClient(timeout=req_timeout) as client:
                         resp = await client.post(url, headers=headers, json=payload)
+                        if resp.status_code == 400 and "temperature" in resp.text:
+                            payload.pop("temperature", None)
+                            resp = await client.post(url, headers=headers, json=payload)
 
-                if resp.status_code == 200:
-                    resp_data = resp.json()
-                    content = resp_data["choices"][0]["message"]["content"]
-                    parsed = _parse_llm_response(content, response_schema)
                     latency = int((time.time() - start_time) * 1000)
-                    key_rec.last_used_at = now
-                    key_rec.failure_count = 0
-                    db.commit()
 
-                    if user_id:
-                        try:
-                            usage = UsageEvent(
-                                user_id=user_id,
-                                job_id=job_id,
-                                provider_id=provider.id,
-                                key_id=key_rec.id,
-                                model=model_name,
-                                event_type="generation",
-                                latency_ms=latency,
-                                success=1,
-                                created_at=now,
-                                input_units=resp_data.get("usage", {}).get("prompt_tokens", 0),
-                                output_units=resp_data.get("usage", {}).get("completion_tokens", 0),
+                    if resp.status_code == 200:
+                        resp_data = resp.json()
+                        content = resp_data["choices"][0]["message"]["content"]
+                        parsed = _parse_llm_response(content, response_schema)
+
+                        if provider.name == "openrouter":
+                            OpenRouterModelManager.mark_model_success(model_id)
+                        elif provider.name == "experientiallabs":
+                            ExperientialLabsModelManager.mark_model_success(model_id)
+
+                        key_record.last_used_at = now
+                        key_record.failure_count = 0
+                        db.commit()
+
+                        if user_id:
+                            try:
+                                usage = UsageEvent(
+                                    user_id=user_id,
+                                    job_id=job_id,
+                                    provider_id=provider.id,
+                                    key_id=key_record.id,
+                                    model=model_id,
+                                    event_type="generation",
+                                    latency_ms=latency,
+                                    success=1,
+                                    created_at=now,
+                                    input_units=resp_data.get("usage", {}).get("prompt_tokens", 0),
+                                    output_units=resp_data.get("usage", {}).get("completion_tokens", 0),
+                                )
+                                db.add(usage)
+                                db.commit()
+                            except Exception:
+                                db.rollback()
+                                logger.warning("Failed to persist UsageEvent for %s", provider.name, exc_info=True)
+
+                        logger.info("Provider %s model %s completed in %sms", provider.name, model_id, latency)
+                        if latency > settings.slow_llm_threshold_ms:
+                            DiagnosticsService.log_slow_operation(
+                                component="llm",
+                                operation=f"chat_completions ({agent_type})",
+                                duration_ms=latency,
+                                threshold_ms=settings.slow_llm_threshold_ms,
+                                provider=provider.name,
+                                additional_context={"model": model_id, "user_id": user_id, "job_id": job_id},
                             )
-                            db.add(usage)
-                            db.commit()
-                        except Exception:
-                            db.rollback()
-                            logger.warning("Failed to persist UsageEvent for custom provider", exc_info=True)
+                        return parsed
 
-                    logger.info("Provider %s model %s completed in %sms", provider.name, model_name, latency)
-                    if latency > settings.slow_llm_threshold_ms:
-                        DiagnosticsService.log_slow_operation(
-                            component="llm",
-                            operation=f"chat_completions ({agent_type})",
-                            duration_ms=latency,
-                            threshold_ms=settings.slow_llm_threshold_ms,
+                    else:
+                        raw_text = resp.text if isinstance(getattr(resp, "text", None), str) else ""
+                        if provider.name == "openrouter":
+                            OpenRouterModelManager.mark_model_failure(model_id, status_code=resp.status_code)
+                        elif provider.name == "experientiallabs":
+                            is_unpayable = resp.status_code == 429 and ("model_requires_payment" in raw_text or "free credits" in raw_text)
+                            cooldown = 3600 if is_unpayable else 60
+                            ExperientialLabsModelManager.mark_model_failure(model_id, status_code=resp.status_code, cooldown_seconds=cooldown)
+
+                        DiagnosticsService.log_external_api_failure(
                             provider=provider.name,
-                            additional_context={"model": model_name, "user_id": user_id, "job_id": job_id},
+                            operation=f"chat_completions ({agent_type})",
+                            error=f"HTTP {resp.status_code}: {raw_text[:300]}",
+                            model_name=model_id,
+                            provider_status_code=resp.status_code,
+                            duration_ms=latency,
+                            additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
                         )
-                    return parsed
+                        logger.warning("Provider %s model %s returned HTTP %s", provider.name, model_id, resp.status_code)
+                        continue
 
-                raw_err = resp.text[:300] if isinstance(getattr(resp, "text", None), str) else ""
-                DiagnosticsService.log_external_api_failure(
-                    provider=provider.name,
-                    operation=f"chat_completions ({agent_type})",
-                    error=f"HTTP {resp.status_code}: {raw_err}",
-                    model_name=model_name,
-                    provider_status_code=resp.status_code,
-                    duration_ms=latency,
-                    additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
-                )
-                logger.warning("Provider %s model %s returned HTTP %s", p_name, model_name, resp.status_code)
-            except Exception as other_err:
-                DiagnosticsService.log_external_api_failure(
-                    provider=provider.name,
-                    operation=f"chat_completions ({agent_type})",
-                    error=other_err,
-                    model_name=model_name,
-                    duration_ms=int((time.time() - start_time) * 1000),
-                    additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
-                )
-                logger.warning("Provider %s failed", provider.name, exc_info=True)
-                continue
+                except Exception as model_err:
+                    if provider.name == "openrouter":
+                        OpenRouterModelManager.mark_model_failure(model_id, status_code=500)
+                    elif provider.name == "experientiallabs":
+                        ExperientialLabsModelManager.mark_model_failure(model_id, status_code=500, cooldown_seconds=300)
 
-        # Offline outlines are useful without configured providers. Do not mislabel
-        # a quota failure or bad response as a successfully AI-written deck.
-        if (openrouter_provider or other_providers) and agent_type in {"deck_planner", "slide_writer"}:
+                    DiagnosticsService.log_external_api_failure(
+                        provider=provider.name,
+                        operation=f"chat_completions ({agent_type})",
+                        error=model_err,
+                        model_name=model_id,
+                        duration_ms=int((time.time() - start_time) * 1000),
+                        additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
+                    )
+                    logger.warning("Provider %s model %s failed", provider.name, model_id, exc_info=True)
+                    continue
+
+        if providers and agent_type in {"deck_planner", "slide_writer"}:
             raise RuntimeError("AI providers could not complete this stage. Check provider availability or quota, then retry.")
         return ProviderRouter._fallback_deterministic(agent_type, user_prompt)
 

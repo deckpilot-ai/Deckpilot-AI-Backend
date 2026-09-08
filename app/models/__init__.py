@@ -8,13 +8,14 @@ from app.models.deck import Artifact, DeckVersion
 from app.models.job import AgentTask, GenerationJob
 from app.models.message import Message
 from app.models.project import Project
-from app.models.provider import AgentRoute, AIKey, AIProvider
+from app.models.provider import AgentRoute, AIKey, AIProvider, AIProviderModel
 from app.models.session import UserSession
 from app.models.user import User
 
 __all__ = [
     "AIKey",
     "AIProvider",
+    "AIProviderModel",
     "AgentRoute",
     "AgentTask",
     "Artifact",
@@ -29,3 +30,4 @@ __all__ = [
     "User",
     "UserSession",
 ]
+

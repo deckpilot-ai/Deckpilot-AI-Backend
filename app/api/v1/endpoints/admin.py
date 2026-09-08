@@ -10,7 +10,7 @@ from app.api.deps import require_admin
 from app.core.config import settings
 from app.db.engine import get_db
 from app.models.application_log import ApplicationLog
-from app.models.provider import AIKey, AIProvider
+from app.models.provider import AIKey, AIProvider, AIProviderModel
 from app.models.user import User
 from app.schemas.application_log import (
     ApplicationLogDetailOut,
@@ -27,12 +27,25 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 class ProviderCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     name: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
     base_url: str = Field(min_length=8, max_length=512)
-    provider_type: str = Field(default="openai_compatible", pattern=r"^openai_compatible$")
+    provider_type: str = Field(default="openai_compatible")
     priority: int = Field(default=1, ge=0, le=100)
+    api_key: str | None = Field(default=None, max_length=4096)
+    key_label: str | None = Field(default=None, max_length=128)
+    models: list[dict[str, Any]] | None = None
+
+
+class ProviderUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    name: str | None = Field(default=None, max_length=128)
+    base_url: str | None = Field(default=None, max_length=512)
+    provider_type: str | None = Field(default=None, max_length=64)
+    priority: int | None = Field(default=None, ge=0, le=100)
+    enabled: int | None = Field(default=None, ge=0, le=1)
 
 
 class KeyCreate(BaseModel):
@@ -53,6 +66,29 @@ class RouteUpdate(BaseModel):
     candidates: list[dict[str, Any]] = Field(min_length=1, max_length=10)
 
 
+class FetchModelsRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    base_url: str | None = None
+    api_key: str | None = None
+    provider_id: str | None = None
+    provider_type: str = "openai_compatible"
+
+
+class SaveModelsRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    models: list[dict[str, Any]] = Field(min_length=1)
+
+
+class ModelUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    priority: int | None = Field(default=None, ge=0, le=100)
+    enabled: int | None = Field(default=None, ge=0, le=1)
+    display_name: str | None = None
+
+
 @router.get("/providers")
 def list_providers(
     admin: Annotated[User, Depends(require_admin)],
@@ -65,6 +101,11 @@ def list_providers(
     result = []
     for p in providers:
         keys = db.scalars(select(AIKey).where(AIKey.provider_id == p.id)).all()
+        models = db.scalars(
+            select(AIProviderModel)
+            .where(AIProviderModel.provider_id == p.id)
+            .order_by(AIProviderModel.priority.desc())
+        ).all()
         result.append({
             "id": p.id,
             "name": p.name,
@@ -80,9 +121,20 @@ def list_providers(
                     "cooldown_until": k.cooldown_until,
                     "failure_count": k.failure_count,
                     "last_used_at": k.last_used_at,
-                    # Raw secret is NEVER returned!
                 }
                 for k in keys
+            ],
+            "models": [
+                {
+                    "id": m.id,
+                    "model_id": m.model_id,
+                    "display_name": m.display_name,
+                    "priority": m.priority,
+                    "enabled": bool(m.enabled),
+                    "context_length": m.context_length,
+                    "created_at": m.created_at,
+                }
+                for m in models
             ],
         })
     return result
@@ -102,15 +154,18 @@ def get_providers_status(
     provider_summaries = []
     for p in providers:
         key_count = len(db.scalars(select(AIKey).where(AIKey.provider_id == p.id, AIKey.enabled == 1)).all())
+        model_count = len(db.scalars(select(AIProviderModel).where(AIProviderModel.provider_id == p.id, AIProviderModel.enabled == 1)).all())
         if p.name == "openrouter" and key_count > 0:
             openrouter_active = True
         elif p.name == "experientiallabs" and key_count > 0:
             explabs_active = True
         provider_summaries.append({
+            "id": p.id,
             "name": p.name,
             "base_url": p.base_url,
             "enabled": bool(p.enabled),
             "active_keys": key_count,
+            "configured_models": model_count,
             "priority": p.priority,
         })
 
@@ -172,6 +227,48 @@ async def refresh_free_models(
     }
 
 
+@router.post("/providers/fetch-models")
+async def fetch_provider_models_endpoint(
+    req: FetchModelsRequest,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Dynamically test connection and fetch available models from any provider endpoint."""
+    base_url = req.base_url
+    api_key = req.api_key
+
+    if req.provider_id:
+        provider = db.scalar(select(AIProvider).where(AIProvider.id == req.provider_id))
+        if not provider:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
+        base_url = provider.base_url
+        key_tuple = ProviderRouter.select_active_key(db, provider.id)
+        if key_tuple:
+            api_key = key_tuple[1]
+
+    if not base_url:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="base_url is required")
+
+    try:
+        discovered = await ProviderRouter.fetch_provider_models(
+            base_url=base_url,
+            api_key=api_key,
+            provider_type=req.provider_type,
+        )
+        return {
+            "base_url": base_url,
+            "total": len(discovered),
+            "models": discovered,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Could not connect to models endpoint at {base_url}: {str(exc)}",
+        ) from exc
+
+
 @router.post("/providers", status_code=status.HTTP_201_CREATED)
 def create_provider(
     req: ProviderCreate,
@@ -186,9 +283,142 @@ def create_provider(
             provider_type=req.provider_type,
             priority=req.priority,
         )
+
+        # Optional initial API key
+        if req.api_key and req.api_key.strip():
+            label = req.key_label.strip() if req.key_label and req.key_label.strip() else f"{req.name}-key"
+            ProviderRouter.add_key(db=db, provider_id=provider.id, label=label, secret=req.api_key.strip())
+
+        # Optional initial models configuration
+        if req.models:
+            ProviderRouter.save_provider_models(db=db, provider_id=provider.id, models_data=req.models)
+
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
     return {"id": provider.id, "name": provider.name, "status": "created"}
+
+
+@router.put("/providers/{provider_id}")
+def update_provider_endpoint(
+    provider_id: str,
+    req: ProviderUpdate,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        provider = ProviderRouter.update_provider(
+            db=db,
+            provider_id=provider_id,
+            name=req.name,
+            base_url=req.base_url,
+            provider_type=req.provider_type,
+            priority=req.priority,
+            enabled=req.enabled,
+        )
+        return {"id": provider.id, "name": provider.name, "status": "updated"}
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+
+@router.delete("/providers/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_provider_endpoint(
+    provider_id: str,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> None:
+    ProviderRouter.delete_provider(db, provider_id)
+
+
+@router.get("/providers/{provider_id}/models")
+def get_provider_models(
+    provider_id: str,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    provider = db.scalar(select(AIProvider).where(AIProvider.id == provider_id))
+    if not provider:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
+    models = db.scalars(
+        select(AIProviderModel)
+        .where(AIProviderModel.provider_id == provider_id)
+        .order_by(AIProviderModel.priority.desc())
+    ).all()
+    return [
+        {
+            "id": m.id,
+            "model_id": m.model_id,
+            "display_name": m.display_name,
+            "priority": m.priority,
+            "enabled": bool(m.enabled),
+            "context_length": m.context_length,
+            "created_at": m.created_at,
+        }
+        for m in models
+    ]
+
+
+@router.post("/providers/{provider_id}/models")
+def save_provider_models_endpoint(
+    provider_id: str,
+    req: SaveModelsRequest,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        saved = ProviderRouter.save_provider_models(db=db, provider_id=provider_id, models_data=req.models)
+        return {
+            "message": f"Successfully configured {len(saved)} models",
+            "models": [
+                {
+                    "id": m.id,
+                    "model_id": m.model_id,
+                    "display_name": m.display_name,
+                    "priority": m.priority,
+                    "enabled": bool(m.enabled),
+                }
+                for m in saved
+            ],
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+
+@router.put("/providers/{provider_id}/models/{model_db_id}")
+def update_model_priority_endpoint(
+    provider_id: str,
+    model_db_id: str,
+    req: ModelUpdate,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    try:
+        model = ProviderRouter.update_provider_model(
+            db=db,
+            model_db_id=model_db_id,
+            priority=req.priority,
+            enabled=req.enabled,
+            display_name=req.display_name,
+        )
+        return {
+            "id": model.id,
+            "model_id": model.model_id,
+            "priority": model.priority,
+            "enabled": bool(model.enabled),
+            "status": "updated",
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+
+@router.delete("/providers/{provider_id}/models/{model_db_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_model_endpoint(
+    provider_id: str,
+    model_db_id: str,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> None:
+    ProviderRouter.delete_provider_model(db, model_db_id)
 
 
 @router.post("/providers/{provider_id}/keys", status_code=status.HTTP_201_CREATED)

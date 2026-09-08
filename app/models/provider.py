@@ -21,6 +21,12 @@ class AIProvider(Base):
     created_at: Mapped[int] = mapped_column(Integer, default=lambda: int(time.time()), nullable=False)
 
     keys = relationship("AIKey", back_populates="provider", cascade="all, delete-orphan")
+    models = relationship(
+        "AIProviderModel",
+        back_populates="provider",
+        cascade="all, delete-orphan",
+        order_by="desc(AIProviderModel.priority)",
+    )
 
 
 class AIKey(Base):
@@ -40,9 +46,25 @@ class AIKey(Base):
     provider = relationship("AIProvider", back_populates="keys")
 
 
+class AIProviderModel(Base):
+    __tablename__ = "ai_provider_models"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    provider_id: Mapped[str] = mapped_column(String(36), ForeignKey("ai_providers.id", ondelete="CASCADE"), index=True, nullable=False)
+    model_id: Mapped[str] = mapped_column(String(256), nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    priority: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    enabled: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    context_length: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[int] = mapped_column(Integer, default=lambda: int(time.time()), nullable=False)
+
+    provider = relationship("AIProvider", back_populates="models")
+
+
 class AgentRoute(Base):
     __tablename__ = "agent_routes"
 
     agent_type: Mapped[str] = mapped_column(String(64), primary_key=True)
     route_json: Mapped[str] = mapped_column(Text, nullable=False)  # JSON array of candidate models/providers
     updated_at: Mapped[int] = mapped_column(Integer, default=lambda: int(time.time()), onupdate=lambda: int(time.time()), nullable=False)
+
