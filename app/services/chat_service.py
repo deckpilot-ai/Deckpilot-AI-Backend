@@ -119,7 +119,7 @@ class ChatService:
                 project_id=project_id,
                 role="assistant",
                 content=output_guardrail.content,
-                created_at=int(time.time()),
+                created_at=max(int(time.time()), user_msg.created_at + 1),
             )
             db.add(assistant_msg)
             db.commit()
@@ -158,7 +158,7 @@ class ChatService:
                 project_id=project_id,
                 role="assistant",
                 content=output_guardrail.content,
-                created_at=int(time.time()),
+                created_at=max(int(time.time()), user_msg.created_at + 1),
             )
             db.add(assistant_msg)
             db.commit()
@@ -222,7 +222,7 @@ class ChatService:
                 project_id=project_id,
                 role="assistant",
                 content=output_guardrail.content,
-                created_at=int(time.time()),
+                created_at=max(int(time.time()), user_msg.created_at + 1),
             )
             db.add(assistant_msg)
             db.commit()
@@ -296,7 +296,7 @@ class ChatService:
                 project_id=project_id,
                 role="assistant",
                 content=output_guardrail.content,
-                created_at=int(time.time()),
+                created_at=max(int(time.time()), user_msg.created_at + 1),
             )
             db.add(assistant_msg)
             if not plan_spec:
@@ -418,7 +418,7 @@ class ChatService:
             project_id=project_id,
             role="assistant",
             content=output_guardrail.content,
-            created_at=int(time.time()),
+            created_at=max(int(time.time()), user_msg.created_at + 1),
         )
         db.add(assistant_msg)
         db.commit()

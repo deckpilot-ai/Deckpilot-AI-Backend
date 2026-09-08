@@ -3,7 +3,7 @@
 import time
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -11,6 +11,10 @@ from app.db.base import Base
 
 class Attachment(Base):
     __tablename__ = "attachments"
+    __table_args__ = (
+        Index("ix_attachments_message_id", "message_id"),
+        Index("ix_attachments_project_created", "project_id", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)

@@ -56,25 +56,6 @@ class MessageService:
         skip: int = 0,
         limit: int = 500,
     ) -> list[Message]:
-        # Self-healing: link any unlinked attachments in this project to the first user message
-        unlinked = db.scalars(
-            select(Attachment).where(
-                Attachment.project_id == project_id,
-                Attachment.message_id.is_(None),
-            )
-        ).all()
-        if unlinked:
-            first_user_msg = db.scalar(
-                select(Message)
-                .where(Message.project_id == project_id, Message.role == "user")
-                .order_by(Message.created_at.asc(), Message.id.asc())
-            )
-            if first_user_msg:
-                for att in unlinked:
-                    att.message_id = first_user_msg.id
-                db.commit()
-                db.expire_all()
-
         stmt = (
             select(Message)
             .options(selectinload(Message.attachments))
