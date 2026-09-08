@@ -26,20 +26,24 @@ class ExtractionResult:
 
 class DocumentExtractor:
     @staticmethod
-    def extract_pdf(file_bytes: bytes, filename: str) -> ExtractionResult:
+    def extract_pdf(file_bytes: bytes, filename: str, on_progress: Any = None) -> ExtractionResult:
         result = ExtractionResult()
         doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+        total_pages = len(doc)
         metadata = doc.metadata or {}
-        result.metadata["page_count"] = len(doc)
+        result.metadata["page_count"] = total_pages
         result.metadata["title"] = metadata.get("title", "")
         result.metadata["author"] = metadata.get("author", "")
+
+        if on_progress:
+            on_progress(f"Analyzing {filename}: opened {total_pages} pages...")
 
         from app.services.image_quality import is_documentary_pixmap
 
         # Pre-scan: detect repeating template graphics / watermarks across >= 3 pages
         xref_page_counts: dict[int, int] = {}
-        if len(doc) >= 3:
-            for p_idx in range(len(doc)):
+        if total_pages >= 3:
+            for p_idx in range(total_pages):
                 p = doc[p_idx]
                 seen_xrefs = set()
                 for img_info in p.get_images(full=True):
@@ -50,7 +54,10 @@ class DocumentExtractor:
 
         extracted_candidates: list[dict[str, Any]] = []
 
-        for page_idx in range(len(doc)):
+        for page_idx in range(total_pages):
+            if on_progress and (page_idx % 2 == 0 or page_idx == total_pages - 1):
+                on_progress(f"Analyzing {filename}: page {page_idx + 1} of {total_pages} ({len(extracted_candidates)} figures found)...")
+
             page = doc[page_idx]
             page_text = page.get_text("text").strip()
             if page_text:
@@ -387,37 +394,6 @@ class DocumentExtractor:
         return result
 
     @staticmethod
-    def extract_csv(file_bytes: bytes, filename: str) -> ExtractionResult:
-        """Extracts tabular data from CSV files."""
-        result = ExtractionResult()
-        try:
-            text = file_bytes.decode("utf-8")
-        except UnicodeDecodeError:
-            text = file_bytes.decode("latin-1", errors="ignore")
-
-        reader = csv.reader(io.StringIO(text))
-        rows = [row for row in reader if any(cell.strip() for cell in row)]
-
-        if rows:
-            result.tables.append({
-                "rows": rows[:100],
-                "source": filename,
-            })
-            md_lines = [f"### CSV Data Table: {filename}"]
-            header = " | ".join(rows[0])
-            sep = " | ".join(["---"] * len(rows[0]))
-            md_lines.append(f"| {header} |")
-            md_lines.append(f"| {sep} |")
-            for r in rows[1:50]:
-                md_lines.append(f"| {' | '.join(r)} |")
-            result.text_blocks.append({
-                "content": "\n".join(md_lines),
-                "source": filename,
-            })
-
-        return result
-
-    @staticmethod
     def extract_pptx(file_bytes: bytes, filename: str) -> ExtractionResult:
         result = ExtractionResult()
         prs = Presentation(io.BytesIO(file_bytes))
@@ -456,35 +432,47 @@ class DocumentExtractor:
         return result
 
     @classmethod
-    def extract_document(cls, file_bytes: bytes, filename: str, mime_type: str = "") -> ExtractionResult:
+    def extract_document(cls, file_bytes: bytes, filename: str, mime_type: str = "", on_progress: Any = None) -> ExtractionResult:
         """Universal document extractor supporting PDF, DOCX/Word, XLSX/Excel, CSV, Images (JPG, PNG, WEBP), and PPTX."""
         ext = Path(filename).suffix.lower()
         # 1. Images (JPG, JPEG, PNG, WEBP, GIF, BMP, TIFF)
         if ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff"]:
+            if on_progress:
+                on_progress(f"Processing image asset: {filename}...")
             return cls.extract_image(file_bytes, filename, mime_type)
 
         # 2. PDF Documents
         elif ext == ".pdf":
-            return cls.extract_pdf(file_bytes, filename)
+            return cls.extract_pdf(file_bytes, filename, on_progress=on_progress)
 
         # 3. Microsoft Word (.docx, .doc)
         elif ext == ".docx":
+            if on_progress:
+                on_progress(f"Extracting Word document: {filename}...")
             return cls.extract_docx(file_bytes, filename)
 
         # 4. Microsoft Excel / Spreadsheets (.xlsx, .xlsm, .xls)
         elif ext in [".xlsx", ".xlsm"]:
+            if on_progress:
+                on_progress(f"Extracting spreadsheet: {filename}...")
             return cls.extract_spreadsheet(file_bytes, filename)
 
         # 5. CSV Tabular Data
         elif ext in [".csv", ".tsv"]:
+            if on_progress:
+                on_progress(f"Extracting tabular data: {filename}...")
             return cls.extract_csv(file_bytes, filename)
 
         # 6. PowerPoint Presentations (.pptx)
         elif ext == ".pptx":
+            if on_progress:
+                on_progress(f"Extracting presentation slides: {filename}...")
             return cls.extract_pptx(file_bytes, filename)
 
         # 7. Plain text / Markdown / Structured text
         elif ext in [".txt", ".md", ".json", ".yaml", ".yml", ".xml"]:
+            if on_progress:
+                on_progress(f"Reading reference text: {filename}...")
             return cls.extract_text(file_bytes, filename)
 
         # Fallback

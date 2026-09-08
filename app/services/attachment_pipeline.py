@@ -23,6 +23,7 @@ from app.models.attachment import Attachment
 from app.models.deck import Artifact
 from app.services.extraction import DocumentExtractor
 from app.services.storage import storage_service
+from app.services.ws_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +86,34 @@ async def _process_with_session(db: Session, attachment_id: str) -> None:
     sha_prefix = attachment.sha256[:16]
 
     try:
+        def progress_callback(msg: str) -> None:
+            try:
+                ws_manager.broadcast_sync(
+                    project_id,
+                    {
+                        "type": "attachment_progress",
+                        "project_id": project_id,
+                        "attachment_id": attachment_id,
+                        "filename": filename,
+                        "message": msg,
+                    },
+                )
+                ws_manager.broadcast_sync(
+                    project_id,
+                    {
+                        "type": "agent_task",
+                        "project_id": project_id,
+                        "agent_type": "reference_intake",
+                        "status": "running",
+                        "message": msg,
+                    },
+                )
+            except Exception:
+                logger.debug("Failed broadcasting extraction progress", exc_info=True)
+
         file_bytes = await run_in_threadpool(storage_service.get_bytes, attachment.storage_key)
         extraction = await run_in_threadpool(
-            DocumentExtractor.extract_document, file_bytes, filename, mime_type
+            DocumentExtractor.extract_document, file_bytes, filename, mime_type, progress_callback
         )
 
         key_map = {
@@ -101,6 +127,9 @@ async def _process_with_session(db: Session, attachment_id: str) -> None:
         for img in extraction.extracted_images:
             img["storage_key"] = key_map[img["storage_key"]]
         extracted_storage_keys = [key for key, _data, _content_type in extraction.image_payloads]
+
+        if extraction.image_payloads:
+            progress_callback(f"Storing {len(extraction.image_payloads)} extracted visual assets from {filename}...")
 
         try:
             semaphore = asyncio.Semaphore(12)
@@ -160,6 +189,12 @@ async def _process_with_session(db: Session, attachment_id: str) -> None:
                 )
             attachment.status = "ready"
             db.commit()
+
+            pages_count = extraction.metadata.get("page_count", 1)
+            img_count = len(extraction.extracted_images)
+            progress_callback(
+                f"Completed extraction for {filename}: {pages_count} pages processed, {img_count} high-res visual figures captured."
+            )
         except Exception:
             db.rollback()
             raise
