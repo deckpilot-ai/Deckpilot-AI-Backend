@@ -7,18 +7,21 @@ import pymupdf
 
 
 def is_documentary_cv_image(image: np.ndarray) -> bool:
-    """Inspect OpenCV image: check resolution, variance, and selective QR detection."""
+    """Inspect OpenCV image: check resolution, variance, aspect ratio, and selective QR detection."""
     height, width = image.shape[:2]
-    if min(height, width) < 50 or (height * width) < 5000:
+    if min(height, width) < 50 or (height * width) < 6000:
+        return False
+    aspect = width / max(1, height)
+    # Reject extreme thin strips (lines, dividers, slivers)
+    if aspect < 0.22 or aspect > 4.5:
         return False
     if max(height, width) > 640:
         scale = 640.0 / max(height, width)
         image = cv2.resize(image, (round(width * scale), round(height * scale)))
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    if float(gray.std()) < 3:
+    if float(gray.std()) < 3.5:
         return False
     # Only run QR detector on square-ish, monochrome images (QR codes are 1:1 aspect ratio and near-grayscale)
-    aspect = width / height
     if 0.82 <= aspect <= 1.22:
         diff = np.abs(image[:, :, 0].astype(int) - image[:, :, 1].astype(int)) + np.abs(image[:, :, 1].astype(int) - image[:, :, 2].astype(int))
         if diff.mean() < 14:  # mostly grayscale/monochrome
@@ -30,7 +33,10 @@ def is_documentary_cv_image(image: np.ndarray) -> bool:
 def is_documentary_pixmap(pix: pymupdf.Pixmap) -> bool:
     """Fast check directly on PyMuPDF Pixmap without expensive PNG compression/decompression."""
     height, width = pix.height, pix.width
-    if min(height, width) < 50 or (height * width) < 5000:
+    if min(height, width) < 50 or (height * width) < 6000:
+        return False
+    aspect = width / max(1, height)
+    if aspect < 0.22 or aspect > 4.5:
         return False
     channels = pix.n
     if channels not in (1, 3, 4):

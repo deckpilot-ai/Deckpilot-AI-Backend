@@ -36,6 +36,18 @@ class DocumentExtractor:
 
         from app.services.image_quality import is_documentary_pixmap
 
+        # Pre-scan: detect repeating template graphics / watermarks across >= 3 pages
+        xref_page_counts: dict[int, int] = {}
+        if len(doc) >= 3:
+            for p_idx in range(len(doc)):
+                p = doc[p_idx]
+                seen_xrefs = set()
+                for img_info in p.get_images(full=True):
+                    x = img_info[0]
+                    if x not in seen_xrefs:
+                        seen_xrefs.add(x)
+                        xref_page_counts[x] = xref_page_counts.get(x, 0) + 1
+
         extracted_candidates: list[dict[str, Any]] = []
 
         for page_idx in range(len(doc)):
@@ -51,9 +63,14 @@ class DocumentExtractor:
             # Extract embedded figures & images
             image_list = page.get_images(full=True)
             visible = {item['xref']: pymupdf.Rect(item['bbox']) for item in page.get_image_info(xrefs=True)}
+            page_figures: list[dict[str, Any]] = []
 
             for img_idx, img_info in enumerate(image_list):
                 xref = img_info[0]
+                # Skip template graphics/watermarks that repeat across 3+ pages
+                if xref_page_counts.get(xref, 0) >= 3:
+                    continue
+
                 rect = visible.get(xref)
                 if rect is None:
                     continue
@@ -63,8 +80,37 @@ class DocumentExtractor:
                     continue
 
                 # Skip tiny decorative icons, border lines, and slivers
-                if rect.width < 40 or rect.height < 40:
+                if rect.width < 45 or rect.height < 45:
                     continue
+
+                # Search nearby text for captions / figure labels
+                rects = page.get_image_rects(xref)
+                caption = ""
+                if rects:
+                    r = rects[0]
+                    candidates = []
+                    for b in page.get_text("blocks"):
+                        if len(b) > 4:
+                            b_text = str(b[4]).strip()
+                            if not b_text:
+                                continue
+                            if b[0] < r.x1 + 40 and b[2] > r.x0 - 40:
+                                dist_below = b[1] - r.y1
+                                dist_above = r.y0 - b[3]
+                                is_fig = bool(re.search(r'\b(?:fig(?:ure)?\.?|map|photo(?:graph)?|chart|diagram|plate)\s*[\d\.]', b_text, re.IGNORECASE))
+                                is_inside_top = (r.y0 - 20 <= b[1] <= r.y0 + 70)
+                                is_inside_bottom = (r.y1 - 70 <= b[3] <= r.y1 + 20)
+                                if is_fig and (is_inside_top or is_inside_bottom or -30 <= dist_below < 120 or -30 <= dist_above < 100):
+                                    candidates.append((0, min(abs(b[1] - r.y0), abs(b[3] - r.y1)), b_text))
+                                elif -15 <= dist_below < 120:
+                                    candidates.append((1, abs(dist_below), b_text))
+                                elif -15 <= dist_above < 90:
+                                    candidates.append((1, abs(dist_above), b_text))
+                    if candidates:
+                        candidates.sort(key=lambda c: (c[0], c[1]))
+                        raw_caption = " ".join(candidates[0][2].split())[:350]
+                        # Clean control characters
+                        caption = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw_caption).strip()
 
                 try:
                     pix = pymupdf.Pixmap(doc, xref)
@@ -81,36 +127,9 @@ class DocumentExtractor:
                         if mask_xref:
                             pix = pymupdf.Pixmap(pix, mask)
 
-                    # Quality filter: test Pixmap samples directly without intermediate PNG encode/decode
+                    # Quality filter: test Pixmap samples directly without expensive PNG encode/decode
                     if not is_documentary_pixmap(pix):
                         continue
-
-                    # Search nearby text for captions / figure labels
-                    rects = page.get_image_rects(xref)
-                    caption = ""
-                    if rects:
-                        r = rects[0]
-                        candidates = []
-                        for b in page.get_text("blocks"):
-                            if len(b) > 4:
-                                b_text = str(b[4]).strip()
-                                if not b_text:
-                                    continue
-                                if b[0] < r.x1 + 40 and b[2] > r.x0 - 40:
-                                    dist_below = b[1] - r.y1
-                                    dist_above = r.y0 - b[3]
-                                    is_fig = bool(re.search(r'\b(?:fig(?:ure)?\.?|map|photo(?:graph)?|chart|diagram|plate)\s*[\d\.]', b_text, re.IGNORECASE))
-                                    is_inside_top = (r.y0 - 20 <= b[1] <= r.y0 + 70)
-                                    is_inside_bottom = (r.y1 - 70 <= b[3] <= r.y1 + 20)
-                                    if is_fig and (is_inside_top or is_inside_bottom or -30 <= dist_below < 120 or -30 <= dist_above < 100):
-                                        candidates.append((0, min(abs(b[1] - r.y0), abs(b[3] - r.y1)), b_text))
-                                    elif -15 <= dist_below < 120:
-                                        candidates.append((1, abs(dist_below), b_text))
-                                    elif -15 <= dist_above < 90:
-                                        candidates.append((1, abs(dist_above), b_text))
-                        if candidates:
-                            candidates.sort(key=lambda c: (c[0], c[1]))
-                            caption = " ".join(candidates[0][2].split())[:350]
 
                     # Capture rendered figure with overlay vector annotations / map details if available
                     if rect.width > 25 and rect.height > 25:
@@ -123,10 +142,12 @@ class DocumentExtractor:
 
                     ext = "png"
                     storage_key = f"extracted/{Path(filename).stem}_p{page_idx+1}_img{img_idx}.{ext}"
-                    has_explicit_caption = 1 if bool(re.search(r'\b(?:fig(?:ure)?\.?|map|photo|chart|diagram|plate)\b', caption, re.I)) else 0
+                    fig_match = re.search(r'\b(?:fig(?:ure)?\.?|map|photo|chart|diagram|plate)\s*([\d\.]+)', caption, re.I)
+                    fig_label = fig_match.group(0).lower() if fig_match else ""
+                    has_explicit_caption = 1 if fig_label or bool(re.search(r'\b(?:fig(?:ure)?\.?|map|photo|chart|diagram|plate)\b', caption, re.I)) else 0
                     area = width * height
 
-                    extracted_candidates.append({
+                    candidate = {
                         "storage_key": storage_key,
                         "width": width,
                         "height": height,
@@ -134,13 +155,48 @@ class DocumentExtractor:
                         "page": page_idx + 1,
                         "byte_size": len(image_bytes),
                         "caption": caption,
+                        "fig_label": fig_label,
+                        "rect": (rect.x0, rect.y0, rect.x1, rect.y1),
                         "image_bytes": image_bytes,
                         "content_type": f"image/{ext}",
                         "priority": (has_explicit_caption, 1 if caption else 0, area),
-                    })
+                    }
+
+                    # Same-page deduplication: check if this figure overlaps or has same fig_label as another figure on this page
+                    duplicate = False
+                    for existing in page_figures:
+                        # If same figure label on same page (e.g. Fig. 5.18), keep the higher-resolution one
+                        if fig_label and existing.get("fig_label") == fig_label:
+                            if area > existing["width"] * existing["height"]:
+                                page_figures.remove(existing)
+                                page_figures.append(candidate)
+                            duplicate = True
+                            break
+                        # Bounding box overlap check
+                        ex_r = existing["rect"]
+                        ix0 = max(rect.x0, ex_r[0])
+                        iy0 = max(rect.y0, ex_r[1])
+                        ix1 = min(rect.x1, ex_r[2])
+                        iy1 = min(rect.y1, ex_r[3])
+                        if ix1 > ix0 and iy1 > iy0:
+                            inter_area = (ix1 - ix0) * (iy1 - iy0)
+                            smaller_area = min(rect.width * rect.height, (ex_r[2] - ex_r[0]) * (ex_r[3] - ex_r[1]))
+                            if smaller_area > 0 and (inter_area / smaller_area) > 0.65:
+                                # Overlapping sub-layer on same page: keep higher priority / larger one
+                                if candidate["priority"] > existing["priority"]:
+                                    page_figures.remove(existing)
+                                    page_figures.append(candidate)
+                                duplicate = True
+                                break
+
+                    if not duplicate:
+                        page_figures.append(candidate)
+
                 except Exception:
                     logger.warning("Skipping unreadable image on PDF page %s", page_idx + 1, exc_info=True)
                     continue
+
+            extracted_candidates.extend(page_figures)
 
         # Cap to top 30 most relevant illustrative figures per document
         if len(extracted_candidates) > 30:
