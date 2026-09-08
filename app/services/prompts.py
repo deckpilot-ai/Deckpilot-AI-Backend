@@ -183,7 +183,13 @@ You must output a strictly valid JSON object with the following structure:
         "Explanation: What the evidence means for this topic.",
         "Interpretation: A source-backed implication, qualified when uncertain."
       ],
+      "metrics": [
+        {"label": "Key Metric", "value": "42%", "delta": "+12% YoY"}
+      ],
+      "quote": "Optional compelling quote from a source or leader (omit if not relevant)",
+      "eyebrow": "Optional short context label above headline (e.g. 'Chapter 3 · Evidence')",
       "takeaway": "One-sentence grounded conclusion for the bottom callout bar.",
+      "speakerNotes": "2-4 sentence presenter guide: what to say aloud, key talking points, data context, or transitions to the next slide. Always populate this field with substantive presenter guidance.",
       "imageArtifactId": "Optional artifact ID from supplied source images matching this topic",
       "imageCaption": "Clean documentary caption for the image"
     }
@@ -196,6 +202,8 @@ Rules:
 3. Include only numbers explicitly present in the supplied sources or user brief. Omit unsupported metrics.
 4. Keep bullets under 20 words for maximum visual scannability.
 5. Whenever a source figure, map, sculpture, coin, or illustration from the grounded data matches the slide's topic, assign its imageArtifactId and imageCaption.
+6. ALWAYS populate speakerNotes with 2-4 substantive sentences to guide the presenter. Never leave it empty.
+7. Include metrics[] only for data-heavy slides (financial, KPI, market-size). Omit for narrative/conceptual slides.
 """
 
 BRAND_STYLE_SYSTEM_PROMPT = """You are Visual Design Director at deckpilotAI. Select a tailored corporate palette and typography hierarchy suited to the presentation topic.
