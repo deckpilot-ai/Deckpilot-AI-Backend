@@ -216,7 +216,7 @@ async def wait_for_pending_attachments(
     project_id: str,
     *,
     timeout_seconds: float = 360.0,
-    poll_interval: float = 2.0,
+    poll_interval: float = 3.0,
     emit: Callable[..., None] | None = None,
 ) -> None:
     """Block until this project has no attachments still being extracted.
@@ -229,13 +229,14 @@ async def wait_for_pending_attachments(
     re-processed inline — the pipeline is idempotent, so this is safe.
     """
     deadline = time.monotonic() + timeout_seconds
+    factory = get_session_factory()
     while True:
-        db.rollback()  # Refresh transaction snapshot on libSQL/Turso
-        pending_count = db.scalar(
-            select(func.count())
-            .select_from(Attachment)
-            .where(Attachment.project_id == project_id, Attachment.status.in_(PENDING_STATUSES))
-        )
+        with factory() as check_session:
+            pending_count = check_session.scalar(
+                select(func.count())
+                .select_from(Attachment)
+                .where(Attachment.project_id == project_id, Attachment.status.in_(PENDING_STATUSES))
+            )
         if not pending_count:
             return
         if time.monotonic() >= deadline:
@@ -248,21 +249,20 @@ async def wait_for_pending_attachments(
             )
         await asyncio.sleep(poll_interval)
 
-    stuck = db.scalars(
-        select(Attachment).where(
-            Attachment.project_id == project_id, Attachment.status.in_(PENDING_STATUSES)
-        )
-    ).all()
-    for attachment in stuck:
-        db.refresh(attachment)
-        if attachment.status not in PENDING_STATUSES:
-            continue
+    with factory() as check_session:
+        stuck = check_session.scalars(
+            select(Attachment).where(
+                Attachment.project_id == project_id, Attachment.status.in_(PENDING_STATUSES)
+            )
+        ).all()
+        stuck_ids = [att.id for att in stuck]
+
+    for att_id in stuck_ids:
         logger.warning(
-            "Recovering stuck attachment extraction attachment_id=%s status=%s",
-            attachment.id,
-            attachment.status,
+            "Recovering stuck attachment extraction attachment_id=%s",
+            att_id,
         )
         if emit is not None:
-            emit("reference_intake", "running", f"Finishing extraction of {attachment.file_name}...")
-        await process_attachment(attachment.id, db=db)
+            emit("reference_intake", "running", "Finishing document extraction inline...")
+        await process_attachment(att_id, db=db)
 
