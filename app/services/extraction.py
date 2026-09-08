@@ -56,8 +56,8 @@ class DocumentExtractor:
 
         for page_idx in range(total_pages):
             import time
-            time.sleep(0.005)  # Yield GIL to keep event loop responsive
-            if on_progress and (page_idx % 3 == 0 or page_idx == total_pages - 1):
+            time.sleep(0.002)  # Yield GIL to keep event loop responsive
+            if on_progress and (page_idx % 4 == 0 or page_idx == total_pages - 1):
                 on_progress(f"Analyzing {filename}: scanned {page_idx + 1} of {total_pages} pages ({len(extracted_candidates)} visual figures found)...")
 
             page = doc[page_idx]
@@ -71,7 +71,11 @@ class DocumentExtractor:
 
             # Extract embedded figures & images
             image_list = page.get_images(full=True)
+            if not image_list:
+                continue
+
             visible = {item['xref']: pymupdf.Rect(item['bbox']) for item in page.get_image_info(xrefs=True)}
+            page_blocks = page.get_text("blocks")
             page_figures: list[dict[str, Any]] = []
 
             for img_idx, img_info in enumerate(image_list):
@@ -95,10 +99,10 @@ class DocumentExtractor:
                 # Search nearby text for captions / figure labels
                 rects = page.get_image_rects(xref)
                 caption = ""
-                if rects:
+                if rects and page_blocks:
                     r = rects[0]
                     candidates = []
-                    for b in page.get_text("blocks"):
+                    for b in page_blocks:
                         if len(b) > 4:
                             b_text = str(b[4]).strip()
                             if not b_text:
@@ -196,7 +200,7 @@ class DocumentExtractor:
                         pass
 
                 ext = "png" if pix.alpha else "jpg"
-                image_bytes = pix.tobytes("png") if pix.alpha else pix.tobytes("jpg", jpg_quality=92)
+                image_bytes = pix.tobytes("png") if pix.alpha else pix.tobytes("jpg", jpg_quality=90)
                 storage_key = f"extracted/{Path(filename).stem}_p{cand['page']}_img{cand['img_idx']}.{ext}"
 
                 result.image_payloads.append((storage_key, image_bytes, f"image/{ext}"))

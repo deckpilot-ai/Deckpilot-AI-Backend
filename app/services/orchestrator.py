@@ -253,7 +253,9 @@ class JobOrchestrator:
                 if grounded_parts:
                     grounding_content = "\n\n".join(grounded_parts)
                     context["grounding"] = grounding_content
-                    enriched_prompt += f"\n\n[MANDATORY GROUNDING DATA FROM ATTACHED DOCUMENTS]:\n{grounding_content}"
+                    # Ensure grounding prompt stays within LLM token budget for fast response
+                    prompt_grounding = grounding_content if len(grounding_content) <= 15000 else grounding_content[:15000] + "\n\n[... Remaining reference sections indexed for grounding ...]"
+                    enriched_prompt += f"\n\n[MANDATORY GROUNDING DATA FROM ATTACHED DOCUMENTS]:\n{prompt_grounding}"
                 else:
                     context["grounding"] = f"Grounded context with {len(existing_artifacts)} reference sources."
 

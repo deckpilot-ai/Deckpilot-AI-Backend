@@ -51,24 +51,6 @@ def is_documentary_pixmap(pix: pymupdf.Pixmap) -> bool:
     except Exception:
         return False
 
-    # Only run QR detector on square-ish monochrome images
-    if 0.82 <= aspect <= 1.22 and channels in (3, 4):
-        try:
-            # Downsample thumbnail for QR check
-            if max(height, width) > 300:
-                thumb = pix.get_pixmap(matrix=pymupdf.Matrix(250.0 / width, 250.0 / height))
-            else:
-                thumb = pix
-            arr = np.frombuffer(thumb.samples, dtype=np.uint8).reshape((thumb.height, thumb.width, thumb.n))
-            if thumb.n == 4:
-                arr = arr[:, :, :3]
-            diff = np.abs(arr[:, :, 0].astype(int) - arr[:, :, 1].astype(int)) + np.abs(arr[:, :, 1].astype(int) - arr[:, :, 2].astype(int))
-            if diff.mean() < 14:
-                detected, _ = cv2.QRCodeDetector().detect(arr)
-                return not bool(detected)
-        except Exception:
-            pass
-
     return True
 
 
