@@ -55,6 +55,8 @@ class DocumentExtractor:
         extracted_candidates: list[dict[str, Any]] = []
 
         for page_idx in range(total_pages):
+            import time
+            time.sleep(0.005)  # Yield GIL to keep event loop responsive
             if on_progress and (page_idx % 3 == 0 or page_idx == total_pages - 1):
                 on_progress(f"Analyzing {filename}: scanned {page_idx + 1} of {total_pages} pages ({len(extracted_candidates)} visual figures found)...")
 

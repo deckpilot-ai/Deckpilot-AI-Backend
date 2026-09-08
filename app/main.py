@@ -31,6 +31,14 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Register main event loop for safe multi-thread WebSocket broadcasting
+    import asyncio
+    from app.services.ws_manager import ws_manager
+    try:
+        ws_manager.set_main_loop(asyncio.get_running_loop())
+    except Exception:
+        pass
+
     # Fail startup when the configured database is unavailable. Production
     # schema changes are applied explicitly through Alembic.
     with engine.connect() as connection:

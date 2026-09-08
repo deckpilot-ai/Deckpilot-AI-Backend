@@ -14,18 +14,31 @@ class WebSocketConnectionManager:
     def __init__(self) -> None:
         # Map of project_id -> set of active WebSocket connections
         self._connections: dict[str, set[WebSocket]] = {}
-        self._lock = asyncio.Lock()
+        self._lock: asyncio.Lock | None = None
+        self._main_loop: asyncio.AbstractEventLoop | None = None
+
+    def set_main_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        self._main_loop = loop
+
+    def _get_lock(self) -> asyncio.Lock:
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     async def connect(self, project_id: str, websocket: WebSocket):
+        try:
+            self._main_loop = asyncio.get_running_loop()
+        except Exception:
+            pass
         await websocket.accept()
-        async with self._lock:
+        async with self._get_lock():
             if project_id not in self._connections:
                 self._connections[project_id] = set()
             self._connections[project_id].add(websocket)
         logger.info(f"[WebSocket] Client connected to project '{project_id}'. Total active: {len(self._connections[project_id])}")
 
     async def disconnect(self, project_id: str, websocket: WebSocket):
-        async with self._lock:
+        async with self._get_lock():
             if project_id in self._connections:
                 self._connections[project_id].discard(websocket)
                 if not self._connections[project_id]:
@@ -34,11 +47,10 @@ class WebSocketConnectionManager:
 
     async def broadcast(self, project_id: str, event: dict[str, Any]):
         """Broadcasts a JSON-serializable event to all clients connected to project_id."""
-        targets = []
-        async with self._lock:
-            if project_id in self._connections:
-                targets = list(self._connections[project_id])
+        if project_id not in self._connections:
+            return
 
+        targets = list(self._connections.get(project_id, set()))
         if not targets:
             return
 
@@ -53,22 +65,22 @@ class WebSocketConnectionManager:
                 disconnected.append(ws)
 
         if disconnected:
-            async with self._lock:
+            async with self._get_lock():
                 for ws in disconnected:
                     if project_id in self._connections:
                         self._connections[project_id].discard(ws)
 
     def broadcast_sync(self, project_id: str, event: dict[str, Any]):
-        """Synchronous wrapper to broadcast events from sync worker contexts."""
+        """Thread-safe wrapper to broadcast events from any thread without blocking."""
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(self.broadcast(project_id, event))
         except RuntimeError:
-            # No running event loop in current thread; execute in temporary loop
-            try:
-                asyncio.run(self.broadcast(project_id, event))
-            except Exception:
-                logger.exception("Synchronous WebSocket broadcast failed for project %s", project_id)
+            if self._main_loop and self._main_loop.is_running():
+                try:
+                    asyncio.run_coroutine_threadsafe(self.broadcast(project_id, event), self._main_loop)
+                except Exception:
+                    pass
 
 
 ws_manager = WebSocketConnectionManager()
