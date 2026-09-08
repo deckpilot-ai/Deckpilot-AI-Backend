@@ -132,7 +132,7 @@ async def _process_with_session(db: Session, attachment_id: str) -> None:
             progress_callback(f"Storing {len(extraction.image_payloads)} extracted visual assets from {filename}...")
 
         try:
-            semaphore = asyncio.Semaphore(12)
+            semaphore = asyncio.Semaphore(2)
 
             async def store_image(image_key: str, image_bytes: bytes, image_content_type: str) -> None:
                 async with semaphore:
@@ -230,6 +230,7 @@ async def wait_for_pending_attachments(
     """
     deadline = time.monotonic() + timeout_seconds
     while True:
+        db.rollback()  # Refresh transaction snapshot on libSQL/Turso
         pending_count = db.scalar(
             select(func.count())
             .select_from(Attachment)
@@ -246,7 +247,6 @@ async def wait_for_pending_attachments(
                 f"Extracting {pending_count} reference document(s)...",
             )
         await asyncio.sleep(poll_interval)
-        db.expire_all()  # drop cached rows so the next poll sees fresh statuses
 
     stuck = db.scalars(
         select(Attachment).where(

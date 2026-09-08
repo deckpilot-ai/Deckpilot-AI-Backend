@@ -166,10 +166,10 @@ class DocumentExtractor:
 
             extracted_candidates.extend(page_figures)
 
-        # Cap to top 25 most relevant figures per document
-        if len(extracted_candidates) > 25:
+        # Cap to top 10 most relevant illustrative figures per document
+        if len(extracted_candidates) > 10:
             extracted_candidates.sort(key=lambda c: c["priority"], reverse=True)
-            extracted_candidates = extracted_candidates[:25]
+            extracted_candidates = extracted_candidates[:10]
 
         # Extract image bytes and payloads for the top candidates
         if on_progress:
