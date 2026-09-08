@@ -212,6 +212,11 @@ class DocumentExtractor:
             except Exception:
                 logger.warning("Skipping image xref %s on page %s", xref, cand["page"], exc_info=True)
 
+        try:
+            doc.close()
+        except Exception:
+            pass
+
         return result
 
     @staticmethod
