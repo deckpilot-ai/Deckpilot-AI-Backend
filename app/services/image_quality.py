@@ -15,9 +15,9 @@ def is_documentary_cv_image(image: np.ndarray) -> bool:
     # Reject extreme thin strips (lines, dividers, slivers)
     if aspect < 0.22 or aspect > 4.5:
         return False
-    if max(height, width) > 640:
-        scale = 640.0 / max(height, width)
-        image = cv2.resize(image, (round(width * scale), round(height * scale)))
+    if max(height, width) > 320:
+        scale = 320.0 / max(height, width)
+        image = cv2.resize(image, (max(1, round(width * scale)), max(1, round(height * scale))))
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     if float(gray.std()) < 3.5:
         return False
@@ -31,7 +31,7 @@ def is_documentary_cv_image(image: np.ndarray) -> bool:
 
 
 def is_documentary_pixmap(pix: pymupdf.Pixmap) -> bool:
-    """Fast check directly on PyMuPDF Pixmap without expensive PNG compression/decompression."""
+    """Fast check directly on PyMuPDF Pixmap without expensive full-image copies or PNG compression."""
     height, width = pix.height, pix.width
     if min(height, width) < 50 or (height * width) < 6000:
         return False
@@ -41,15 +41,35 @@ def is_documentary_pixmap(pix: pymupdf.Pixmap) -> bool:
     channels = pix.n
     if channels not in (1, 3, 4):
         return False
+
+    # Fast strided sample to check image variance without allocating full image array
+    stride = max(1, (height * width) // 8000)
     try:
-        arr = np.frombuffer(pix.samples, dtype=np.uint8).reshape((height, width, channels))
+        raw_samples = np.frombuffer(pix.samples, dtype=np.uint8)[::stride * channels]
+        if len(raw_samples) > 20 and float(raw_samples.std()) < 3.5:
+            return False
     except Exception:
         return False
-    if channels == 4:
-        arr = arr[:, :, :3]
-    elif channels == 1:
-        arr = cv2.cvtColor(arr, cv2.COLOR_GRAY2BGR)
-    return is_documentary_cv_image(arr)
+
+    # Only run QR detector on square-ish monochrome images
+    if 0.82 <= aspect <= 1.22 and channels in (3, 4):
+        try:
+            # Downsample thumbnail for QR check
+            if max(height, width) > 300:
+                thumb = pix.get_pixmap(matrix=pymupdf.Matrix(250.0 / width, 250.0 / height))
+            else:
+                thumb = pix
+            arr = np.frombuffer(thumb.samples, dtype=np.uint8).reshape((thumb.height, thumb.width, thumb.n))
+            if thumb.n == 4:
+                arr = arr[:, :, :3]
+            diff = np.abs(arr[:, :, 0].astype(int) - arr[:, :, 1].astype(int)) + np.abs(arr[:, :, 1].astype(int) - arr[:, :, 2].astype(int))
+            if diff.mean() < 14:
+                detected, _ = cv2.QRCodeDetector().detect(arr)
+                return not bool(detected)
+        except Exception:
+            pass
+
+    return True
 
 
 def is_documentary_image(payload: bytes) -> bool:

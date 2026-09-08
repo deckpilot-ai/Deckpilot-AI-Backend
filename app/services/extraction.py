@@ -55,8 +55,8 @@ class DocumentExtractor:
         extracted_candidates: list[dict[str, Any]] = []
 
         for page_idx in range(total_pages):
-            if on_progress and (page_idx % 2 == 0 or page_idx == total_pages - 1):
-                on_progress(f"Analyzing {filename}: page {page_idx + 1} of {total_pages} ({len(extracted_candidates)} figures found)...")
+            if on_progress and (page_idx % 3 == 0 or page_idx == total_pages - 1):
+                on_progress(f"Analyzing {filename}: scanned {page_idx + 1} of {total_pages} pages ({len(extracted_candidates)} visual figures found)...")
 
             page = doc[page_idx]
             page_text = page.get_text("text").strip()
@@ -119,108 +119,96 @@ class DocumentExtractor:
                         # Clean control characters
                         caption = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw_caption).strip()
 
-                try:
-                    pix = pymupdf.Pixmap(doc, xref)
-                    if pix.colorspace and pix.colorspace.n != 3:
-                        pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
-                    mask_xref = img_info[1]
-                    if mask_xref:
-                        mask = pymupdf.Pixmap(doc, mask_xref)
-                        if (mask.width, mask.height) != (pix.width, pix.height):
-                            pix = page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), clip=rect, alpha=False)
-                            mask_xref = 0
-                        if pix.alpha:
-                            pix = pymupdf.Pixmap(pix, 0)
-                        if mask_xref:
-                            pix = pymupdf.Pixmap(pix, mask)
+                fig_match = re.search(r'\b(?:fig(?:ure)?\.?|map|photo|chart|diagram|plate)\s*([\d\.]+)', caption, re.I)
+                fig_label = fig_match.group(0).lower() if fig_match else ""
+                has_explicit_caption = 1 if fig_label or bool(re.search(r'\b(?:fig(?:ure)?\.?|map|photo|chart|diagram|plate)\b', caption, re.I)) else 0
+                area = rect.width * rect.height
 
-                    # Quality filter: test Pixmap samples directly without expensive PNG encode/decode
-                    if not is_documentary_pixmap(pix):
-                        continue
+                candidate = {
+                    "xref": xref,
+                    "img_info": img_info,
+                    "page": page_idx + 1,
+                    "img_idx": img_idx,
+                    "caption": caption,
+                    "fig_label": fig_label,
+                    "rect": (rect.x0, rect.y0, rect.x1, rect.y1),
+                    "priority": (has_explicit_caption, 1 if caption else 0, area),
+                }
 
-                    # Capture rendered figure with overlay vector annotations / map details if available
-                    if rect.width > 25 and rect.height > 25:
-                        figure = page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), clip=rect, alpha=False)
-                        image_bytes = figure.tobytes("png")
-                        width, height = figure.width, figure.height
-                    else:
-                        image_bytes = pix.tobytes("png")
-                        width, height = pix.width, pix.height
-
-                    ext = "png"
-                    storage_key = f"extracted/{Path(filename).stem}_p{page_idx+1}_img{img_idx}.{ext}"
-                    fig_match = re.search(r'\b(?:fig(?:ure)?\.?|map|photo|chart|diagram|plate)\s*([\d\.]+)', caption, re.I)
-                    fig_label = fig_match.group(0).lower() if fig_match else ""
-                    has_explicit_caption = 1 if fig_label or bool(re.search(r'\b(?:fig(?:ure)?\.?|map|photo|chart|diagram|plate)\b', caption, re.I)) else 0
-                    area = width * height
-
-                    candidate = {
-                        "storage_key": storage_key,
-                        "width": width,
-                        "height": height,
-                        "format": ext,
-                        "page": page_idx + 1,
-                        "byte_size": len(image_bytes),
-                        "caption": caption,
-                        "fig_label": fig_label,
-                        "rect": (rect.x0, rect.y0, rect.x1, rect.y1),
-                        "image_bytes": image_bytes,
-                        "content_type": f"image/{ext}",
-                        "priority": (has_explicit_caption, 1 if caption else 0, area),
-                    }
-
-                    # Same-page deduplication: check if this figure overlaps or has same fig_label as another figure on this page
-                    duplicate = False
-                    for existing in page_figures:
-                        # If same figure label on same page (e.g. Fig. 5.18), keep the higher-resolution one
-                        if fig_label and existing.get("fig_label") == fig_label:
-                            if area > existing["width"] * existing["height"]:
+                # Same-page deduplication: check if this figure overlaps or has same fig_label as another figure on this page
+                duplicate = False
+                for existing in page_figures:
+                    if fig_label and existing.get("fig_label") == fig_label:
+                        if area > (existing["rect"][2] - existing["rect"][0]) * (existing["rect"][3] - existing["rect"][1]):
+                            page_figures.remove(existing)
+                            page_figures.append(candidate)
+                        duplicate = True
+                        break
+                    ex_r = existing["rect"]
+                    ix0 = max(rect.x0, ex_r[0])
+                    iy0 = max(rect.y0, ex_r[1])
+                    ix1 = min(rect.x1, ex_r[2])
+                    iy1 = min(rect.y1, ex_r[3])
+                    if ix1 > ix0 and iy1 > iy0:
+                        inter_area = (ix1 - ix0) * (iy1 - iy0)
+                        smaller_area = min(rect.width * rect.height, (ex_r[2] - ex_r[0]) * (ex_r[3] - ex_r[1]))
+                        if smaller_area > 0 and (inter_area / smaller_area) > 0.65:
+                            if candidate["priority"] > existing["priority"]:
                                 page_figures.remove(existing)
                                 page_figures.append(candidate)
                             duplicate = True
                             break
-                        # Bounding box overlap check
-                        ex_r = existing["rect"]
-                        ix0 = max(rect.x0, ex_r[0])
-                        iy0 = max(rect.y0, ex_r[1])
-                        ix1 = min(rect.x1, ex_r[2])
-                        iy1 = min(rect.y1, ex_r[3])
-                        if ix1 > ix0 and iy1 > iy0:
-                            inter_area = (ix1 - ix0) * (iy1 - iy0)
-                            smaller_area = min(rect.width * rect.height, (ex_r[2] - ex_r[0]) * (ex_r[3] - ex_r[1]))
-                            if smaller_area > 0 and (inter_area / smaller_area) > 0.65:
-                                # Overlapping sub-layer on same page: keep higher priority / larger one
-                                if candidate["priority"] > existing["priority"]:
-                                    page_figures.remove(existing)
-                                    page_figures.append(candidate)
-                                duplicate = True
-                                break
 
-                    if not duplicate:
-                        page_figures.append(candidate)
-
-                except Exception:
-                    logger.warning("Skipping unreadable image on PDF page %s", page_idx + 1, exc_info=True)
-                    continue
+                if not duplicate:
+                    page_figures.append(candidate)
 
             extracted_candidates.extend(page_figures)
 
-        # Cap to top 30 most relevant illustrative figures per document
-        if len(extracted_candidates) > 30:
+        # Cap to top 25 most relevant figures per document
+        if len(extracted_candidates) > 25:
             extracted_candidates.sort(key=lambda c: c["priority"], reverse=True)
-            extracted_candidates = extracted_candidates[:30]
+            extracted_candidates = extracted_candidates[:25]
+
+        # Extract image bytes and payloads for the top candidates
+        if on_progress:
+            on_progress(f"Finalizing {len(extracted_candidates)} high-res figures from {filename}...")
 
         for cand in extracted_candidates:
-            result.image_payloads.append((cand["storage_key"], cand["image_bytes"], cand["content_type"]))
-            result.extracted_images.append({
-                "storage_key": cand["storage_key"],
-                "width": cand["width"],
-                "height": cand["height"],
-                "format": cand["format"],
-                "page": cand["page"],
-                "byte_size": cand["byte_size"],
-                "caption": cand["caption"],
-            })
+            xref = cand["xref"]
+            try:
+                pix = pymupdf.Pixmap(doc, xref)
+                if pix.colorspace and pix.colorspace.n != 3:
+                    pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
+                if not is_documentary_pixmap(pix):
+                    continue
+
+                mask_xref = cand["img_info"][1] if len(cand.get("img_info", [])) > 1 else 0
+                if mask_xref:
+                    try:
+                        mask = pymupdf.Pixmap(doc, mask_xref)
+                        if (mask.width, mask.height) == (pix.width, pix.height):
+                            if pix.alpha:
+                                pix = pymupdf.Pixmap(pix, 0)
+                            pix = pymupdf.Pixmap(pix, mask)
+                    except Exception:
+                        pass
+
+                ext = "png" if pix.alpha else "jpg"
+                image_bytes = pix.tobytes("png") if pix.alpha else pix.tobytes("jpg", jpg_quality=92)
+                storage_key = f"extracted/{Path(filename).stem}_p{cand['page']}_img{cand['img_idx']}.{ext}"
+
+                result.image_payloads.append((storage_key, image_bytes, f"image/{ext}"))
+                result.extracted_images.append({
+                    "storage_key": storage_key,
+                    "width": pix.width,
+                    "height": pix.height,
+                    "format": ext,
+                    "page": cand["page"],
+                    "byte_size": len(image_bytes),
+                    "caption": cand["caption"],
+                })
+            except Exception:
+                logger.warning("Skipping image xref %s on page %s", xref, cand["page"], exc_info=True)
 
         return result
 
@@ -391,6 +379,37 @@ class DocumentExtractor:
                     "source": f"{filename}#{sheet_name}",
                 })
 
+        return result
+
+    @staticmethod
+    def extract_csv(file_bytes: bytes, filename: str) -> ExtractionResult:
+        """Extracts structured tables and markdown rows from CSV/TSV files."""
+        result = ExtractionResult()
+        try:
+            text = file_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            text = file_bytes.decode("latin-1", errors="ignore")
+
+        delimiter = "\t" if filename.endswith(".tsv") else ","
+        reader = csv.reader(io.StringIO(text), delimiter=delimiter)
+        rows = [row for row in reader if any(cell.strip() for cell in row)]
+
+        if rows:
+            result.tables.append({
+                "rows": rows[:100],
+                "source": filename,
+            })
+            md_lines = [f"### Tabular CSV Data: {filename}"]
+            header = " | ".join(rows[0])
+            sep = " | ".join(["---"] * len(rows[0]))
+            md_lines.append(f"| {header} |")
+            md_lines.append(f"| {sep} |")
+            for r in rows[1:50]:
+                md_lines.append(f"| {' | '.join(r)} |")
+            result.text_blocks.append({
+                "content": "\n".join(md_lines),
+                "source": filename,
+            })
         return result
 
     @staticmethod

@@ -215,7 +215,7 @@ async def wait_for_pending_attachments(
     db: Session,
     project_id: str,
     *,
-    timeout_seconds: float = 180.0,
+    timeout_seconds: float = 360.0,
     poll_interval: float = 2.0,
     emit: Callable[..., None] | None = None,
 ) -> None:
@@ -254,6 +254,9 @@ async def wait_for_pending_attachments(
         )
     ).all()
     for attachment in stuck:
+        db.refresh(attachment)
+        if attachment.status not in PENDING_STATUSES:
+            continue
         logger.warning(
             "Recovering stuck attachment extraction attachment_id=%s status=%s",
             attachment.id,
