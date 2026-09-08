@@ -5,7 +5,7 @@ import json
 import time
 import sys
 
-BASE_URL = "https://deckpilot-ai-backend.onrender.com/api/v1"
+BASE_URL = "https://deckpilot-ai.duckdns.org/api/v1"
 ADMIN_EMAIL = "admin@creatorpilot.ai"
 ADMIN_PASSWORD = "Admin@123456"
 PDF_PATH = r"c:\DeckPilotAI\source data.pdf"

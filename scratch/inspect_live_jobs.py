@@ -6,7 +6,7 @@ def main():
     try:
         # Login as admin
         req = urllib.request.Request(
-            'https://deckpilot-ai-backend.onrender.com/api/v1/auth/login',
+            'https://deckpilot-ai.duckdns.org/api/v1/auth/login',
             data=json.dumps({'email': 'admin@creatorpilot.ai', 'password': 'Admin@123456'}).encode(),
             headers={'Content-Type': 'application/json'},
             method='POST'
@@ -16,7 +16,7 @@ def main():
 
         # Get projects
         req = urllib.request.Request(
-            'https://deckpilot-ai-backend.onrender.com/api/v1/projects',
+            'https://deckpilot-ai.duckdns.org/api/v1/projects',
             headers={'Authorization': f'Bearer {token}'}
         )
         with urllib.request.urlopen(req) as resp:
@@ -29,7 +29,7 @@ def main():
             
             # Get active job
             req = urllib.request.Request(
-                f'https://deckpilot-ai-backend.onrender.com/api/v1/projects/{pid}/jobs/active',
+                f'https://deckpilot-ai.duckdns.org/api/v1/projects/{pid}/jobs/active',
                 headers={'Authorization': f'Bearer {token}'}
             )
             try:
@@ -41,7 +41,7 @@ def main():
                         print(f"  Latest Job: {jid} | Status: {job.get('status')}")
                         # Fetch full job
                         req2 = urllib.request.Request(
-                            f'https://deckpilot-ai-backend.onrender.com/api/v1/jobs/{jid}',
+                            f'https://deckpilot-ai.duckdns.org/api/v1/jobs/{jid}',
                             headers={'Authorization': f'Bearer {token}'}
                         )
                         with urllib.request.urlopen(req2) as jdresp:
@@ -54,7 +54,7 @@ def main():
 
             # Get attachments
             req = urllib.request.Request(
-                f'https://deckpilot-ai-backend.onrender.com/api/v1/projects/{pid}/attachments',
+                f'https://deckpilot-ai.duckdns.org/api/v1/projects/{pid}/attachments',
                 headers={'Authorization': f'Bearer {token}'}
             )
             try:
@@ -68,7 +68,7 @@ def main():
 
             # Get messages
             req = urllib.request.Request(
-                f'https://deckpilot-ai-backend.onrender.com/api/v1/projects/{pid}/messages',
+                f'https://deckpilot-ai.duckdns.org/api/v1/projects/{pid}/messages',
                 headers={'Authorization': f'Bearer {token}'}
             )
             try:
