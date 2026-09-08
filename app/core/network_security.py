@@ -15,23 +15,20 @@ def validate_provider_base_url(value: str) -> str:
 
     hostname = parsed.hostname.lower().rstrip(".")
 
-    # In production, require HTTPS unless explicit localhost in development
-    if settings.is_secure_environment and parsed.scheme != "https" and hostname not in {"localhost", "127.0.0.1"}:
-        raise ValueError("Provider base URL must use HTTPS in production environments")
+    if parsed.scheme != "https" and hostname not in {"localhost", "127.0.0.1"}:
+        raise ValueError("Provider base URL must use HTTPS for remote endpoints")
 
     try:
         address = ipaddress.ip_address(hostname)
     except ValueError:
         address = None
 
-    if address is not None and not address.is_global and settings.is_secure_environment:
-        raise ValueError("Provider base URL cannot target a private network in production")
+    if address is not None:
+        if address.is_private or address.is_loopback or address.is_link_local or address.is_reserved or not address.is_global:
+            raise ValueError("Provider base URL cannot target private or metadata IP addresses")
 
-    allowed_hosts = settings.ai_provider_allowed_host_list
-    if allowed_hosts and "*" not in allowed_hosts:
-        if hostname not in allowed_hosts and not any(hostname.endswith(f".{h}") for h in allowed_hosts):
-            # If not in explicit whitelist, allow any valid domain unless strict whitelist is enforced
-            pass
+    if parsed.port not in {None, 80, 443}:
+        raise ValueError(f"Provider base URL cannot use custom port {parsed.port}")
 
     return value.strip().rstrip("/")
 
