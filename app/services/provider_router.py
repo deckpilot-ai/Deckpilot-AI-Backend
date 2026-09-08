@@ -19,6 +19,10 @@ from app.core.encryption import (
 from app.core.network_security import validate_provider_base_url
 from app.models.audit import UsageEvent
 from app.models.provider import AgentRoute, AIKey, AIProvider, AIProviderModel
+from app.services.codecraft_models import (
+    CURATED_CODECRAFT_MODELS,
+    CodeCraftModelManager,
+)
 from app.services.diagnostics_service import DiagnosticsService
 from app.services.experientiallabs_models import ExperientialLabsModelManager
 from app.services.openrouter_models import OpenRouterModelManager
@@ -64,6 +68,7 @@ class ProviderRouter:
     def sync_environment_providers(db: Session) -> None:
         """Auto-synchronize system AI providers and API keys from settings / environment into database."""
         provider_configs = [
+            ("codecraft", settings.codecraft_base_url or "https://codecraftapi.com/v1", settings.codecraft_api_key, 15),
             ("experientiallabs", settings.experientiallabs_base_url or "https://api.experientiallabs.ai/v1", settings.effective_experientiallabs_api_key, 11),
             ("openrouter", "https://openrouter.ai/api/v1", settings.openrouter_api_key, 10),
             ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 9),
@@ -92,7 +97,12 @@ class ProviderRouter:
                 existing_models = db.scalars(select(AIProviderModel).where(AIProviderModel.provider_id == provider.id)).all()
                 if not existing_models:
                     default_models = []
-                    if name == "openrouter":
+                    if name == "codecraft":
+                        default_models = [
+                            {"model_id": m["id"], "display_name": m["name"], "priority": max(100 - (i * 2), 1), "enabled": 1, "context_length": m.get("context_length")}
+                            for i, m in enumerate(CURATED_CODECRAFT_MODELS)
+                        ]
+                    elif name == "openrouter":
                         from app.services.openrouter_models import CURATED_FREE_MODELS
                         default_models = [
                             {"model_id": m["id"], "display_name": m["name"], "priority": 100 - (i * 5), "enabled": 1, "context_length": m.get("context_length")}
@@ -374,7 +384,19 @@ class ProviderRouter:
                     last_error = str(err)
 
         # Fallback to curated catalog for known providers if live endpoint is unreachable
-        if "openrouter" in cleaned_url:
+        if "codecraft" in cleaned_url:
+            effective = CodeCraftModelManager.get_effective_models(api_key=api_key, base_url=cleaned_url)
+            return [
+                {
+                    "id": m["id"],
+                    "name": m["name"],
+                    "context_length": m.get("context_length"),
+                    "description": m.get("description"),
+                    "default_priority": max(100 - (idx * 2), 1),
+                }
+                for idx, m in enumerate(effective)
+            ]
+        elif "openrouter" in cleaned_url:
             from app.services.openrouter_models import CURATED_FREE_MODELS
             return [
                 {
@@ -544,6 +566,11 @@ class ProviderRouter:
             model_candidates: list[str] = []
             if configured_models:
                 model_candidates = [m.model_id for m in configured_models]
+            elif provider.name == "codecraft":
+                effective = CodeCraftModelManager.get_effective_models(
+                    api_key=secret_key, base_url=provider_base_url
+                )
+                model_candidates = [m["id"] for m in effective if CodeCraftModelManager.is_available(m["id"])]
             elif provider.name == "experientiallabs":
                 ranked = await ExperientialLabsModelManager.get_ranked_candidates(
                     api_key=secret_key, base_url=provider_base_url
@@ -597,7 +624,7 @@ class ProviderRouter:
                     if not is_reasoning_model:
                         payload["temperature"] = 0.2
 
-                    req_timeout = httpx.Timeout(min(float(settings.llm_read_timeout_seconds), 25.0), connect=5.0)
+                    req_timeout = httpx.Timeout(min(float(settings.llm_read_timeout_seconds), 45.0), connect=5.0)
                     async with httpx.AsyncClient(timeout=req_timeout) as client:
                         resp = await client.post(url, headers=headers, json=payload)
                         if resp.status_code == 400 and "temperature" in resp.text:
@@ -655,7 +682,9 @@ class ProviderRouter:
 
                     else:
                         raw_text = resp.text if isinstance(getattr(resp, "text", None), str) else ""
-                        if provider.name == "openrouter":
+                        if provider.name == "codecraft":
+                            CodeCraftModelManager.mark_rate_limited(model_id, cooldown_seconds=60)
+                        elif provider.name == "openrouter":
                             OpenRouterModelManager.mark_model_failure(model_id, status_code=resp.status_code)
                         elif provider.name == "experientiallabs":
                             is_unpayable = resp.status_code == 429 and ("model_requires_payment" in raw_text or "free credits" in raw_text)
@@ -675,7 +704,9 @@ class ProviderRouter:
                         continue
 
                 except Exception as model_err:
-                    if provider.name == "openrouter":
+                    if provider.name == "codecraft":
+                        CodeCraftModelManager.mark_rate_limited(model_id, cooldown_seconds=120)
+                    elif provider.name == "openrouter":
                         OpenRouterModelManager.mark_model_failure(model_id, status_code=500)
                     elif provider.name == "experientiallabs":
                         ExperientialLabsModelManager.mark_model_failure(model_id, status_code=500, cooldown_seconds=300)

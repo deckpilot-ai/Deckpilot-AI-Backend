@@ -42,7 +42,8 @@ class Settings(BaseSettings):
     allowed_hosts: str = "localhost,127.0.0.1,testserver"
     ai_provider_allowed_hosts: str = (
         "openrouter.ai,api.openai.com,generativelanguage.googleapis.com,"
-        "api.groq.com,api.mistral.ai,api.anthropic.com,api.experientiallabs.ai"
+        "api.groq.com,api.mistral.ai,api.anthropic.com,api.experientiallabs.ai,"
+        "codecraftapi.com,api.codecraftapi.com"
     )
 
     # Request limits
@@ -70,6 +71,8 @@ class Settings(BaseSettings):
     experientiallabs_api_key: str = ""
     explabs_api_key: str = ""
     experientiallabs_base_url: str = "https://api.experientiallabs.ai/v1"
+    codecraft_api_key: str = ""
+    codecraft_base_url: str = "https://codecraftapi.com/v1"
 
     @property
     def effective_experientiallabs_api_key(self) -> str:
