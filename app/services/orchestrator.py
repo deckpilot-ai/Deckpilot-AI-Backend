@@ -357,7 +357,7 @@ class JobOrchestrator:
                             user_id=user_id,
                             job_id=job_id,
                         ),
-                        timeout=5.0,
+                        timeout=15.0,
                     )
                 except Exception as e:
                     logger.info("Brand detection fast-path: leveraging DesignIntelligenceAgent (%s)", e)
@@ -407,7 +407,7 @@ class JobOrchestrator:
                             user_id=user_id,
                             job_id=job_id,
                         ),
-                        timeout=30.0,
+                        timeout=90.0,
                     )
                 except Exception as e:
                     logger.warning("Deck planner LLM fallback to StorylineAgent: %s", e)
@@ -479,7 +479,7 @@ class JobOrchestrator:
                                 user_id=user_id,
                                 job_id=job_id,
                             ),
-                            timeout=25.0,
+                            timeout=90.0,
                         )
                         ws_list = []
                         if isinstance(writer_out, list):
@@ -580,6 +580,20 @@ class JobOrchestrator:
                                         slide["imageCaption"] = meta.get("caption") or art.source_locator or "Uploaded reference image"
                         except Exception:
                             logger.warning("Source image %s unavailable", art.id)
+
+                # Distribute available documentary source_images to slides if not explicitly assigned
+                if source_images:
+                    available_img_ids = list(source_images.keys())
+                    img_idx = 0
+                    for slide in context.get("deck_spec", {}).get("slides", []):
+                        if not slide.get("imageArtifactId") and img_idx < len(available_img_ids):
+                            art_id = available_img_ids[img_idx]
+                            slide["imageArtifactId"] = art_id
+                            meta = json.loads(next((a.json_data for a in existing_artifacts if a.id == art_id), "{}"))
+                            slide["imageCaption"] = meta.get("caption") or "Source document illustration"
+                            if slide.get("layoutHint") in (None, "default", "two_column"):
+                                slide["layoutHint"] = "image_focus"
+                            img_idx += 1
 
                 for slide in context.get("deck_spec", {}).get("slides", []):
                     if slide.get("imageArtifactId") and slide.get("imageArtifactId") not in source_images:

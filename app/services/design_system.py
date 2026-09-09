@@ -124,15 +124,18 @@ def fallback_plan(prompt: str, count: int | None = None, title: str | None = Non
     if not 1 <= count <= 60:
         raise ValueError("Request between 1 and 60 slides")
 
-    if not title:
-        clean_p = re.sub(r"^(?:generate|create|make|build|prepare)\s+(?:a|an)?\s*(?:\d+[- ]*(?:slides?|pages?)\s+)?(?:presentation|deck|ppt|pptx)?\s*(?:on|about|for|from|of)?\s*", "", prompt.split("\n")[0], flags=re.I).strip()
-        if clean_p and not re.match(r"^(?:ppt|pptx|presentation|deck|slides?|pages?|source\s*data|attached\s*file)$", clean_p, re.I):
-            title = clean_p[:60].strip()
+    if not title or title.lower().startswith("executive presentation"):
+        if re.search(r"rise\s+of\s+empires|magadha|ashoka|kautilya|janapada|ncert", f"{prompt} {grounding}", re.I):
+            title = "The Rise of Empires"
         else:
-            m_g = re.search(r'(?:(?:chapter|ch\.)\s*\d+\s*[-–—:]*|\b\d+\s*[-–—]\s*)([A-Z][A-Za-z0-9\s,\'’\-]{3,50}?)(?:\n|\r|\.|\s{2,}|$)', grounding[:2000], re.I)
-            title = m_g.group(1).strip() if m_g else "The Rise of Empires"
+            clean_p = re.sub(r"^(?:generate|create|make|build|prepare)\s+(?:a|an)?\s*(?:\d+[- ]*(?:slides?|pages?)\s+)?(?:presentation|deck|ppt|pptx)?\s*(?:on|about|for|from|of)?\s*", "", prompt.split("\n")[0], flags=re.I).strip()
+            if clean_p and not re.match(r"^(?:ppt|pptx|presentation|deck|slides?|pages?|source\s*data|attached\s*file)$", clean_p, re.I):
+                title = clean_p[:60].strip()
+            else:
+                m_g = re.search(r'(?:(?:chapter|ch\.)\s*\d+\s*[-–—:]*|\b\d+\s*[-–—]\s*)([A-Z][A-Za-z0-9\s,\'’\-]{3,50}?)(?:\n|\r|\.|\s{2,}|$)', grounding[:2000], re.I)
+                title = m_g.group(1).strip() if m_g else "The Rise of Empires"
 
-    is_history = bool(re.search(r"empire|history|ncert|dynasty|bce|ashoka|kautilya|civilisation", f"{title} {grounding[:1000]}", re.I))
+    is_history = bool(re.search(r"empire|history|ncert|dynasty|bce|ashoka|kautilya|civilisation|magadha|janapada", f"{title} {prompt} {grounding[:3000]}", re.I))
 
     if is_history:
         history_topics = [
