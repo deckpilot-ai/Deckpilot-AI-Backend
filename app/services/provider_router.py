@@ -717,8 +717,8 @@ class ProviderRouter:
                     timeout_val = 6.0
                     conn_timeout = 3.0
                 else:
-                    timeout_val = min(float(settings.llm_read_timeout_seconds), 30.0)
-                    conn_timeout = 4.0
+                    timeout_val = float(settings.llm_read_timeout_seconds or 90.0)
+                    conn_timeout = 8.0
                 req_timeout = httpx.Timeout(timeout_val, connect=conn_timeout)
                 async with httpx.AsyncClient(timeout=req_timeout) as client:
                     resp = await client.post(url, headers=headers, json=payload)
