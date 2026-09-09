@@ -625,8 +625,8 @@ class ProviderRouter:
                 len(ranked),
             )
 
-        # 4. Try candidates in ranked order
-        for candidate in ranked:
+        # 4. Try candidates in ranked order (limit to top 3 healthiest candidates to prevent prolonged hangs)
+        for candidate in ranked[:3]:
             provider = candidate["provider"]
             provider_base_url = candidate["provider_base_url"]
             key_record = candidate["key_record"]
@@ -674,7 +674,9 @@ class ProviderRouter:
                 if not is_reasoning_model:
                     payload["temperature"] = 0.2
 
-                req_timeout = httpx.Timeout(min(float(settings.llm_read_timeout_seconds), 45.0), connect=5.0)
+                # Fast timeout for brand/title intelligence, standard timeout for generation
+                timeout_val = 6.0 if agent_type in ("font_brand_detection", "title_intelligence") else min(float(settings.llm_read_timeout_seconds), 30.0)
+                req_timeout = httpx.Timeout(timeout_val, connect=4.0)
                 async with httpx.AsyncClient(timeout=req_timeout) as client:
                     resp = await client.post(url, headers=headers, json=payload)
                     if resp.status_code == 400 and "temperature" in resp.text:

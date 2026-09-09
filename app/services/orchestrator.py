@@ -327,21 +327,27 @@ class JobOrchestrator:
                 _update_task("font_brand_detection", "running", started=True)
                 _emit("font_brand_detection", "running", "Creating tailored design system, color palette, and typography hierarchy...")
 
+                goal: PresentationGoal = context.get("presentation_goal") or RequirementsAgent.analyze_requirements(user_prompt)
+
                 llm_brand = None
                 try:
-                    llm_brand = await ProviderRouter.call_llm(
-                        db=db,
-                        agent_type="font_brand_detection",
-                        system_prompt=BRAND_STYLE_SYSTEM_PROMPT,
-                        user_prompt=enriched_prompt,
-                        response_schema={"type": "object"},
-                        user_id=user_id,
-                        job_id=job_id,
+                    # Non-blocking brand hint with concise prompt and fast 5-second timeout
+                    brand_input = f"Topic: {goal.topic}\nAudience: {goal.target_audience}\nIndustry: {goal.industry}\nPreferences: {user_prompt[:300]}"
+                    llm_brand = await asyncio.wait_for(
+                        ProviderRouter.call_llm(
+                            db=db,
+                            agent_type="font_brand_detection",
+                            system_prompt=BRAND_STYLE_SYSTEM_PROMPT,
+                            user_prompt=brand_input,
+                            response_schema={"type": "object"},
+                            user_id=user_id,
+                            job_id=job_id,
+                        ),
+                        timeout=5.0,
                     )
                 except Exception as e:
-                    logger.warning("LLM brand detection fallback: %s", e)
+                    logger.info("Brand detection fast-path: leveraging DesignIntelligenceAgent (%s)", e)
 
-                goal: PresentationGoal = context.get("presentation_goal") or RequirementsAgent.analyze_requirements(user_prompt)
                 design_system: DesignSystem = DesignIntelligenceAgent.generate_design_system(
                     goal=goal,
                     reference_profile=reference_ppt_profile,
@@ -364,7 +370,8 @@ class JobOrchestrator:
             if job_mode != "export" and "deck_planner" in task_types:
                 _update_task("deck_planner", "running", started=True)
 
-                target_slide_count = (context.get("presentation_goal") or PresentationGoal()).target_slide_count
+                goal: PresentationGoal = context.get("presentation_goal") or RequirementsAgent.analyze_requirements(user_prompt)
+                target_slide_count = goal.target_slide_count
                 planner_prompt = enriched_prompt
                 if target_slide_count:
                     planner_prompt += (
@@ -374,15 +381,22 @@ class JobOrchestrator:
 
                 _emit("deck_planner", "running", f"Structuring storyline across {target_slide_count} slides...")
 
-                deck_spec = await ProviderRouter.call_llm(
-                    db=db,
-                    agent_type="deck_planner",
-                    system_prompt=DECK_PLANNER_SYSTEM_PROMPT,
-                    user_prompt=planner_prompt,
-                    response_schema={"type": "object"},
-                    user_id=user_id,
-                    job_id=job_id,
-                )
+                deck_spec = None
+                try:
+                    deck_spec = await asyncio.wait_for(
+                        ProviderRouter.call_llm(
+                            db=db,
+                            agent_type="deck_planner",
+                            system_prompt=DECK_PLANNER_SYSTEM_PROMPT,
+                            user_prompt=planner_prompt,
+                            response_schema={"type": "object"},
+                            user_id=user_id,
+                            job_id=job_id,
+                        ),
+                        timeout=30.0,
+                    )
+                except Exception as e:
+                    logger.warning("Deck planner LLM fallback to StorylineAgent: %s", e)
 
                 if not isinstance(deck_spec, dict):
                     deck_spec = {}
@@ -400,7 +414,7 @@ class JobOrchestrator:
                     deck_spec = fallback_plan(user_prompt, target_slide_count)
 
                 if not deck_spec.get("deckTitle"):
-                    deck_spec["deckTitle"] = (context.get("presentation_goal") or PresentationGoal()).topic or "Executive Presentation"
+                    deck_spec["deckTitle"] = goal.topic or "Executive Presentation"
 
                 # Title enhancement on planned slides
                 for s in deck_spec.get("slides", []):
@@ -435,14 +449,23 @@ class JobOrchestrator:
                     )
 
                     try:
-                        writer_out = await ProviderRouter.call_llm(
-                            db=db,
-                            agent_type="slide_writer",
-                            system_prompt=SLIDE_WRITER_SYSTEM_PROMPT,
-                            user_prompt=f"User Intent: {enriched_prompt}\nPreserve each planned topic and slideId exactly.\nPlanned Slides Batch: {json.dumps(batch_slides)}",
-                            response_schema={"type": "object"},
-                            user_id=user_id,
-                            job_id=job_id,
+                        writer_batch_prompt = (
+                            f"User Goal: {user_prompt[:800]}\n"
+                            f"Grounding Reference: {context.get('grounding', '')[:2500]}\n"
+                            f"Preserve each planned topic and slideId exactly.\n"
+                            f"Planned Slides Batch: {json.dumps(batch_slides)}"
+                        )
+                        writer_out = await asyncio.wait_for(
+                            ProviderRouter.call_llm(
+                                db=db,
+                                agent_type="slide_writer",
+                                system_prompt=SLIDE_WRITER_SYSTEM_PROMPT,
+                                user_prompt=writer_batch_prompt,
+                                response_schema={"type": "object"},
+                                user_id=user_id,
+                                job_id=job_id,
+                            ),
+                            timeout=25.0,
                         )
                         ws_list = []
                         if isinstance(writer_out, list):
