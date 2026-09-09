@@ -69,10 +69,10 @@ class ProviderRouter:
     def sync_environment_providers(db: Session) -> None:
         """Auto-synchronize system AI providers and API keys from settings / environment into database."""
         provider_configs = [
+            ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 18),
             ("codecraft", settings.codecraft_base_url or "https://codecraftapi.com/v1", settings.codecraft_api_key, 15),
             ("experientiallabs", settings.experientiallabs_base_url or "https://api.experientiallabs.ai/v1", settings.effective_experientiallabs_api_key, 11),
             ("openrouter", "https://openrouter.ai/api/v1", settings.openrouter_api_key, 10),
-            ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 9),
             ("openai", "https://api.openai.com/v1", settings.openai_api_key, 8),
             ("groq", "https://api.groq.com/openai/v1", settings.groq_api_key, 7),
             ("mistral", "https://api.mistral.ai/v1", settings.mistral_api_key, 6),
@@ -93,12 +93,22 @@ class ProviderRouter:
                     db.add(provider)
                     db.commit()
                     db.refresh(provider)
+                else:
+                    if provider.priority != priority:
+                        provider.priority = priority
+                        db.commit()
 
                 # Seed initial default models if this provider has none configured
                 existing_models = db.scalars(select(AIProviderModel).where(AIProviderModel.provider_id == provider.id)).all()
                 if not existing_models:
                     default_models = []
-                    if name == "codecraft":
+                    if name == "gemini":
+                        default_models = [
+                            {"model_id": "gemini-2.5-flash", "display_name": "Gemini 2.5 Flash", "priority": 100, "enabled": 1, "context_length": 1000000},
+                            {"model_id": "gemini-3.6-flash", "display_name": "Gemini 3.6 Flash", "priority": 95, "enabled": 1, "context_length": 1000000},
+                            {"model_id": "gemini-2.5-pro", "display_name": "Gemini 2.5 Pro", "priority": 90, "enabled": 1, "context_length": 1000000},
+                        ]
+                    elif name == "codecraft":
                         default_models = [
                             {"model_id": m["id"], "display_name": m["name"], "priority": max(100 - (i * 2), 1), "enabled": 1, "context_length": m.get("context_length")}
                             for i, m in enumerate(CURATED_CODECRAFT_MODELS)
@@ -119,11 +129,6 @@ class ProviderRouter:
                         default_models = [
                             {"model_id": "gpt-4o", "display_name": "GPT-4o (Flagship)", "priority": 95, "enabled": 1, "context_length": 128000},
                             {"model_id": "gpt-4o-mini", "display_name": "GPT-4o Mini", "priority": 90, "enabled": 1, "context_length": 128000},
-                        ]
-                    elif name == "gemini":
-                        default_models = [
-                            {"model_id": "gemini-3.6-flash", "display_name": "Gemini 3.6 Flash", "priority": 95, "enabled": 1, "context_length": 1000000},
-                            {"model_id": "gemini-2.5-pro", "display_name": "Gemini 2.5 Pro", "priority": 90, "enabled": 1, "context_length": 1000000},
                         ]
                     elif name == "groq":
                         default_models = [
@@ -646,8 +651,13 @@ class ProviderRouter:
                 return True
             return False
 
+        skipped_providers: set[str] = set()
+
         for candidate in ranked[:max_candidates]:
             provider = candidate["provider"]
+            if provider.name in skipped_providers:
+                continue
+
             provider_base_url = candidate["provider_base_url"]
             key_record = candidate["key_record"]
             secret_key = candidate["secret_key"]
@@ -840,12 +850,33 @@ class ProviderRouter:
                         duration_ms=latency,
                         additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
                     )
+                    is_provider_outage = (
+                        resp.status_code in (502, 503, 504, 403)
+                        or (resp.status_code == 429 and any(
+                            phrase in raw_text.lower()
+                            for phrase in ("card on file", "insufficient_quota", "requires_purchase", "free tier", "out of credits", "quota_exceeded")
+                        ))
+                    )
+                    if is_provider_outage:
+                        logger.warning(
+                            "Provider %s experienced provider-level failure (HTTP %s). Skipping remaining models for this provider.",
+                            provider.name, resp.status_code,
+                        )
+                        skipped_providers.add(provider.name)
+
                     logger.warning("Provider %s model %s returned HTTP %s", provider.name, model_id, resp.status_code)
                     continue
 
             except Exception as model_err:
                 # Record failure in health tracker
                 health_tracker.record_failure(provider.name, model_id)
+
+                if isinstance(model_err, (httpx.ConnectError, httpx.ConnectTimeout)):
+                    logger.warning(
+                        "Provider %s connection error (%s). Skipping remaining models for this provider.",
+                        provider.name, model_err,
+                    )
+                    skipped_providers.add(provider.name)
 
                 if provider.name == "codecraft":
                     CodeCraftModelManager.mark_rate_limited(model_id, cooldown_seconds=120)
