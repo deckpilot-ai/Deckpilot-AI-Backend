@@ -1,5 +1,6 @@
 """Service for conversational chat turns, intent detection, 3-mode routing (Ask, Plan, Autopilot), and presentation triggering."""
 
+import asyncio
 import json
 import logging
 import time
@@ -389,18 +390,21 @@ class ChatService:
 
         assistant_text = None
         try:
-            llm_res = await ProviderRouter.call_llm(
-                db=db,
-                agent_type="copilot_chat",
-                system_prompt=COPILOT_CHAT_SYSTEM_PROMPT,
-                user_prompt=user_prompt_conversational,
-                response_schema=None,
-                user_id=user_id,
+            llm_res = await asyncio.wait_for(
+                ProviderRouter.call_llm(
+                    db=db,
+                    agent_type="copilot_chat",
+                    system_prompt=COPILOT_CHAT_SYSTEM_PROMPT,
+                    user_prompt=user_prompt_conversational,
+                    response_schema=None,
+                    user_id=user_id,
+                ),
+                timeout=6.0,
             )
             if isinstance(llm_res, dict):
                 assistant_text = llm_res.get("text") or llm_res.get("content")
         except Exception:
-            logger.warning("Chat provider failed; using fallback", exc_info=True)
+            logger.warning("Chat provider failed or timed out; using fast fallback", exc_info=True)
 
         # Concise default if LLM returns empty or fails
         if not assistant_text or len(assistant_text.strip()) < 5:

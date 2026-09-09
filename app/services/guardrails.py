@@ -40,27 +40,71 @@ VERBOSITY_WORD_LIMITS: dict[VerbosityLevel, int] = {
 
 # Regex patterns for greetings
 GREETING_PATTERNS = [
-    r"^(hi|hello|hey|hola|sup|yo|greetings|howdy|good\s*(morning|afternoon|evening|day))(\s+(there|copilot|deckpilot|assistant|bot|team|all|everyone))?(!|\.|\?|\s)*$",
-    r"^(how\s+are\s+you|how's\s+it\s+going|what'?s\s+up|how\s+do\s+you\s+do)(!|\.|\?|\s)*$",
+    r"^(hi|hello|hey|hola|sup|yo|greetings|howdy|good\s*(morning|afternoon|evening|day))(\s+(there|copilot|deckpilot|assistant|bot|team|all|everyone|friend))?(!|\.|\?|\s)*$",
+    r"^(how\s+are\s+you|how's\s+it\s+going|what'?s\s+up|how\s+do\s+you\s+do|how\s+are\s+things)(!|\.|\?|\s)*$",
+    r"^(hi|hello|hey)\s+([a-zA-Z0-9_\-]+\s*)?([,\.\?!]\s*)?(how\s+are\s+you|what'?s\s+up|how\s+can\s+you\s+help|what\s+can\s+you\s+do|how\s+are\s+things)(!|\.|\?|\s)*$",
+    r"^(hi|hello|hey|greetings)\s+(there|copilot|deckpilot|assistant|bot|ai)[,\.\s]+(how\s+are\s+you|what'?s\s+up|how\s+can\s+you\s+help|what\s+can\s+you\s+do).*$",
 ]
 
 # Regex patterns for casual politeness / acknowledgement
 POLITENESS_PATTERNS = [
-    r"^(thanks(\s+a\s+lot)?|thank\s+you(\s+(so\s+much|very\s+much))?|thx|ty|much\s+appreciated)(!|\.|\?|\s)*$",
-    r"^(ok|okay|cool|nice|great|awesome|got\s+it|understood|sure|alright|perfect)(!|\.|\?|\s)*$",
-    r"^(bye|goodbye|see\s+you|cya)(!|\.|\?|\s)*$",
+    r"^(thanks(\s+a\s+lot)?|thank\s+you(\s+(so\s+much|very\s+much|a\s+lot))?|thx|ty|much\s+appreciated|appreciate\s+it)(!|\.|\?|\s)*$",
+    r"^(ok|okay|cool|nice|great|awesome|got\s+it|understood|sure|alright|perfect|well\s+done|good\s+job)(!|\.|\?|\s)*$",
+    r"^(bye|goodbye|see\s+you|cya|take\s+care)(!|\.|\?|\s)*$",
+]
+
+# Regex patterns for affirmations & confirmations (e.g. "yes", "go ahead", "let's do it")
+CONFIRMATION_PATTERNS = [
+    r"^(yes|yeah|yep|yup|definitely|absolutely|indeed|go\s*ahead|let'?s\s*do\s*it|proceed|continue|sounds\s*good|do\s*it)(\s+(please|copilot|deckpilot))?(!|\.|\s)*$",
+    r"^(yes\s+please|yes\s+do\s+it|yes\s+create|yes\s+build|yes\s+generate|ok\s+go\s+ahead|sure\s+thing)(!|\.|\s)*$",
+]
+
+# Regex patterns for negations & dismissals (e.g. "no", "cancel", "not now")
+NEGATION_PATTERNS = [
+    r"^(no|nope|nah|not\s+now|never\s*mind|cancel|stop|don'?t|leave\s+it)(!|\.|\s)*$",
+    r"^(no\s+thanks|no\s+thank\s+you|no\s+not\s+yet|not\s+really)(!|\.|\s)*$",
 ]
 
 # Capability inquiries
 CAPABILITY_PATTERNS = [
     r"^(who\s+are\s+you|what\s+are\s+you|what\s+can\s+you\s+do|tell\s+me\s+about\s+yourself)(!|\.|\?|\s)*$",
-    r"^(how\s+does\s+this\s+work|what\s+is\s+deckpilot|what\s+do\s+you\s+do)(!|\.|\?|\s)*$",
-    r"^(can\s+you\s+(make|create|build)\s+(a\s+)?(presentation|deck|slides)\??)$",
+    r"^(how\s+does\s+this\s+work|what\s+is\s+deckpilot|what\s+do\s+you\s+do|what\s+is\s+this(\s+app)?)(!|\.|\?|\s)*$",
+    r"^(how\s+do\s+i\s+use\s+this|how\s+to\s+use\s+this|how\s+to\s+start|how\s+does\s+it\s+work)(!|\.|\?|\s)*$",
+    r"^(what\s+features\s+do\s+you\s+have|what\s+can\s+i\s+do\s+here|tell\s+me\s+features)(!|\.|\?|\s)*$",
+    r"^(can\s+you\s+(make|create|build|generate|design)\s+(a\s+)?(presentation|deck|slides|ppt|powerpoint)\??)$",
+    r"^(i\s+want\s+to\s+(make|create|build|generate)\s+(a\s+)?(presentation|deck|slides|ppt|powerpoint)\??)$",
+]
+
+# Document upload & format inquiries
+DOCUMENT_UPLOAD_PATTERNS = [
+    r"^(how\s+to\s+upload(\s+(a\s+)?(pdf|file|files|doc|document|documents|notes|data))?|how\s+do\s+i\s+upload(\s+(a\s+)?(pdf|file|files|doc|document|documents))?|can\s+i\s+upload(\s+(a\s+)?(pdf|file|files|doc|document|documents|image|images))?|can\s+you\s+read\s+(pdf|documents|files)|what\s+files?\s+(are\s+)?supported)(!|\.|\?|\s)*$",
+    r"^(upload\s+(file|pdf|doc|document)|how\s+to\s+add\s+(documents|files|pdf)|where\s+(do\s+i|to)\s+upload)(!|\.|\?|\s)*$",
 ]
 
 # Casual help
 HELP_PATTERNS = [
-    r"^(help|can\s+you\s+help\s+me|i\s+need\s+help|assist\s+me)(!|\.|\?|\s)*$",
+    r"^(help|can\s+you\s+help\s+me|i\s+need\s+help|assist\s+me|help\s+me|support)(!|\.|\?|\s)*$",
+    r"^(what\s+should\s+i\s+do|how\s+to\s+get\s+started|where\s+do\s+i\s+start)(!|\.|\?|\s)*$",
+]
+
+# FAQ: Pricing, free tier
+PRICING_PATTERNS = [
+    r"^(is\s+(this|it)\s+free|what\s+does\s+it\s+cost|pricing|how\s+much\s+is\s+it)(!|\.|\?|\s)*$",
+]
+
+# FAQ: Download & export
+EXPORT_DOWNLOAD_PATTERNS = [
+    r"^(how\s+(can\s+i|to|do\s+i)\s+(download|export)(\s+(the\s+)?(deck|presentation|ppt|pptx|slides))?|can\s+i\s+download(\s+(the\s+)?(ppt|pptx|file|presentation))?)(!|\.|\?|\s)*$",
+]
+
+# FAQ: Editing slides
+EDIT_PATTERNS = [
+    r"^(can\s+i\s+edit(\s+(the\s+)?(slides|deck|presentation))?|how\s+(to|do\s+i)\s+edit(\s+slides)?)(!|\.|\?|\s)*$",
+]
+
+# FAQ: Speed / time
+SPEED_PATTERNS = [
+    r"^(how\s+long\s+does\s+it\s+take|how\s+fast\s+(is\s+it|are\s+you)|generation\s+time)(!|\.|\?|\s)*$",
 ]
 
 # Presentation creation triggers
@@ -175,22 +219,85 @@ class InputGuardrailService:
                     "You're welcome! Let me know whenever you'd like to create or refine a presentation.",
                 )
 
-        # 4. Capability inquiries (e.g. "Who are you?", "What can you do?")
+        # 4. Confirmations & Affirmations (e.g. "Yes", "Go ahead", "Sure", "Let's do it")
+        for pattern in CONFIRMATION_PATTERNS:
+            if re.match(pattern, lower):
+                return (
+                    IntentCategory.POLITENESS,
+                    VerbosityLevel.MINIMAL,
+                    "Great! Tell me what topic or outline you'd like to create, or upload your document to get started.",
+                )
+
+        # 5. Negations & Dismissals (e.g. "No", "Cancel", "Not now")
+        for pattern in NEGATION_PATTERNS:
+            if re.match(pattern, lower):
+                return (
+                    IntentCategory.POLITENESS,
+                    VerbosityLevel.MINIMAL,
+                    "Understood! Let me know whenever you're ready to build or refine your presentation.",
+                )
+
+        # 6. Capability inquiries (e.g. "Who are you?", "What can you do?", "How does this work?")
         for pattern in CAPABILITY_PATTERNS:
             if re.match(pattern, lower):
                 return (
                     IntentCategory.CAPABILITY_QUERY,
                     VerbosityLevel.CONCISE,
-                    "I am **deckpilotAI** Copilot. I turn ideas, outlines, and documents into executive PowerPoint decks. Tell me your topic, and I will research, outline, and build your slides.",
+                    "I am **deckpilotAI** Copilot. I turn ideas, outlines, and documents into executive PowerPoint decks (.pptx). Tell me your topic, and I will research, outline, and build your slides.",
                 )
 
-        # 5. Casual help (e.g. "Can you help me?", "Help")
+        # 7. Document upload & format inquiries (e.g. "Can I upload PDF?", "How to upload?")
+        for pattern in DOCUMENT_UPLOAD_PATTERNS:
+            if re.match(pattern, lower):
+                return (
+                    IntentCategory.CAPABILITY_QUERY,
+                    VerbosityLevel.CONCISE,
+                    "You can upload PDF, Word documents (.docx), or text notes using the attachment clip icon. I'll extract key insights, data tables, and diagrams to build your presentation.",
+                )
+
+        # 8. Casual help (e.g. "Can you help me?", "Help")
         for pattern in HELP_PATTERNS:
             if re.match(pattern, lower):
                 return (
                     IntentCategory.CASUAL_HELP,
                     VerbosityLevel.CONCISE,
                     "Absolutely! I can create complete presentations, formulate slide outlines, or research strategic topics. What topic are you working on?",
+                )
+
+        # 9. FAQ: Pricing / Free Tier
+        for pattern in PRICING_PATTERNS:
+            if re.match(pattern, lower):
+                return (
+                    IntentCategory.CAPABILITY_QUERY,
+                    VerbosityLevel.CONCISE,
+                    "**deckpilotAI** is free to use during our developer preview. You can generate, preview, and download full PowerPoint presentations (.pptx) without restrictions.",
+                )
+
+        # 10. FAQ: Export / Download
+        for pattern in EXPORT_DOWNLOAD_PATTERNS:
+            if re.match(pattern, lower):
+                return (
+                    IntentCategory.CAPABILITY_QUERY,
+                    VerbosityLevel.CONCISE,
+                    "Once your deck is generated, you can download the complete PowerPoint presentation (.pptx) using the **Export / Download PPTX** button in the top navigation bar.",
+                )
+
+        # 11. FAQ: Editing slides
+        for pattern in EDIT_PATTERNS:
+            if re.match(pattern, lower):
+                return (
+                    IntentCategory.CAPABILITY_QUERY,
+                    VerbosityLevel.CONCISE,
+                    "Yes! You can edit any prompt message in chat to regenerate slides, or download the .pptx file and edit it directly in Microsoft PowerPoint, Google Slides, or Apple Keynote.",
+                )
+
+        # 12. FAQ: Generation speed
+        for pattern in SPEED_PATTERNS:
+            if re.match(pattern, lower):
+                return (
+                    IntentCategory.CAPABILITY_QUERY,
+                    VerbosityLevel.CONCISE,
+                    "Generating a complete presentation takes approximately 15–25 seconds. DeckPilot researches the topic, plans slide structure, writes content, and renders professional 16:9 PowerPoint slides.",
                 )
 
         # 6. Mode overrides
