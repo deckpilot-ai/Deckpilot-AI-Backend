@@ -693,6 +693,7 @@ class ProviderRouter:
                 if response_schema and "json" not in sys_prompt_final.lower():
                     sys_prompt_final += "\n\nRespond with valid JSON matching the requested structure."
 
+                is_reasoning_model = any(m in model_id.lower() for m in ("o1", "o3", "reasoner", "r1"))
                 effective_model_id = (
                     model_id.replace("models/", "")
                     if provider.name == "gemini"
