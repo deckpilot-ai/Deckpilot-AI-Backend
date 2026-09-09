@@ -170,16 +170,16 @@ class DocumentExtractor:
 
             extracted_candidates.extend(page_figures)
 
-        # Cap to top 10 most relevant illustrative figures per document
-        if len(extracted_candidates) > 10:
-            extracted_candidates.sort(key=lambda c: c["priority"], reverse=True)
-            extracted_candidates = extracted_candidates[:10]
+        # Sort all candidate figures by priority (explicit figure caption, caption presence, area)
+        extracted_candidates.sort(key=lambda c: c["priority"], reverse=True)
 
-        # Extract image bytes and payloads for the top candidates
         if on_progress:
-            on_progress(f"Finalizing {len(extracted_candidates)} high-res figures from {filename}...")
+            on_progress(f"Finalizing high-res documentary figures from {filename}...")
 
+        max_figures = 16
         for cand in extracted_candidates:
+            if len(result.extracted_images) >= max_figures:
+                break
             xref = cand["xref"]
             try:
                 pix = pymupdf.Pixmap(doc, xref)

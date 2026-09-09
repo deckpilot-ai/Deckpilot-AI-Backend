@@ -316,6 +316,94 @@ class PPTXRenderer:
                 quote_text = (slide_data.quote or {}).get("text") if isinstance(slide_data.quote, dict) else "Strategic Horizon & Execution Commitment"
                 cls._text(slide, quote_text, 8.15, 4.15, 4.35, 1.9, white, title_font, 15, bold=True, center=True, italic=True)
 
+            elif slide_data.layout_hint in ("big_questions", "numbered_columns") or (layout == LayoutFamily.CARD_GRID and len(bullets) == 4 and any("?" in b for b in bullets)):
+                for j, item in enumerate(bullets[:4]):
+                    x = 0.6 + j * (2.8 + 0.3)
+                    y = 2.05
+                    w = 2.8
+                    h = 4.65
+                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, h, fill, f"card-{j+1}", corner_radius=0.04)
+                    cls._shape(slide, MSO_SHAPE.OVAL, x + 0.8, y + 0.3, 1.2, 1.2, primary, f"badge-{j+1}")
+                    cls._text(slide, f"0{j+1}", x + 0.8, y + 0.3, 1.2, 1.2, white, title_font, 28, bold=True, center=True)
+                    if "\n" in item:
+                        parts = item.split("\n", 1)
+                    elif ":" in item:
+                        parts = item.split(":", 1)
+                    elif "?" in item:
+                        parts = item.split("?", 1)
+                        parts[0] = parts[0] + "?"
+                    else:
+                        parts = [item[:45], item[45:]]
+                    q_t = parts[0].strip()
+                    q_b = parts[1].strip() if len(parts) > 1 else ""
+                    if len(q_t) > 48:
+                        q_t = q_t[:45].rsplit(" ", 1)[0] + "..."
+                    cls._text(slide, q_t, x + 0.15, y + 1.65, w - 0.3, 0.85, primary, title_font, 12.5, bold=True, center=True)
+                    cls._shape(slide, MSO_SHAPE.RECTANGLE, x + 0.8, y + 2.55, 1.2, 0.04, accent, "rule")
+                    if q_b:
+                        if len(q_b) > 180:
+                            q_b = q_b[:175].rsplit(" ", 1)[0] + "..."
+                        cls._text(slide, q_b, x + 0.2, y + 2.7, w - 0.4, 1.8, body_col, body_font, 11, center=True)
+
+            elif slide_data.layout_hint in ("saptanga", "hub_spoke") or getattr(slide_data.diagram_spec, "diagram_type", "") in ("saptanga", "hub_spoke"):
+                cx, cy, cw, ch = 5.25, 2.35, 2.85, 2.95
+                cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, cx, cy, cw, ch, primary, "center-hub", corner_radius=0.06)
+                cls._shape(slide, MSO_SHAPE.OVAL, cx + 0.925, cy + 0.3, 1.0, 1.0, accent, "hub-disc")
+                cls._text(slide, "★", cx + 0.925, cy + 0.3, 1.0, 1.0, white, body_font, 20, bold=True, center=True)
+                cls._text(slide, "Swāmi (The Sovereign)", cx + 0.15, cy + 1.45, cw - 0.3, 0.4, white, title_font, 14.5, bold=True, center=True)
+                cls._text(slide, "The supreme authority guiding state welfare, justice, defence, and moral righteousness.", cx + 0.15, cy + 1.9, cw - 0.3, 0.9, tint(white, 0.15), body_font, 10.5, center=True)
+
+                limbs = bullets if len(bullets) >= 6 else (bullets + [f"Limb {k}: Administrative function" for k in range(len(bullets), 6)])
+                for k, limb in enumerate(limbs[:6]):
+                    is_right = k >= 3
+                    row = k % 3
+                    rx = 8.35 if is_right else 0.6
+                    ry = 1.75 + row * 1.55
+                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, rx, ry, 4.35, 1.35, fill, f"limb-{k+1}", corner_radius=0.04)
+                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, rx + 0.15, ry + 0.15, 0.5, 0.32, tint(accent, 0.85), f"pill-{k+1}", corner_radius=0.2)
+                    cls._text(slide, f"0{k+1}", rx + 0.15, ry + 0.15, 0.5, 0.32, primary, title_font, 11, bold=True, center=True)
+                    if ":" in limb:
+                        parts = limb.split(":", 1)
+                    elif "\n" in limb:
+                        parts = limb.split("\n", 1)
+                    else:
+                        parts = [limb[:30], limb[30:]]
+                    l_t = parts[0].strip()
+                    l_b = parts[1].strip() if len(parts) > 1 else ""
+                    if len(l_t) > 30:
+                        l_t = l_t[:27].rsplit(" ", 1)[0] + "..."
+                    cls._text(slide, l_t, rx + 0.75, ry + 0.15, 3.45, 0.35, primary, title_font, 12, bold=True)
+                    if l_b:
+                        if len(l_b) > 140:
+                            l_b = l_b[:135].rsplit(" ", 1)[0] + "..."
+                        cls._text(slide, l_b, rx + 0.15, ry + 0.55, 4.05, 0.7, body_col, body_font, 11)
+
+            elif slide_data.layout_hint in ("two_column_definition", "concept_definition") and image_bytes:
+                cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 1.75, 6.4, 3.1, fill, "narrative-card", corner_radius=0.04)
+                cls._text(slide, "\n".join(bullets[:3]), 0.85, 1.95, 5.9, 2.65, body_col, body_font, 12.5, bullet_list=True)
+                cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 5.05, 6.4, 1.65, tint(accent, 0.92), "vocab-card", corner_radius=0.04)
+                cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.85, 5.2, 2.2, 0.3, accent, "vocab-pill", corner_radius=0.15)
+                cls._text(slide, "KEY CONCEPT", 0.85, 5.22, 2.2, 0.26, white, body_font, 10.5, bold=True, center=True)
+                def_text = slide_data.takeaway or (bullets[3] if len(bullets) > 3 else "Universal moral conduct and ethical statecraft.")
+                cls._text(slide, def_text, 0.85, 5.6, 5.9, 0.95, body_col, body_font, 12)
+                cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.3, 1.75, 5.4, 4.95, white, "artifact-frame", corner_radius=0.03)
+                cls._render_picture(slide, image_bytes, 7.45, 1.9, 5.1, 4.1)
+                caption = slide_data.image_caption or "Source document illustration"
+                cls._text(slide, caption[:95], 7.45, 6.2, 5.1, 0.4, primary, body_font, 10.5, italic=True, center=True)
+
+            elif slide_data.layout_hint in ("stacked_comparison", "legacy", "two_highways") and image_bytes:
+                mid = max(1, math.ceil(len(bullets) / 2))
+                grp1 = bullets[:mid]
+                grp2 = bullets[mid:]
+                cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 1.75, 6.4, 2.35, fill, "card-1", corner_radius=0.04)
+                cls._text(slide, "\n".join(grp1), 0.85, 1.95, 5.9, 1.95, body_col, body_font, 12, bullet_list=True)
+                cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 4.3, 6.4, 2.4, fill, "card-2", corner_radius=0.04)
+                cls._text(slide, "\n".join(grp2), 0.85, 4.5, 5.9, 2.0, body_col, body_font, 12, bullet_list=True)
+                cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.3, 1.75, 5.4, 4.95, white, "map-frame", corner_radius=0.03)
+                cls._render_picture(slide, image_bytes, 7.45, 1.9, 5.1, 4.15)
+                caption = slide_data.image_caption or "Source document map"
+                cls._text(slide, caption[:95], 7.45, 6.2, 5.1, 0.4, primary, body_font, 10.5, italic=True, center=True)
+
             elif layout in (LayoutFamily.CARD_GRID, LayoutFamily.THREE_COLUMN):
                 items = bullets or ([slide_data.takeaway] if slide_data.takeaway else [])
                 count = len(items)

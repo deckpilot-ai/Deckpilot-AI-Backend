@@ -27,6 +27,7 @@ from app.schemas.generation_state import (
     AssetMetadata,
     DesignSystem,
     PresentationGoal,
+    PresentationType,
     QAReport,
     SlideSpec,
 )
@@ -261,12 +262,25 @@ class JobOrchestrator:
                 context["reference_count"] = len(existing_artifacts)
                 context["reference_ppt_profile"] = reference_ppt_profile
 
-                # Infer Presentation Goal
+                # Infer Presentation Goal with document-aware sample text
+                sample_text = ""
+                for art in existing_artifacts:
+                    if art.type == "text_block" and art.json_data:
+                        try:
+                            data = json.loads(art.json_data)
+                            txt = data if isinstance(data, str) else str(data.get("content", ""))
+                            sample_text += txt + "\n"
+                        except Exception:
+                            pass
+                        if len(sample_text) > 4000:
+                            break
+
                 goal = RequirementsAgent.analyze_requirements(
                     user_prompt=user_prompt,
                     reference_files=[a.file_name for a in attachments],
                     reference_asset_count=len(existing_artifacts),
                     grounded_text_length=sum(len(a.json_data or "") for a in existing_artifacts if a.type == "text_block"),
+                    sample_text=sample_text,
                 )
                 context["presentation_goal"] = goal
 
@@ -411,7 +425,7 @@ class JobOrchestrator:
                             break
 
                 if not isinstance(deck_spec.get("slides"), list) or not deck_spec["slides"]:
-                    deck_spec = fallback_plan(user_prompt, target_slide_count)
+                    deck_spec = fallback_plan(user_prompt, target_slide_count, title=goal.topic, grounding=context.get("grounding", ""))
 
                 if not deck_spec.get("deckTitle"):
                     deck_spec["deckTitle"] = goal.topic or "Executive Presentation"
@@ -518,12 +532,19 @@ class JobOrchestrator:
                                 slide[field] = slide_data[field]
 
                     if not slide.get("bullets"):
-                        topic = slide.get("headline") or slide.get("purpose") or "Strategic Value"
-                        slide["bullets"] = [
-                            f"Key Focus: Accelerate disciplined progress across {str(topic).lower()}.",
-                            "Performance Driver: Leverage integrated cross-functional systems and modern toolchains.",
-                            "Measurable Impact: Deliver high-confidence milestone outcomes with continuous stakeholder alignment."
-                        ]
+                        topic = slide.get("headline") or slide.get("purpose") or "Core Insights"
+                        if getattr(goal, "presentation_type", None) == PresentationType.RESEARCH_EDUCATION:
+                            slide["bullets"] = [
+                                f"Historical Foundations: Critical examination of primary evidence and historical records for {str(topic).lower()}.",
+                                "Institutional Analysis: Structural developments in governance, trade networks, and societal organization.",
+                                "Enduring Significance: Lasting cultural, architectural, and ethical contributions that shaped civilization."
+                            ]
+                        else:
+                            slide["bullets"] = [
+                                f"Key Focus: Accelerate disciplined progress across {str(topic).lower()}.",
+                                "Performance Driver: Leverage integrated cross-functional systems and modern toolchains.",
+                                "Measurable Impact: Deliver high-confidence milestone outcomes with continuous stakeholder alignment."
+                            ]
 
                     if not slide.get("speakerNotes"):
                         slide["speakerNotes"] = f"Presenter note for Slide {idx + 1}: Emphasize the core takeaways and operational milestones."

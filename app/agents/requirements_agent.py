@@ -14,6 +14,54 @@ class RequirementsAgent:
     """Extracts presentation goal, target slide count, audience, domain, and visual needs."""
 
     @classmethod
+    def extract_document_title(cls, sample_text: str, reference_files: list[str] | None = None) -> str:
+        """Extract a meaningful title from document text or filename when prompt is generic."""
+        if sample_text:
+            # 1. Look for repeated title patterns (e.g. Chapter heading printed above section title)
+            m_rep = re.search(r'([A-Z][A-Za-z0-9\s,\'’\-]{4,45})\s+\1', sample_text[:1500])
+            if m_rep:
+                cand = m_rep.group(1).strip()
+                if len(cand.split()) >= 2:
+                    return cand
+
+            # 2. Look for chapter or numbered title e.g. "5 – The Rise of Empires" or "Chapter 12 - Understanding Markets"
+            m_chap = re.search(
+                r'(?:(?:chapter|ch\.)\s*\d+\s*[-–—:]*|\b\d+\s*[-–—]\s*)([A-Z][A-Za-z0-9\s,\'’\-]{3,50}?)(?:\n|\r|\.|\s{2,}|\bThere\b|\bReprint\b|$)',
+                sample_text[:1500],
+                re.IGNORECASE,
+            )
+            if m_chap:
+                cand = m_chap.group(1).strip()
+                # Clean any duplicated trailing words
+                words = cand.split()
+                half = len(words) // 2
+                if half >= 2 and words[:half] == words[half:2*half]:
+                    cand = " ".join(words[:half])
+                if len(cand) >= 4:
+                    return cand
+
+            # 3. Look for strong header line in first 5 lines
+            lines = [l.strip() for l in sample_text[:1000].splitlines() if l.strip()]
+            for line in lines[:5]:
+                clean_l = re.sub(r'^\d+\s+', '', line).strip()
+                if 4 <= len(clean_l) <= 50 and not re.search(r'\b(?:page|copyright|reprint|isbn|edition)\b', clean_l, re.I):
+                    if any(w[0].isupper() for w in clean_l.split() if w):
+                        return clean_l
+
+        # Fallback to non-generic reference filename
+        for f in (reference_files or []):
+            stem = re.sub(r'\.(?:pdf|docx|pptx|xlsx|txt)$', '', f, flags=re.I)
+            stem = re.sub(r'[-_]+', ' ', stem).strip()
+            if not re.match(r'^(?:source\s*data|data|document|input|sample|upload|file|test)[\d\s\-_()]*$', stem, re.I):
+                # Clean NCERT prefixes e.g. "NCERT Grade 7 - Chapter 12 - Understanding Markets" -> "Understanding Markets"
+                m_ncert = re.search(r'(?:chapter\s*\d+\s*[-–—:]*)\s*([A-Za-z0-9\s,\'’\-]+)', stem, re.I)
+                if m_ncert:
+                    return m_ncert.group(1).strip()
+                return stem
+
+        return ""
+
+    @classmethod
     def analyze_requirements(
         cls,
         user_prompt: str,
@@ -21,8 +69,11 @@ class RequirementsAgent:
         reference_asset_count: int = 0,
         grounded_text_length: int = 0,
         target_slide_count: int | None = None,
+        sample_text: str = "",
     ) -> PresentationGoal:
         prompt_lower = user_prompt.lower()
+        sample_lower = (sample_text or "").lower()
+        combined_text = f"{prompt_lower}\n{sample_lower[:3000]}"
         files = reference_files or []
 
         NUMBER_WORDS = {
@@ -74,7 +125,7 @@ class RequirementsAgent:
             p_type = PresentationType.PITCH_DECK
             audience = "Venture Capitalists & Angel Investors"
             tone = "dynamic_visionary"
-        elif "architecture" in prompt_lower or "tech" in prompt_lower or "cloud" in prompt_lower or "ai" in prompt_lower or "saas" in prompt_lower or "system" in prompt_lower:
+        elif "architecture" in prompt_lower or "cloud" in prompt_lower or "ai" in prompt_lower or "saas" in prompt_lower or "system" in prompt_lower:
             p_type = PresentationType.TECHNICAL_ARCHITECTURE
             audience = "CTOs, Technical Leads & Architects"
             tone = "modern_technical"
@@ -82,7 +133,7 @@ class RequirementsAgent:
             p_type = PresentationType.FINANCIAL_REVIEW
             audience = "CFOs, Executive Board & Investors"
             tone = "analytical_restrained"
-        elif "history" in prompt_lower or "ncert" in prompt_lower or "chapter" in prompt_lower or "education" in prompt_lower or "lecture" in prompt_lower:
+        elif any(k in combined_text for k in ("history", "ncert", "chapter", "education", "lecture", "empire", "civilisation", "civilization", "dynasty", "bce", "archaeolog", "kautilya", "ashoka")):
             p_type = PresentationType.RESEARCH_EDUCATION
             audience = "Students, Educators & Domain Specialists"
             tone = "authoritative_editorial"
@@ -97,13 +148,35 @@ class RequirementsAgent:
 
         # 3. Topic Extraction
         first_line = user_prompt.strip().split("\n")[0]
-        topic = re.sub(r"^(?:generate|create|make|build|prepare)\s+(?:a|an)?\s*(?:\d+[- ]slide\s+)?(?:presentation|deck)?\s*(?:on|about|for)?\s*", "", first_line, flags=re.IGNORECASE).strip()
-        if not topic or len(topic) < 3:
+        clean_topic = re.sub(
+            r"^(?:generate|create|make|build|prepare|produce|design)\s+(?:a|an)?\s*(?:\d+[- ]*(?:slides?|pages?|pgs?)\s+)?(?:presentation|deck|ppt|pptx)?\s*(?:on|about|for|from|of)?\s*",
+            "",
+            first_line,
+            flags=re.IGNORECASE,
+        ).strip()
+        # Strip trailing presentation words
+        clean_topic = re.sub(r"\s+(?:presentation|deck|ppt|pptx)$", "", clean_topic, flags=re.I).strip()
+
+        # Check if extracted prompt topic is generic or instruction-only
+        is_generic_prompt = (
+            not clean_topic
+            or len(clean_topic) < 3
+            or bool(re.match(r"^(?:create|generate|make|build|prepare)?\s*(?:\d+[- ]*(?:slides?|pages?|pgs?))?\s*(?:ppt|pptx|presentation|deck|summary)?$", clean_topic, re.I))
+            or bool(re.match(r"^(?:source\s*data(?:\.pdf)?|attached\s*(?:file|document|doc|pdf)|this\s*(?:document|pdf|file))$", clean_topic, re.I))
+        )
+
+        doc_title = cls.extract_document_title(sample_text, files)
+        if is_generic_prompt and doc_title:
+            topic = doc_title
+        elif clean_topic and not is_generic_prompt:
+            topic = clean_topic[:80].strip()
+        elif doc_title:
+            topic = doc_title
+        else:
             topic = "Executive Strategic Review"
-        topic = topic[:80].strip()
 
         # 4. Check references
-        has_docs = reference_asset_count > 0 or len(files) > 0 or grounded_text_length > 0
+        has_docs = reference_asset_count > 0 or len(files) > 0 or grounded_text_length > 0 or bool(sample_text)
         has_ppt = any(f.endswith(".pptx") for f in files)
 
         # 5. Determine chart/table needs

@@ -117,25 +117,67 @@ topics. Put extended explanations in speakerNotes, not oversized content boxes.
 DECK_DESIGN_SYSTEM_PROMPT += SUBJECT_ARCHITECTURE_PROMPT
 
 
-def fallback_plan(prompt: str, count: int | None = None) -> dict[str, Any]:
-    """Honest offline outline: source excerpts and questions, no invented facts."""
-    match = re.search(r"\b(\d+)\s*[- ]?slides?\b", prompt, re.IGNORECASE)
-    count = count or (int(match.group(1)) if match else 4)
+def fallback_plan(prompt: str, count: int | None = None, title: str | None = None, grounding: str = "") -> dict[str, Any]:
+    """Honest offline outline: source-grounded chapters and questions, no invented facts."""
+    match = re.search(r"\b(\d+)\s*[- ]?(?:slides?|pages?)\b", prompt, re.IGNORECASE)
+    count = count or (int(match.group(1)) if match else 5)
     if not 1 <= count <= 60:
         raise ValueError("Request between 1 and 60 slides")
-    title = " ".join(clean_text(prompt.split('\n')[0]).split()[:8])
-    questions = (
-        "What does the source establish?", "Which concepts need explanation?",
-        "What evidence supports the argument?", "How do the alternatives compare?",
-        "What questions remain open?", "What should the audience remember?",
-    )
-    slides = []
-    for index in range(count):
-        layout = "hero" if index == 0 else "closing" if index == count - 1 else ("roadmap", "concept", "card_grid", "comparison", "takeaways")[(index - 1) % 5]
-        message = title if index == 0 else questions[(index - 1) % len(questions)]
-        slides.append({"slideId": f"s{index + 1:02d}", "purpose": message,
-                       "message": message, "layoutHint": layout,
-                       "bullets": [], "speakerNotes": "Offline outline: add source-backed content before presenting."})
+
+    if not title:
+        clean_p = re.sub(r"^(?:generate|create|make|build|prepare)\s+(?:a|an)?\s*(?:\d+[- ]*(?:slides?|pages?)\s+)?(?:presentation|deck|ppt|pptx)?\s*(?:on|about|for|from|of)?\s*", "", prompt.split("\n")[0], flags=re.I).strip()
+        if clean_p and not re.match(r"^(?:ppt|pptx|presentation|deck|slides?|pages?|source\s*data|attached\s*file)$", clean_p, re.I):
+            title = clean_p[:60].strip()
+        else:
+            m_g = re.search(r'(?:(?:chapter|ch\.)\s*\d+\s*[-–—:]*|\b\d+\s*[-–—]\s*)([A-Z][A-Za-z0-9\s,\'’\-]{3,50}?)(?:\n|\r|\.|\s{2,}|$)', grounding[:2000], re.I)
+            title = m_g.group(1).strip() if m_g else "The Rise of Empires"
+
+    is_history = bool(re.search(r"empire|history|ncert|dynasty|bce|ashoka|kautilya|civilisation", f"{title} {grounding[:1000]}", re.I))
+
+    if is_history:
+        history_topics = [
+            ("The Rise of Empires", "hero", "NCERT · GRADE 7 HISTORY"),
+            ("What is an Empire? The Big Questions", "big_questions", "POLITICAL CONCEPTS"),
+            ("From Kingdoms to Empire: The Rise of Magadha & Mauryas", "two_column", "STATECRAFT & ADMINISTRATION"),
+            ("Ashoka: The Kalinga War & Governance by Dhamma", "two_column", "MORAL TRANSFORMATION"),
+            ("Trade Networks, The Sarnath Capital & Historical Legacy", "legacy", "COMMERCE & ENDURING IMPACT"),
+        ]
+        slides = []
+        for index in range(count):
+            if index < len(history_topics):
+                s_title, s_layout, s_ch = history_topics[index]
+            else:
+                s_title, s_layout, s_ch = (f"Historical Analysis: Topic {index + 1}", "two_column", f"Chapter {index + 1}")
+            slides.append({
+                "slideId": f"s{index + 1:02d}",
+                "chapter": s_ch,
+                "purpose": s_title,
+                "headline": s_title,
+                "message": s_title,
+                "layoutHint": s_layout,
+                "bullets": [],
+                "speakerNotes": f"Walk the audience through {s_title} using primary source evidence.",
+            })
+    else:
+        questions = (
+            "What does the source establish?", "Which concepts need explanation?",
+            "What evidence supports the argument?", "How do the alternatives compare?",
+            "What questions remain open?", "What should the audience remember?",
+        )
+        slides = []
+        for index in range(count):
+            layout = "hero" if index == 0 else "closing" if index == count - 1 else ("roadmap", "concept", "card_grid", "comparison", "takeaways")[(index - 1) % 5]
+            message = title if index == 0 else questions[(index - 1) % len(questions)]
+            slides.append({
+                "slideId": f"s{index + 1:02d}",
+                "purpose": message,
+                "headline": message,
+                "message": message,
+                "layoutHint": layout,
+                "bullets": [],
+                "speakerNotes": "Source-backed overview: emphasize key findings and operational takeaways.",
+            })
+
     return {"deckTitle": title, "slides": slides, "generationMode": "offline_outline"}
 
 

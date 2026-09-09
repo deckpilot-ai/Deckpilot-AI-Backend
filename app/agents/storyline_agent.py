@@ -13,6 +13,7 @@ from app.schemas.generation_state import (
     DiagramSpec,
     LayoutFamily,
     PresentationGoal,
+    PresentationType,
     SlideSpec,
     TableSpec,
 )
@@ -141,9 +142,23 @@ class StorylineAgent:
                 )
 
             # 7. Construct SlideSpec
-            eyebrow = raw_slide.get("eyebrow") or raw_slide.get("chapter") or f"Chapter {(i // 4) + 1} · {goal.topic.split()[0].upper()}"
-            takeaway = raw_slide.get("takeaway") or "Strategic Takeaway: Disciplined milestone delivery drives compounding enterprise advantage."
-            speaker_notes = raw_slide.get("speakerNotes") or raw_slide.get("speaker_notes") or f"In this slide, walk the audience through {purpose.lower()}. Highlight key metrics and emphasize the strategic next steps."
+            if raw_slide.get("eyebrow"):
+                eyebrow = raw_slide.get("eyebrow")
+            elif raw_slide.get("chapter"):
+                eyebrow = raw_slide.get("chapter")
+            elif getattr(goal, "presentation_type", None) == PresentationType.RESEARCH_EDUCATION:
+                eyebrow = f"Chapter {(i // 4) + 1} · {goal.topic}"
+            else:
+                eyebrow = f"Section {(i // 4) + 1} · {goal.topic}"
+
+            if raw_slide.get("takeaway"):
+                takeaway = raw_slide.get("takeaway")
+            elif getattr(goal, "presentation_type", None) == PresentationType.RESEARCH_EDUCATION:
+                takeaway = f"Core Insight: Primary evidence and historical analysis of {headline.lower()}."
+            else:
+                takeaway = f"Strategic Takeaway: Actionable focus on {headline.lower()}."
+
+            speaker_notes = raw_slide.get("speakerNotes") or raw_slide.get("speaker_notes") or f"In this slide, walk the audience through {purpose.lower()}. Emphasize key findings and historical context."
 
             spec = SlideSpec(
                 slide_id=slide_id,
