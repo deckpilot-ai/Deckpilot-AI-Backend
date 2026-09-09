@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3.6-flash"
+    gemini_model: str = "gemini-3.8-flash"
     llm_read_timeout_seconds: int = Field(default=120, ge=10, le=300)
     groq_api_key: str = ""
     mistral_api_key: str = ""

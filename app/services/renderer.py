@@ -95,6 +95,9 @@ class PPTXRenderer:
         frame.margin_left = frame.margin_right = Inches(0.02)
         frame.margin_top = frame.margin_bottom = Inches(0.02)
 
+        if title and len(text) > 400:
+            raise ValueError("Slide text exceeds its layout budget; shorten the source copy and regenerate")
+
         floor = 18 if title and size >= 24 else min(int(round(size)), 9)
         curr_size = int(round(size))
         while True:

@@ -104,9 +104,13 @@ class ProviderRouter:
                     default_models = []
                     if name == "gemini":
                         default_models = [
-                            {"model_id": "gemini-2.5-flash", "display_name": "Gemini 2.5 Flash", "priority": 100, "enabled": 1, "context_length": 1000000},
-                            {"model_id": "gemini-3.6-flash", "display_name": "Gemini 3.6 Flash", "priority": 95, "enabled": 1, "context_length": 1000000},
-                            {"model_id": "gemini-2.5-pro", "display_name": "Gemini 2.5 Pro", "priority": 90, "enabled": 1, "context_length": 1000000},
+                            {"model_id": "gemini-3.8-flash", "display_name": "Gemini 3.8 Flash", "priority": 100, "enabled": 1, "context_length": 1000000},
+                            {"model_id": "gemini-3.7-flash", "display_name": "Gemini 3.7 Flash", "priority": 98, "enabled": 1, "context_length": 1000000},
+                            {"model_id": "gemini-3.5-flash", "display_name": "Gemini 3.5 Flash", "priority": 96, "enabled": 1, "context_length": 1000000},
+                            {"model_id": "gemini-2.5-flash", "display_name": "Gemini 2.5 Flash", "priority": 94, "enabled": 1, "context_length": 1000000},
+                            {"model_id": "gemini-3.5-flash-lite", "display_name": "Gemini 3.5 Flash Lite", "priority": 92, "enabled": 1, "context_length": 1000000},
+                            {"model_id": "gemini-2.5-flash-lite", "display_name": "Gemini 2.5 Flash Lite", "priority": 90, "enabled": 1, "context_length": 1000000},
+                            {"model_id": "gemini-3.1-flash-lite-preview", "display_name": "Gemini 3.1 Flash Lite Preview", "priority": 88, "enabled": 1, "context_length": 1000000},
                         ]
                     elif name == "codecraft":
                         default_models = [
@@ -596,7 +600,14 @@ class ProviderRouter:
                 if "groq" in p_name:
                     model_candidates = [("openai/gpt-oss-120b", 90), ("llama-3.3-70b-versatile", 80)]
                 elif "gemini" in p_name:
-                    model_candidates = [(settings.gemini_model, 95), ("gemini-1.5-flash", 85)]
+                    model_candidates = [
+                        (settings.gemini_model or "gemini-3.8-flash", 100),
+                        ("gemini-3.7-flash", 98),
+                        ("gemini-3.5-flash", 96),
+                        ("gemini-2.5-flash", 94),
+                        ("gemini-3.5-flash-lite", 92),
+                        ("gemini-2.5-flash-lite", 90),
+                    ]
                 elif "openai" in p_name:
                     model_candidates = [("gpt-4o-mini", 90), ("gpt-4o", 95)]
                 elif "mistral" in p_name:
