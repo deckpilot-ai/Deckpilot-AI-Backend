@@ -294,6 +294,9 @@ class PresentationGoal(BaseModel):
     has_reference_ppt: bool = False
     required_charts: list[str] = Field(default_factory=list)
     required_tables: list[str] = Field(default_factory=list)
+    # Explicit instructions from the user prompt (colors, themes, slide structure, sections, etc.)
+    # that MUST be honoured by all downstream LLM agents.
+    user_directives: str = ""
 
 
 class AssetMetadata(BaseModel):

@@ -117,71 +117,160 @@ topics. Put extended explanations in speakerNotes, not oversized content boxes.
 DECK_DESIGN_SYSTEM_PROMPT += SUBJECT_ARCHITECTURE_PROMPT
 
 
+def _extract_topics_from_grounding(grounding: str, count: int) -> list[tuple[str, str, str]]:
+    """Dynamically extract slide topics from source document text.
+
+    Returns a list of (title, layout_hint, chapter_label) tuples derived entirely
+    from headings, section titles, and key phrases found in the grounding text.
+    No hardcoded content is used — every item comes from the document.
+    """
+    topics: list[tuple[str, str, str]] = []
+
+    # --- Pattern 1: Numbered/lettered headings (e.g. "1. Introduction", "Chapter 3 – Markets") ---
+    heading_re = re.compile(
+        r"(?:^|\n)"
+        r"(?:chapter|section|unit|part|topic|lesson|module|ch\.?)?\s*"
+        r"(?:\d+[\.\-–—:)]?\s*)?"
+        r"([A-Z][A-Za-z0-9 ,\''&:\-]{4,70})"
+        r"(?:\n|\r|\.{2,}|\t|\s{3,}|$)",
+        re.MULTILINE,
+    )
+    seen: set[str] = set()
+    for m in heading_re.finditer(grounding[:8000]):
+        raw = m.group(1).strip().rstrip(".")
+        key = raw.casefold()
+        if key in seen or len(raw) < 5:
+            continue
+        # Skip lines that are clearly body prose (long sentences)
+        if raw.count(" ") > 10:
+            continue
+        seen.add(key)
+        topics.append(raw)
+
+    # --- Pattern 2: Bold/title-cased short phrases (**bold**, ALL CAPS short) ---
+    bold_re = re.compile(r"\*\*([A-Za-z][A-Za-z0-9 &,:\-']{4,60})\*\*")
+    caps_re = re.compile(r"\b([A-Z][A-Z0-9 &,:\-]{3,40}[A-Z])\b")
+    for m in bold_re.finditer(grounding[:6000]):
+        raw = m.group(1).strip()
+        key = raw.casefold()
+        if key not in seen and len(raw) >= 5:
+            seen.add(key)
+            topics.append(raw)
+    for m in caps_re.finditer(grounding[:4000]):
+        raw = m.group(1).strip().title()
+        key = raw.casefold()
+        if key not in seen and len(raw) >= 5 and raw.count(" ") <= 6:
+            seen.add(key)
+            topics.append(raw)
+
+    # If we still have very few topics, split the first 3000 chars into sentences
+    # and pick the shortest noun-phrase starters as candidate titles.
+    if len(topics) < max(count, 3):
+        sentences = re.split(r"(?<=[.!?])\s+", grounding[:3000])
+        for sent in sentences:
+            sent = sent.strip()
+            # Take up to the first comma or colon as a short phrase
+            phrase = re.split(r"[,;:\-–—]", sent)[0].strip()
+            if 5 <= len(phrase) <= 70 and phrase.count(" ") <= 8:
+                key = phrase.casefold()
+                if key not in seen:
+                    seen.add(key)
+                    topics.append(phrase)
+            if len(topics) >= count * 2:
+                break
+
+    # --- Assign layout hints based on content-type keywords ---
+    LAYOUT_KEYWORDS: list[tuple[re.Pattern, str]] = [
+        (re.compile(r"\bcompare|contrast|versus|vs\b", re.I), "comparison"),
+        (re.compile(r"\bstep[s]?|process|workflow|phase[s]?\b", re.I), "process_steps"),
+        (re.compile(r"\btime(?:line|period)|century|decade|\bBCE\b|\bCE\b|\b\d{3,4}\b", re.I), "timeline"),
+        (re.compile(r"\bstat[s]?|metric[s]?|number[s]?|percent|figure[s]?|data\b", re.I), "metrics_grid"),
+        (re.compile(r"\bwhy|cause[s]?|reason[s]?|factor[s]?|impact[s]?|effect[s]?\b", re.I), "card_grid"),
+        (re.compile(r"\blegacy|heritage|enduring|lasting|long.?term\b", re.I), "closing"),
+        (re.compile(r"\bintroduction|overview|background|context|what is\b", re.I), "concept"),
+        (re.compile(r"\bconclusion|summary|takeaway[s]?|lesson[s]?|key points\b", re.I), "takeaways"),
+        (re.compile(r"\bchapter[s]?|agenda|outline|roadmap|plan\b", re.I), "roadmap"),
+        (re.compile(r"\bcase study|example|scenario|story\b", re.I), "case_study"),
+    ]
+
+    def _layout_for(text: str) -> str:
+        for pattern, hint in LAYOUT_KEYWORDS:
+            if pattern.search(text):
+                return hint
+        return "two_column"
+
+    # Build slide tuples
+    result: list[tuple[str, str, str]] = []
+    for i, topic in enumerate(topics[:count]):
+        layout = "hero" if i == 0 else _layout_for(topic)
+        chapter = f"Section {i + 1}"
+        result.append((topic, layout, chapter))
+
+    return result
+
+
 def fallback_plan(prompt: str, count: int | None = None, title: str | None = None, grounding: str = "") -> dict[str, Any]:
-    """Honest offline outline: source-grounded chapters and questions, no invented facts."""
+    """Emergency offline outline used only when ALL LLM providers have failed.
+
+    Every slide title and topic is extracted dynamically from the grounding
+    (source document text).  No hardcoded content or invented facts are used.
+    If the grounding is empty, generic numbered placeholders are produced so the
+    slide_writer agent can still attempt to fill them using the user prompt.
+    """
     match = re.search(r"\b(\d+)\s*[- ]?(?:slides?|pages?)\b", prompt, re.IGNORECASE)
     count = count or (int(match.group(1)) if match else 5)
     if not 1 <= count <= 60:
-        raise ValueError("Request between 1 and 60 slides")
+        count = max(1, min(count, 60))
 
-    if not title or title.lower().startswith("executive presentation"):
-        if re.search(r"rise\s+of\s+empires|magadha|ashoka|kautilya|janapada|ncert", f"{prompt} {grounding}", re.I):
-            title = "The Rise of Empires"
-        else:
-            clean_p = re.sub(r"^(?:generate|create|make|build|prepare)\s+(?:a|an)?\s*(?:\d+[- ]*(?:slides?|pages?)\s+)?(?:presentation|deck|ppt|pptx)?\s*(?:on|about|for|from|of)?\s*", "", prompt.split("\n")[0], flags=re.I).strip()
-            if clean_p and not re.match(r"^(?:ppt|pptx|presentation|deck|slides?|pages?|source\s*data|attached\s*file)$", clean_p, re.I):
-                title = clean_p[:60].strip()
-            else:
-                m_g = re.search(r'(?:(?:chapter|ch\.)\s*\d+\s*[-–—:]*|\b\d+\s*[-–—]\s*)([A-Z][A-Za-z0-9\s,\'’\-]{3,50}?)(?:\n|\r|\.|\s{2,}|$)', grounding[:2000], re.I)
-                title = m_g.group(1).strip() if m_g else "The Rise of Empires"
-
-    is_history = bool(re.search(r"empire|history|ncert|dynasty|bce|ashoka|kautilya|civilisation|magadha|janapada", f"{title} {prompt} {grounding[:3000]}", re.I))
-
-    if is_history:
-        history_topics = [
-            ("The Rise of Empires", "hero", "NCERT · GRADE 7 HISTORY"),
-            ("What is an Empire? The Big Questions", "big_questions", "POLITICAL CONCEPTS"),
-            ("From Kingdoms to Empire: The Rise of Magadha & Mauryas", "two_column", "STATECRAFT & ADMINISTRATION"),
-            ("Ashoka: The Kalinga War & Governance by Dhamma", "two_column", "MORAL TRANSFORMATION"),
-            ("Trade Networks, The Sarnath Capital & Historical Legacy", "legacy", "COMMERCE & ENDURING IMPACT"),
-        ]
-        slides = []
-        for index in range(count):
-            if index < len(history_topics):
-                s_title, s_layout, s_ch = history_topics[index]
-            else:
-                s_title, s_layout, s_ch = (f"Historical Analysis: Topic {index + 1}", "two_column", f"Chapter {index + 1}")
-            slides.append({
-                "slideId": f"s{index + 1:02d}",
-                "chapter": s_ch,
-                "purpose": s_title,
-                "headline": s_title,
-                "message": s_title,
-                "layoutHint": s_layout,
-                "bullets": [],
-                "speakerNotes": f"Walk the audience through {s_title} using primary source evidence.",
-            })
-    else:
-        questions = (
-            "What does the source establish?", "Which concepts need explanation?",
-            "What evidence supports the argument?", "How do the alternatives compare?",
-            "What questions remain open?", "What should the audience remember?",
+    # --- Derive title from grounding or prompt, never hardcode a subject-specific string ---
+    if not title or re.match(r"^(?:executive presentation|presentation|deck|slides?)$", title.strip(), re.I):
+        # Try to get the first meaningful heading from the document
+        heading_match = re.search(
+            r"(?:^|\n)([A-Z][A-Za-z0-9 ,&:\-']{5,70})(?:\n|\r|\.{2,}|$)",
+            grounding[:2000],
+            re.MULTILINE,
         )
-        slides = []
-        for index in range(count):
-            layout = "hero" if index == 0 else "closing" if index == count - 1 else ("roadmap", "concept", "card_grid", "comparison", "takeaways")[(index - 1) % 5]
-            message = title if index == 0 else questions[(index - 1) % len(questions)]
-            slides.append({
-                "slideId": f"s{index + 1:02d}",
-                "purpose": message,
-                "headline": message,
-                "message": message,
-                "layoutHint": layout,
-                "bullets": [],
-                "speakerNotes": "Source-backed overview: emphasize key findings and operational takeaways.",
-            })
+        if heading_match:
+            title = heading_match.group(1).strip().rstrip(".")
+        else:
+            # Strip the generation verb from the user prompt to get the topic
+            clean_p = re.sub(
+                r"^(?:generate|create|make|build|prepare)\s+(?:a|an)?\s*"
+                r"(?:\d+[- ]*(?:slides?|pages?)\s+)?(?:presentation|deck|ppt|pptx)?"
+                r"\s*(?:on|about|for|from|of)?\s*",
+                "",
+                prompt.split("\n")[0],
+                flags=re.I,
+            ).strip()
+            title = (clean_p[:60].strip() if clean_p else None) or "Presentation"
+
+    # --- Extract topics dynamically from document grounding ---
+    dynamic_topics = _extract_topics_from_grounding(grounding, count) if grounding.strip() else []
+
+    slides: list[dict[str, Any]] = []
+    for index in range(count):
+        if index < len(dynamic_topics):
+            s_title, s_layout, s_chapter = dynamic_topics[index]
+        else:
+            # Grounding exhausted: produce numbered stubs the slide_writer can fill
+            s_title = f"{title}: Part {index + 1}"
+            s_layout = "hero" if index == 0 else "closing" if index == count - 1 else "two_column"
+            s_chapter = f"Section {index + 1}"
+
+        slides.append({
+            "slideId": f"s{index + 1:02d}",
+            "chapter": s_chapter,
+            "purpose": s_title,
+            "headline": s_title,
+            "message": s_title,
+            "layoutHint": s_layout,
+            "bullets": [],
+            "speakerNotes": f"Source-grounded content for: {s_title}",
+        })
 
     return {"deckTitle": title, "slides": slides, "generationMode": "offline_outline"}
+
+
 
 
 def prepare_deck(spec: dict[str, Any], evidence: str) -> dict[str, Any]:

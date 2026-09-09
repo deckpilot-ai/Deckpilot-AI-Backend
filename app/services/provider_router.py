@@ -625,8 +625,27 @@ class ProviderRouter:
                 len(ranked),
             )
 
-        # 4. Try candidates in ranked order (limit candidates and timeouts for interactive chat)
-        max_candidates = 2 if agent_type == "copilot_chat" else 3
+        # 4. Try candidates in ranked order.
+        # For interactive chat we cap at 2 to keep latency low.
+        # For generation agents we try ALL available candidates before giving up.
+        max_candidates = 2 if agent_type == "copilot_chat" else len(ranked)
+
+        def _is_context_length_error(status_code: int, body: str) -> bool:
+            """Return True when the API refused because the input was too long."""
+            context_phrases = (
+                "context length", "context window", "context_length_exceeded",
+                "too many tokens", "input too large", "maximum context",
+                "request too large", "prompt is too long", "tokens exceed",
+                "reduce the length", "content too large", "payload too large",
+            )
+            body_lower = body.lower()
+            if status_code in (400, 413, 422) and any(p in body_lower for p in context_phrases):
+                return True
+            # Some providers return 200 with an error payload
+            if "context" in body_lower and "exceed" in body_lower:
+                return True
+            return False
+
         for candidate in ranked[:max_candidates]:
             provider = candidate["provider"]
             provider_base_url = candidate["provider_base_url"]
@@ -747,6 +766,59 @@ class ProviderRouter:
                 else:
                     raw_text = resp.text if isinstance(getattr(resp, "text", None), str) else ""
 
+                    # ── Context-length retry strategy ─────────────────────────────────
+                    # When the input is too large, retry the SAME provider up to 3 times
+                    # with progressively compressed prompts before failing over.
+                    if _is_context_length_error(resp.status_code, raw_text) and agent_type not in ("copilot_chat",):
+                        from app.services.grounding_chunker import GroundingChunker
+                        compressed_prompt = user_prompt
+                        ctx_succeeded = False
+                        for compression_level in (1, 2, 3):
+                            compressed_prompt = GroundingChunker.compress_prompt_for_retry(
+                                compressed_prompt, compression_level
+                            )
+                            logger.warning(
+                                "Context-length error on %s/%s (HTTP %s) — retrying with compression level %d "
+                                "(prompt %d -> %d chars)",
+                                provider.name, model_id, resp.status_code,
+                                compression_level, len(user_prompt), len(compressed_prompt),
+                            )
+                            try:
+                                compressed_payload = dict(payload)
+                                compressed_payload["messages"] = [
+                                    {"role": "system", "content": sys_prompt_final},
+                                    {"role": "user", "content": compressed_prompt},
+                                ]
+                                async with httpx.AsyncClient(timeout=req_timeout) as _ctx_client:
+                                    ctx_resp = await _ctx_client.post(url, headers=headers, json=compressed_payload)
+                                if ctx_resp.status_code == 200:
+                                    ctx_data = ctx_resp.json()
+                                    ctx_content = ctx_data["choices"][0]["message"]["content"]
+                                    ctx_parsed = _parse_llm_response(ctx_content, response_schema)
+                                    ctx_latency = int((time.time() - start_time) * 1000)
+                                    health_tracker.record_success(provider.name, model_id, float(ctx_latency))
+                                    logger.info(
+                                        "Context-compression retry succeeded at level %d for %s/%s",
+                                        compression_level, provider.name, model_id,
+                                    )
+                                    ctx_succeeded = True
+                                    return ctx_parsed
+                                elif not _is_context_length_error(ctx_resp.status_code, ctx_resp.text):
+                                    # Different error — stop compressing, fall through to normal failure
+                                    break
+                                # Still a context error — try next compression level
+                            except Exception as _ctx_err:
+                                logger.warning(
+                                    "Context-compression retry level %d failed for %s/%s: %s",
+                                    compression_level, provider.name, model_id, _ctx_err,
+                                )
+                                break
+
+                        if ctx_succeeded:
+                            continue  # shouldn't reach here but guard anyway
+                        # All 3 compression levels failed — fall through to normal failure handling
+                    # ── End context-length retry ──────────────────────────────────────
+
                     # Record failure in health tracker
                     health_tracker.record_failure(provider.name, model_id)
 
@@ -793,20 +865,12 @@ class ProviderRouter:
                 logger.warning("Provider %s model %s failed", provider.name, model_id, exc_info=True)
                 continue
 
-        logger.info("All candidates exhausted for agent_type=%s, engaging deterministic fallback", agent_type)
-        return ProviderRouter._fallback_deterministic(agent_type, user_prompt)
-
-    @staticmethod
-    def _fallback_deterministic(agent_type: str, user_prompt: str) -> dict[str, Any]:
-        """Provides deterministic fallback responses matching agent schemas when offline or in dev."""
-        from app.services.design_system import default_brand, fallback_plan
-
-        if agent_type == "deck_planner":
-            return fallback_plan(user_prompt)
-        if agent_type == "slide_writer":
-            return {"slides": [], "generationMode": "offline_outline"}
-        if agent_type == "copilot_chat":
-            return {"message": "I have processed your request and generated the presentation."}
-        if agent_type == "font_brand_detection":
-            return default_brand(user_prompt)
-        return {"result": f"Completed {agent_type} successfully."}
+        # All providers and models exhausted — do NOT silently return hardcoded content.
+        # Raise so the orchestrator can decide: retry with a simpler prompt, degrade gracefully,
+        # or surface a meaningful error to the user.
+        provider_names = ", ".join({c["provider_name"] for c in ranked}) or "none configured"
+        raise RuntimeError(
+            f"All LLM candidates exhausted for agent_type='{agent_type}'. "
+            f"Tried providers: [{provider_names}]. "
+            "Check provider keys, rate limits, and health tracker state."
+        )

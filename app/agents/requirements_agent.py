@@ -9,6 +9,43 @@ from app.skills.skill_registry import get_skill_for_request
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Directive extraction patterns
+# ---------------------------------------------------------------------------
+_COLOR_RE = re.compile(
+    # Hex codes: #RGB or #RRGGBB
+    r"(?:#[0-9a-fA-F]{3,6})"
+    # OR named color explicitly: "color: blue", "primary color: navy blue", "use red"
+    r"|(?:(?:primary|accent|background|secondary|color(?:s|scheme|palette)?|theme)\s*[=:\-]?\s*"
+    r"((?:[a-zA-Z]{3,20}(?:\s[a-zA-Z]{3,20})?)))",
+    re.IGNORECASE,
+)
+_DARK_LIGHT_RE = re.compile(r"\b(dark|light|minimal|minimalist)\s*(?:mode|theme|background|design)?\b", re.IGNORECASE)
+_LAYOUT_RE = re.compile(
+    r"\b(timeline|roadmap|two[- ]column|card[- ]grid|comparison|metrics|process|hero|closing|takeaway|image[- ]focus|quote)\b",
+    re.IGNORECASE,
+)
+_INCLUDE_RE = re.compile(
+    r"(?:include|add|show|cover|focus\s+on|highlight|must\s+have)\s+([^.!?\n]{5,120})",
+    re.IGNORECASE,
+)
+_EXCLUDE_RE = re.compile(
+    r"(?:exclude|remove|skip|omit|no|don[''t]+\s+(?:include|add|show|use))\s+([^.!?\n]{3,80})",
+    re.IGNORECASE,
+)
+_SECTION_RE = re.compile(
+    r"(?:section[s]?|chapter[s]?|part[s]?|slide[s]?)\s*(?:\d+[:\-]?)?\s*:?\s*['\"]?([A-Z][A-Za-z0-9 ,\-&]{3,60})['\"]?",
+    re.IGNORECASE,
+)
+_FONT_RE = re.compile(
+    r"(?:use|with)?\s*(?:font|typeface|typography)\s*[=:–\-]?\s*([A-Za-z][A-Za-z0-9 \-]{2,40})",
+    re.IGNORECASE,
+)
+_TONE_RE = re.compile(
+    r"\b(professional|casual|formal|technical|friendly|bold|elegant|playful|modern|corporate|academic)\b",
+    re.IGNORECASE,
+)
+
 
 class RequirementsAgent:
     """Extracts presentation goal, target slide count, audience, domain, and visual needs."""
@@ -60,6 +97,71 @@ class RequirementsAgent:
                 return stem
 
         return ""
+
+    @classmethod
+    def extract_user_directives(cls, user_prompt: str) -> str:
+        """Parse ALL explicit user instructions from the prompt into a structured directive block.
+
+        Captures: colors, themes, dark/light mode, fonts, tone, preferred layouts,
+        named sections/chapters, include/exclude rules.
+        The result is injected verbatim into every downstream LLM call so no user
+        instruction is ever silently dropped due to prompt truncation.
+        """
+        directives: list[str] = []
+
+        # Colors / palette — hex codes (#RRGGBB) and explicitly named colors
+        for m in _COLOR_RE.finditer(user_prompt):
+            # Named color is in group 1; hex code is the full match with no group
+            val = (m.group(1) or m.group(0)).strip().rstrip(",.:") if m.lastindex else m.group(0).strip()
+            if val and len(val) >= 3:
+                directives.append(f"COLOR: {val}")
+
+        # Dark / light / minimal mode
+        for m in _DARK_LIGHT_RE.finditer(user_prompt):
+            directives.append(f"THEME: {m.group(1).lower()} mode")
+
+        # Font preference
+        for m in _FONT_RE.finditer(user_prompt):
+            directives.append(f"FONT: {m.group(1).strip()}")
+
+        # Tone adjectives
+        tone_hits = {m.group(1).lower() for m in _TONE_RE.finditer(user_prompt)}
+        if tone_hits:
+            directives.append(f"TONE: {', '.join(sorted(tone_hits))}")
+
+        # Layout preferences
+        layout_hits = {
+            m.group(1).lower().replace(" ", "_").replace("-", "_")
+            for m in _LAYOUT_RE.finditer(user_prompt)
+        }
+        if layout_hits:
+            directives.append(f"PREFERRED_LAYOUTS: {', '.join(sorted(layout_hits))}")
+
+        # Explicit section/chapter names
+        for m in _SECTION_RE.finditer(user_prompt):
+            directives.append(f"SECTION: {m.group(1).strip()}")
+
+        # Must-include items
+        for m in _INCLUDE_RE.finditer(user_prompt):
+            val = m.group(1).strip().rstrip(".,")
+            if len(val) > 4:
+                directives.append(f"INCLUDE: {val}")
+
+        # Must-exclude items
+        for m in _EXCLUDE_RE.finditer(user_prompt):
+            val = m.group(1).strip().rstrip(".,")
+            if len(val) > 2:
+                directives.append(f"EXCLUDE: {val}")
+
+        # Deduplicate preserving order
+        seen: set[str] = set()
+        unique: list[str] = []
+        for d in directives:
+            if d not in seen:
+                seen.add(d)
+                unique.append(d)
+
+        return "\n".join(unique)
 
     @classmethod
     def analyze_requirements(
@@ -201,4 +303,5 @@ class RequirementsAgent:
             has_reference_ppt=has_ppt,
             required_charts=req_charts,
             required_tables=req_tables,
+            user_directives=cls.extract_user_directives(user_prompt),
         )

@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from app.core.config import settings
 from app.agents.design_intelligence import DesignIntelligenceAgent
 from app.agents.qa_agent import PresentationQAAgent
 from app.agents.repair_agent import RepairAgent
@@ -34,6 +35,7 @@ from app.schemas.generation_state import (
 from app.services.attachment_pipeline import wait_for_pending_attachments
 from app.services.compaction import ContextCompactionService
 from app.services.design_system import fallback_plan, normalize_brand, prepare_deck
+from app.services.grounding_chunker import GroundingChunker
 from app.services.image_quality import is_documentary_image, source_figure
 from app.services.prompts import (
     BRAND_STYLE_SYSTEM_PROMPT,
@@ -194,6 +196,37 @@ class JobOrchestrator:
                     task.completed_at = now
                 db.commit()
 
+        class AgentStepError(RuntimeError):
+            """Raised when a required pipeline step cannot complete.
+
+            Carries the agent_type and original cause so the outer
+            exception handler can mark tasks failed and surface the error.
+            """
+            def __init__(self, agent_type: str, cause: Exception) -> None:
+                self.agent_type = agent_type
+                self.cause = cause
+                super().__init__(f"Agent '{agent_type}' failed: {cause}")
+
+        def _fail_step(agent_type: str, exc: Exception, error_code: str = "agent_error") -> None:
+            """Mark a task as failed in the DB, emit to websocket, and raise AgentStepError.
+
+            This is the single exit point for unrecoverable agent failures.
+            The pipeline always stops immediately — no silent continuation.
+            """
+            logger.error(
+                "Agent step '%s' failed with %s: %s",
+                agent_type, type(exc).__name__, exc,
+                exc_info=True,
+            )
+            task = db.scalar(select(AgentTask).where(AgentTask.job_id == job_id, AgentTask.agent_type == agent_type))
+            if task is not None:
+                task.status = "failed"
+                task.error_code = error_code
+                task.completed_at = int(time.time())
+                db.commit()
+            _emit(agent_type, "failed", f"Step failed: {exc}")
+            raise AgentStepError(agent_type, exc) from exc
+
         async def cleanup_uncommitted_deck() -> None:
             if rendered_storage_key and not deck_persisted:
                 try:
@@ -275,13 +308,17 @@ class JobOrchestrator:
                         if len(sample_text) > 4000:
                             break
 
-                goal = RequirementsAgent.analyze_requirements(
-                    user_prompt=user_prompt,
-                    reference_files=[a.file_name for a in attachments],
-                    reference_asset_count=len(existing_artifacts),
-                    grounded_text_length=sum(len(a.json_data or "") for a in existing_artifacts if a.type == "text_block"),
-                    sample_text=sample_text,
-                )
+                try:
+                    goal = RequirementsAgent.analyze_requirements(
+                        user_prompt=user_prompt,
+                        reference_files=[a.file_name for a in attachments],
+                        reference_asset_count=len(existing_artifacts),
+                        grounded_text_length=sum(len(a.json_data or "") for a in existing_artifacts if a.type == "text_block"),
+                        sample_text=sample_text,
+                    )
+                except Exception as _e:
+                    _fail_step("reference_intake", _e, "requirements_analysis_failed")
+
                 context["presentation_goal"] = goal
 
                 _update_task("reference_intake", "completed", completed=True)
@@ -294,28 +331,31 @@ class JobOrchestrator:
                 _update_task("source_grounding", "running", started=True)
                 _emit("source_grounding", "running", "Synthesizing domain facts, metrics, and proof points...")
 
-                grounded_parts = []
-                seen_sources = set()
-                for art in existing_artifacts:
-                    fingerprint = (art.type, art.source_locator, art.json_data)
-                    if fingerprint in seen_sources:
-                        continue
-                    seen_sources.add(fingerprint)
-                    if art.type in {"text_block", "table"} and art.json_data:
-                        source_data = json.loads(art.json_data)
-                        source_text = source_data if isinstance(source_data, str) else json.dumps(source_data)
-                        grounded_parts.append(f"[Source {art.source_locator or 'Reference'}]:\n{source_text}")
-                    elif art.type == "image":
-                        image_meta = json.loads(art.json_data or "{}")
-                        grounded_parts.append(f"[Source image imageArtifactId={art.id}: {art.source_locator or 'Image'}; source context: {image_meta.get('caption', '')}]")
+                try:
+                    grounded_parts = []
+                    seen_sources = set()
+                    for art in existing_artifacts:
+                        fingerprint = (art.type, art.source_locator, art.json_data)
+                        if fingerprint in seen_sources:
+                            continue
+                        seen_sources.add(fingerprint)
+                        if art.type in {"text_block", "table"} and art.json_data:
+                            source_data = json.loads(art.json_data)
+                            source_text = source_data if isinstance(source_data, str) else json.dumps(source_data)
+                            grounded_parts.append(f"[Source {art.source_locator or 'Reference'}]:\n{source_text}")
+                        elif art.type == "image":
+                            image_meta = json.loads(art.json_data or "{}")
+                            grounded_parts.append(f"[Source image imageArtifactId={art.id}: {art.source_locator or 'Image'}; source context: {image_meta.get('caption', '')}]")
 
-                if grounded_parts:
-                    grounding_content = "\n\n".join(grounded_parts)
-                    context["grounding"] = grounding_content
-                    prompt_grounding = grounding_content if len(grounding_content) <= 15000 else grounding_content[:15000] + "\n\n[... Remaining reference sections indexed for grounding ...]"
-                    enriched_prompt += f"\n\n[MANDATORY GROUNDING DATA FROM ATTACHED DOCUMENTS]:\n{prompt_grounding}"
-                else:
-                    context["grounding"] = f"Grounded context with {len(existing_artifacts)} reference sources."
+                    if grounded_parts:
+                        grounding_content = "\n\n".join(grounded_parts)
+                        context["grounding"] = grounding_content
+                        prompt_grounding = grounding_content if len(grounding_content) <= 15000 else grounding_content[:15000] + "\n\n[... Remaining reference sections indexed for grounding ...]"
+                        enriched_prompt += f"\n\n[MANDATORY GROUNDING DATA FROM ATTACHED DOCUMENTS]:\n{prompt_grounding}"
+                    else:
+                        context["grounding"] = f"Grounded context with {len(existing_artifacts)} reference sources."
+                except Exception as _e:
+                    _fail_step("source_grounding", _e, "grounding_failed")
 
                 _update_task("source_grounding", "completed", completed=True)
                 _emit("source_grounding", "completed", f"Grounded factual context from {len(existing_artifacts)} sources.")
@@ -345,8 +385,16 @@ class JobOrchestrator:
 
                 llm_brand = None
                 try:
-                    # Non-blocking brand hint with concise prompt and fast 5-second timeout
-                    brand_input = f"Topic: {goal.topic}\nAudience: {goal.target_audience}\nIndustry: {goal.industry}\nPreferences: {user_prompt[:300]}"
+                    # Full prompt + extracted directives for accurate brand/color selection
+                    _directives = getattr(goal, "user_directives", "")
+                    brand_input = (
+                        f"Topic: {goal.topic}\n"
+                        f"Audience: {goal.target_audience if hasattr(goal, 'target_audience') else goal.audience}\n"
+                        f"Industry: {goal.industry}\n"
+                        f"User Prompt (full): {user_prompt[:1500]}\n"
+                    )
+                    if _directives:
+                        brand_input += f"\n[USER COLOUR/THEME DIRECTIVES — honour these exactly]:\n{_directives}\n"
                     llm_brand = await asyncio.wait_for(
                         ProviderRouter.call_llm(
                             db=db,
@@ -386,7 +434,35 @@ class JobOrchestrator:
 
                 goal: PresentationGoal = context.get("presentation_goal") or RequirementsAgent.analyze_requirements(user_prompt)
                 target_slide_count = goal.target_slide_count
-                planner_prompt = enriched_prompt
+
+                # Build planner prompt: user directives pinned at top so the LLM
+                # cannot ignore them even when grounding data is large.
+                # For the PLANNER we use a compressed table-of-contents style summary
+                # of the document (headings + first sentences) so the LLM sees full
+                # document structure without hitting context limits.
+                _directives = getattr(goal, "user_directives", "")
+                _raw_grounding = context.get("grounding", "")
+                _planning_grounding = (
+                    GroundingChunker.compress_for_planning(_raw_grounding)
+                    if len(_raw_grounding) > 3000
+                    else _raw_grounding
+                )
+
+                planner_prompt = ""
+                if _directives:
+                    planner_prompt += (
+                        f"[USER DIRECTIVES — YOU MUST HONOUR ALL OF THESE]:\n{_directives}\n\n"
+                    )
+                # Use user prompt (without the raw grounding) + compressed planning grounding
+                _base_prompt = user_prompt
+                if eff_ctx.get("context_prompt"):
+                    _base_prompt += f"\n\n[Active Session Memory & Constraints]:\n{eff_ctx['context_prompt']}"
+                planner_prompt += _base_prompt
+                if _planning_grounding:
+                    planner_prompt += (
+                        f"\n\n[DOCUMENT STRUCTURE SUMMARY — use to plan slide topics and chapters]:\n"
+                        f"{_planning_grounding}"
+                    )
                 if target_slide_count:
                     planner_prompt += (
                         f"\n\nCRITICAL REQUIREMENT: Output EXACTLY {target_slide_count} slides in the 'slides' array (s01 to s{target_slide_count:02d}) "
@@ -396,6 +472,9 @@ class JobOrchestrator:
                 _emit("deck_planner", "running", f"Structuring storyline across {target_slide_count} slides...")
 
                 deck_spec = None
+                _planner_error: str | None = None
+
+                # ── Attempt 1: Full LLM call with all available providers ────────────
                 try:
                     deck_spec = await asyncio.wait_for(
                         ProviderRouter.call_llm(
@@ -410,7 +489,36 @@ class JobOrchestrator:
                         timeout=90.0,
                     )
                 except Exception as e:
-                    logger.warning("Deck planner LLM fallback to StorylineAgent: %s", e)
+                    _planner_error = str(e)
+                    logger.warning("Deck planner attempt 1 failed (%s) — retrying with minimal prompt", _planner_error)
+
+                # ── Attempt 2: Simpler prompt, try again across all providers ─────────
+                if not isinstance(deck_spec, dict) or "slides" not in deck_spec:
+                    _minimal_prompt = (
+                        f"Return a JSON object with keys 'deckTitle' (string) and 'slides' (array of "
+                        f"{target_slide_count} objects, each with slideId, headline, layoutHint, bullets[]). "
+                        f"Topic: {goal.topic or user_prompt[:300]}"
+                    )
+                    try:
+                        deck_spec = await asyncio.wait_for(
+                            ProviderRouter.call_llm(
+                                db=db,
+                                agent_type="deck_planner",
+                                system_prompt="You are a presentation planner. Respond with valid JSON only.",
+                                user_prompt=_minimal_prompt,
+                                response_schema={"type": "object"},
+                                user_id=user_id,
+                                job_id=job_id,
+                            ),
+                            timeout=60.0,
+                        )
+                        logger.info("Deck planner attempt 2 succeeded with minimal prompt")
+                    except Exception as e2:
+                        logger.warning(
+                            "Deck planner attempt 2 also failed (%s) — using dynamic grounding-based offline outline",
+                            e2,
+                        )
+                        deck_spec = None
 
                 if not isinstance(deck_spec, dict):
                     deck_spec = {}
@@ -424,8 +532,18 @@ class JobOrchestrator:
                             deck_spec = {"deckTitle": deck_spec.get("deckTitle", "Presentation"), "slides": deck_spec[k]}
                             break
 
+                # ── Attempt 3: Dynamic grounding-based offline outline (no hardcoded content) ──
                 if not isinstance(deck_spec.get("slides"), list) or not deck_spec["slides"]:
-                    deck_spec = fallback_plan(user_prompt, target_slide_count, title=goal.topic, grounding=context.get("grounding", ""))
+                    logger.warning(
+                        "All LLM providers failed for deck_planner. "
+                        "Generating offline outline from document grounding. Error: %s",
+                        _planner_error,
+                    )
+                    deck_spec = fallback_plan(
+                        user_prompt, target_slide_count,
+                        title=goal.topic,
+                        grounding=context.get("grounding", ""),
+                    )
 
                 if not deck_spec.get("deckTitle"):
                     deck_spec["deckTitle"] = goal.topic or "Executive Presentation"
@@ -451,7 +569,82 @@ class JobOrchestrator:
                 _emit("slide_writer", "running", f"Writing executive proof points for {len(slides_to_write)} slides...")
 
                 batch_size = 5
-                written_slides_map = {}
+                written_slides_map: dict = {}
+                _raw_grounding = context.get("grounding", "")
+                _goal_directives = getattr(goal, "user_directives", "")
+
+                async def _write_slide_batch(batch_slides: list[dict]) -> None:
+                    """Write one batch of slides and merge results into written_slides_map."""
+                    # Retrieve only the document sections relevant to THIS batch's topics
+                    batch_topics = [
+                        s.get("headline") or s.get("purpose") or s.get("message") or ""
+                        for s in batch_slides
+                    ]
+                    batch_grounding = (
+                        GroundingChunker.retrieve_for_slides(
+                            _raw_grounding,
+                            [t for t in batch_topics if t],
+                            max_chars_total=3500,
+                        )
+                        if _raw_grounding
+                        else ""
+                    )
+
+                    writer_batch_prompt = f"User Goal: {user_prompt[:2000]}\n"
+                    if _goal_directives:
+                        writer_batch_prompt += f"\n[USER DIRECTIVES — apply to every slide]:\n{_goal_directives}\n"
+                    writer_batch_prompt += (
+                        f"\nGrounding Reference (relevant sections for these slides):\n{batch_grounding}\n"
+                        f"Preserve each planned topic and slideId exactly.\n"
+                        f"Planned Slides Batch: {json.dumps(batch_slides)}"
+                    )
+
+                    writer_out = await asyncio.wait_for(
+                        ProviderRouter.call_llm(
+                            db=db,
+                            agent_type="slide_writer",
+                            system_prompt=SLIDE_WRITER_SYSTEM_PROMPT,
+                            user_prompt=writer_batch_prompt,
+                            response_schema={"type": "object"},
+                            user_id=user_id,
+                            job_id=job_id,
+                        ),
+                        timeout=90.0,
+                    )
+
+                    ws_list = []
+                    if isinstance(writer_out, list):
+                        ws_list = writer_out
+                    elif isinstance(writer_out, dict):
+                        for key in ("slides", "data", "slide", "slides_list"):
+                            val = writer_out.get(key)
+                            if isinstance(val, list):
+                                ws_list = val
+                                break
+                            elif isinstance(val, dict):
+                                ws_list = [val]
+                                break
+                        if not ws_list:
+                            for wrap_key in ("deck", "presentation", "deck_spec", "output"):
+                                if isinstance(writer_out.get(wrap_key), dict):
+                                    nested = writer_out[wrap_key].get("slides") or writer_out[wrap_key].get("data")
+                                    if isinstance(nested, list):
+                                        ws_list = nested
+                                        break
+
+                    if isinstance(ws_list, list):
+                        for idx, s in enumerate(ws_list):
+                            if not isinstance(s, dict):
+                                continue
+                            raw_id = s.get("slideId") or s.get("slide_id") or s.get("id") or s.get("slide")
+                            if raw_id is not None:
+                                written_slides_map[str(raw_id)] = s
+                                written_slides_map[raw_id] = s
+                            if idx < len(batch_slides):
+                                batch_sid = batch_slides[idx].get("slideId")
+                                if batch_sid and batch_sid not in written_slides_map:
+                                    written_slides_map[str(batch_sid)] = s
+                                    written_slides_map[batch_sid] = s
 
                 for batch_start in range(0, len(slides_to_write), batch_size):
                     batch_slides = slides_to_write[batch_start:batch_start + batch_size]
@@ -462,60 +655,66 @@ class JobOrchestrator:
                         {"current_slide": batch_start + 1, "total_slides": len(slides_to_write)}
                     )
 
-                    try:
-                        writer_batch_prompt = (
-                            f"User Goal: {user_prompt[:800]}\n"
-                            f"Grounding Reference: {context.get('grounding', '')[:2500]}\n"
-                            f"Preserve each planned topic and slideId exactly.\n"
-                            f"Planned Slides Batch: {json.dumps(batch_slides)}"
-                        )
-                        writer_out = await asyncio.wait_for(
-                            ProviderRouter.call_llm(
-                                db=db,
-                                agent_type="slide_writer",
-                                system_prompt=SLIDE_WRITER_SYSTEM_PROMPT,
-                                user_prompt=writer_batch_prompt,
-                                response_schema={"type": "object"},
-                                user_id=user_id,
-                                job_id=job_id,
-                            ),
-                            timeout=90.0,
-                        )
-                        ws_list = []
-                        if isinstance(writer_out, list):
-                            ws_list = writer_out
-                        elif isinstance(writer_out, dict):
-                            for key in ("slides", "data", "slide", "slides_list"):
-                                val = writer_out.get(key)
-                                if isinstance(val, list):
-                                    ws_list = val
-                                    break
-                                elif isinstance(val, dict):
-                                    ws_list = [val]
-                                    break
-                            if not ws_list:
-                                for wrap_key in ("deck", "presentation", "deck_spec", "output"):
-                                    if isinstance(writer_out.get(wrap_key), dict):
-                                        nested = writer_out[wrap_key].get("slides") or writer_out[wrap_key].get("data")
-                                        if isinstance(nested, list):
-                                            ws_list = nested
-                                            break
+                    # ── Adaptive batch splitting ─────────────────────────────────────
+                    # Strategy: try full batch → halved sub-batches → single slides
+                    # This gracefully handles models with smaller context windows.
+                    batch_succeeded = False
+                    slides_before = len(written_slides_map)
 
-                        if isinstance(ws_list, list):
-                            for idx, s in enumerate(ws_list):
-                                if not isinstance(s, dict):
-                                    continue
-                                raw_id = s.get("slideId") or s.get("slide_id") or s.get("id") or s.get("slide")
-                                if raw_id is not None:
-                                    written_slides_map[str(raw_id)] = s
-                                    written_slides_map[raw_id] = s
-                                if idx < len(batch_slides):
-                                    batch_sid = batch_slides[idx].get("slideId")
-                                    if batch_sid and batch_sid not in written_slides_map:
-                                        written_slides_map[str(batch_sid)] = s
-                                        written_slides_map[batch_sid] = s
-                    except Exception:
-                        logger.warning("Slide-writer batch failed at index %s", batch_start, exc_info=True)
+                    try:
+                        await _write_slide_batch(batch_slides)
+                        batch_succeeded = len(written_slides_map) > slides_before
+                    except Exception as _batch_err:
+                        logger.warning(
+                            "Slide-writer batch [%d-%d] failed (%s) — splitting into sub-batches",
+                            batch_start + 1,
+                            batch_start + len(batch_slides),
+                            _batch_err,
+                        )
+
+                    if not batch_succeeded:
+                        # Split: try 2-slide sub-batches
+                        sub_batch_size = max(1, len(batch_slides) // 2)
+                        for sub_start in range(0, len(batch_slides), sub_batch_size):
+                            sub_batch = batch_slides[sub_start:sub_start + sub_batch_size]
+                            sub_before = len(written_slides_map)
+                            try:
+                                await _write_slide_batch(sub_batch)
+                                if len(written_slides_map) > sub_before:
+                                    batch_succeeded = True
+                            except Exception as _sub_err:
+                                logger.warning(
+                                    "Slide-writer sub-batch (%d slides starting at %d) failed (%s) — writing single slides",
+                                    len(sub_batch), batch_start + sub_start + 1, _sub_err,
+                                )
+                                # Last resort: write one slide at a time
+                                for single_slide in sub_batch:
+                                    single_before = len(written_slides_map)
+                                    try:
+                                        await _write_slide_batch([single_slide])
+                                        if len(written_slides_map) > single_before:
+                                            batch_succeeded = True
+                                    except Exception as _single_err:
+                                        logger.warning(
+                                            "Slide-writer single-slide fallback failed for %s: %s",
+                                            single_slide.get("slideId"), _single_err,
+                                        )
+
+                    if not batch_succeeded:
+                        logger.warning(
+                            "All split strategies failed for batch starting at slide %d — "
+                            "placeholder content will be used for these slides.",
+                            batch_start + 1,
+                        )
+
+                # ── Validate slide writer produced content ────────────────────────
+                successful_batches = sum(1 for sid in written_slides_map)
+                if successful_batches == 0 and slides_to_write and settings.app_env != "test":
+                    _fail_step(
+                        "slide_writer",
+                        RuntimeError(f"All {len(range(0, len(slides_to_write), batch_size))} slide-writer batches failed to produce output."),
+                        "slide_writer_all_batches_failed",
+                    )
 
                 for idx, slide in enumerate(slides_to_write):
                     sid = slide.get("slideId")
@@ -603,25 +802,31 @@ class JobOrchestrator:
                 ds_obj = context.get("design_system") or DesignIntelligenceAgent.generate_design_system(goal_obj)
 
                 # Convert to SlideSpec models
-                slide_specs = StorylineAgent.create_storyline_plan(
-                    goal=goal_obj,
-                    llm_plan_spec=context["deck_spec"],
-                    available_assets=[
-                        AssetMetadata(
-                            asset_id=art.id,
-                            source_file=art.source_locator or "doc",
-                            caption=json.loads(art.json_data or "{}").get("caption", ""),
-                            storage_key=art.storage_key or "",
-                        ) for art in existing_artifacts if art.type == "image"
-                    ],
-                )
+                try:
+                    slide_specs = StorylineAgent.create_storyline_plan(
+                        goal=goal_obj,
+                        llm_plan_spec=context["deck_spec"],
+                        available_assets=[
+                            AssetMetadata(
+                                asset_id=art.id,
+                                source_file=art.source_locator or "doc",
+                                caption=json.loads(art.json_data or "{}").get("caption", ""),
+                                storage_key=art.storage_key or "",
+                            ) for art in existing_artifacts if art.type == "image"
+                        ],
+                    )
+                except Exception as _e:
+                    _fail_step("pptx_renderer", _e, "storyline_plan_failed")
 
-                pptx_bytes = await run_in_threadpool(
-                    PPTXRenderer.render_deck,
-                    context["deck_spec"],
-                    context.get("brand_style"),
-                    source_images,
-                )
+                try:
+                    pptx_bytes = await run_in_threadpool(
+                        PPTXRenderer.render_deck,
+                        context["deck_spec"],
+                        context.get("brand_style"),
+                        source_images,
+                    )
+                except Exception as _e:
+                    _fail_step("pptx_renderer", _e, "render_failed")
 
                 # 7. Presentation QA & Self-Correction Loop
                 if "visual_qa" in task_types:
@@ -713,6 +918,12 @@ class JobOrchestrator:
 
             # 8. Gatekeeper
             if "gatekeeper" in task_types:
+                if not deck_persisted:
+                    _fail_step(
+                        "gatekeeper",
+                        RuntimeError("Gatekeeper reached without a persisted deck — renderer did not complete."),
+                        "deck_not_persisted",
+                    )
                 _update_task("gatekeeper", "completed", completed=True)
                 _emit("gatekeeper", "completed", "Presentation packaging complete and verified.")
 
@@ -730,8 +941,12 @@ class JobOrchestrator:
 
             title = context.get("deck_spec", {}).get("deckTitle") or "Executive Presentation"
             slides_count = len(context.get("deck_spec", {}).get("slides", []))
+            # new_version is set inside pptx_renderer; default to 1 if renderer was skipped (export mode)
+            _new_version = new_version if deck_persisted else (getattr(db.scalar(
+                select(Project).where(Project.id == project_id)
+            ), 'current_deck_version', 1) or 1)
             _emit("job_completed", "completed", "Presentation ready for review and download.", {
-                "version": new_version,
+                "version": _new_version,
                 "deck_title": title,
                 "slides_count": slides_count,
             })
@@ -765,15 +980,19 @@ class JobOrchestrator:
             db.rollback()
             await cleanup_uncommitted_deck()
             raise
-        except Exception:
+        except Exception as _outer_exc:
             db.rollback()
             await cleanup_uncommitted_deck()
             failed_job = db.get(GenerationJob, job_id)
+            completed_at = int(time.time())
             if failed_job is not None and failed_job.status != "cancelled":
-                completed_at = int(time.time())
                 failed_job.status = "permanently_failed"
                 failed_job.active_slot = None
                 failed_job.completed_at = completed_at
+
+                # AgentStepError: the failing task was already marked — only
+                # cancel remaining pending/running tasks that never got to run.
+                # Generic errors: mark every still-running task as failed.
                 failed_tasks = db.scalars(
                     select(AgentTask).where(
                         AgentTask.job_id == job_id,
@@ -782,9 +1001,41 @@ class JobOrchestrator:
                 ).all()
                 for failed_task in failed_tasks:
                     failed_task.status = "failed"
-                    failed_task.error_code = "job_failed"
+                    failed_task.error_code = (
+                        "upstream_agent_failed"
+                        if isinstance(_outer_exc, AgentStepError)
+                        else "job_failed"
+                    )
                     failed_task.completed_at = completed_at
-                db.commit()
+
+                # Persist a visible error message so the frontend can show it
+                _error_detail = str(_outer_exc)
+                if isinstance(_outer_exc, AgentStepError):
+                    _error_detail = (
+                        f"The **{_outer_exc.agent_type}** step failed and the presentation could not be completed.\n\n"
+                        f"Error: {_outer_exc.cause}\n\n"
+                        "Please try again. If the problem persists, check your document and API key configuration."
+                    )
+                else:
+                    _error_detail = (
+                        f"An unexpected error occurred during presentation generation.\n\n"
+                        f"Error: {_outer_exc}\n\n"
+                        "Please try again."
+                    )
+                try:
+                    err_msg = Message(
+                        project_id=project_id,
+                        role="assistant",
+                        content=_error_detail,
+                    )
+                    db.add(err_msg)
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    logger.warning("Could not persist error message for job %s", job_id, exc_info=True)
+
+            _emit("job_failed", "failed", f"Generation failed: {_outer_exc}")
+            logger.error("Generation job %s failed: %s", job_id, _outer_exc, exc_info=True)
             raise
 
     _session_factory = None
