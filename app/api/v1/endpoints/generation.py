@@ -319,26 +319,7 @@ async def download_pptx(
     utf8_filename = f"{sanitized}_v{version}.pptx"
     encoded_utf8 = quote(utf8_filename, safe="")
 
-    # High-speed download path via Cloudflare R2 presigned URL
-    if storage_service.use_r2:
-        presigned_url = storage_service.generate_presigned_download_url(
-            art.storage_key, expires_in=1800, filename=utf8_filename
-        )
-        if url_only:
-            return {
-                "download_url": presigned_url,
-                "filename": utf8_filename,
-            }
-        return RedirectResponse(
-            url=presigned_url,
-            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
-            headers={
-                "Content-Disposition": f'attachment; filename="{ascii_filename}"; filename*=UTF-8\'\'{encoded_utf8}',
-                "Access-Control-Expose-Headers": "Content-Disposition, Location",
-            },
-        )
-
-    # Local storage fallback
+    # Stream file bytes directly from storage service (R2 or local)
     try:
         file_bytes = await run_in_threadpool(storage_service.get_bytes, art.storage_key)
     except Exception as exc:
