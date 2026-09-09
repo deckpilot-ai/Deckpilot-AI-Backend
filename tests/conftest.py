@@ -58,10 +58,14 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
+    from app.services.attachment_pipeline import set_session_factory as set_attachment_session_factory
+
     Base.metadata.create_all(bind=test_engine)
     JobOrchestrator.set_session_factory(TestingSessionLocal)
+    set_attachment_session_factory(TestingSessionLocal)
     yield
     Base.metadata.drop_all(bind=test_engine)
+
 
 
 @pytest.fixture

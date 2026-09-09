@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -40,9 +41,12 @@ class StorageService:
             self.s3_client = None
 
     def _local_path(self, key: str) -> Path:
-        root = self.local_storage_dir.resolve()
-        path = (root / key).resolve()
-        if not path.is_relative_to(root):
+        clean_key = key.lstrip("/\\")
+        root = Path(os.path.realpath(os.path.abspath(str(self.local_storage_dir))))
+        path = Path(os.path.realpath(os.path.abspath(str(root / clean_key))))
+        norm_path = os.path.normcase(str(path))
+        norm_root = os.path.normcase(str(root))
+        if not (norm_path == norm_root or norm_path.startswith(norm_root + os.sep) or norm_path.startswith(norm_root + "/")):
             raise ValueError("Storage key resolves outside the configured storage directory")
         return path
 

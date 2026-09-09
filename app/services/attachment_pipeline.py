@@ -76,6 +76,8 @@ async def _process_with_session(db: Session, attachment_id: str) -> None:
     if attachment is None or attachment.status == "ready":
         return
 
+
+
     if attachment.status != "extracting":
         attachment.status = "extracting"
         db.commit()
@@ -218,33 +220,40 @@ async def wait_for_pending_attachments(
     db: Session,
     project_id: str,
     *,
-    timeout_seconds: float = 600.0,
-    poll_interval: float = 4.0,
+    timeout_seconds: float = 60.0,
+    poll_interval: float = 1.0,
     emit: Callable[..., None] | None = None,
 ) -> None:
     """Block until this project has no attachments still being extracted.
 
     Used by the orchestrator's reference_intake stage so a generation job that
     starts right after an upload always runs with complete grounding data.
-
-    Inline recovery is ONLY attempted for attachments still in the ``pending``
-    state (i.e. the background worker never picked them up). Attachments in
-    ``extracting`` state are actively being processed by the background worker;
-    racing against that worker with a second inline extraction causes DB
-    deadlocks and double-work. Instead we wait an additional grace period for
-    those to complete naturally, and only mark them failed if they do not
-    finish within the extended deadline.
     """
+    # 1. Process any pending attachments inline if not yet picked up
+    pending = db.scalars(
+        select(Attachment).where(
+            Attachment.project_id == project_id, Attachment.status == "pending"
+        )
+    ).all()
+    pending_ids = [att.id for att in pending]
+
+    for att_id in pending_ids:
+        if emit is not None:
+            emit("reference_intake", "running", "Processing attached document...")
+        try:
+            await process_attachment(att_id, db=db)
+        except Exception:
+            logger.warning("Inline attachment processing failed for attachment %s", att_id, exc_info=True)
+
+    # 2. Wait for any actively extracting attachments to finish
     deadline = time.monotonic() + timeout_seconds
-    factory = get_session_factory()
     while True:
-        with factory() as check_session:
-            pending_count = check_session.scalar(
-                select(func.count())
-                .select_from(Attachment)
-                .where(Attachment.project_id == project_id, Attachment.status.in_(PENDING_STATUSES))
-            )
-        if not pending_count:
+        extracting_count = db.scalar(
+            select(func.count())
+            .select_from(Attachment)
+            .where(Attachment.project_id == project_id, Attachment.status == "extracting")
+        ) or 0
+        if not extracting_count:
             return
         if time.monotonic() >= deadline:
             break
@@ -252,51 +261,9 @@ async def wait_for_pending_attachments(
             emit(
                 "reference_intake",
                 "running",
-                f"Extracting {pending_count} reference document(s)...",
+                f"Extracting {extracting_count} reference document(s)...",
             )
         await asyncio.sleep(poll_interval)
 
-    # After timeout: only inline-recover truly orphaned (pending) attachments.
-    # Attachments still in 'extracting' have an active background worker —
-    # attempting a parallel extraction would race and deadlock. Just log and
-    # proceed; the grounding step will use whatever artifacts are already ready.
-    factory = get_session_factory()
-    with factory() as check_session:
-        orphaned = check_session.scalars(
-            select(Attachment).where(
-                Attachment.project_id == project_id, Attachment.status == "pending"
-            )
-        ).all()
-        orphaned_ids = [att.id for att in orphaned]
 
-        still_extracting_count = check_session.scalar(
-            select(func.count())
-            .select_from(Attachment)
-            .where(Attachment.project_id == project_id, Attachment.status == "extracting")
-        ) or 0
-
-    if still_extracting_count:
-        logger.warning(
-            "project_id=%s has %s attachment(s) still in 'extracting' after %.0fs timeout. "
-            "Background worker is active — skipping inline recovery to avoid race condition. "
-            "Proceeding with partial grounding data.",
-            project_id,
-            still_extracting_count,
-            timeout_seconds,
-        )
-        if emit is not None:
-            emit(
-                "reference_intake",
-                "running",
-                "Background extraction still in progress — proceeding with available content.",
-            )
-
-    for att_id in orphaned_ids:
-        logger.warning(
-            "Recovering orphaned (pending) attachment extraction attachment_id=%s",
-            att_id,
-        )
-        if emit is not None:
-            emit("reference_intake", "running", "Finishing orphaned document extraction inline...")
-        await process_attachment(att_id, db=db)
 
