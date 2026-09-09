@@ -25,25 +25,47 @@ class RequirementsAgent:
         prompt_lower = user_prompt.lower()
         files = reference_files or []
 
-        # 1. Slide Count detection
+        NUMBER_WORDS = {
+            "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+            "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
+            "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19,
+            "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50
+        }
+
+        # 1. Slide Count detection (supports "12 page", "12 slides", "deck of 12", "12-page", "twelve slides")
         if target_slide_count is not None and target_slide_count > 0:
             slide_count = target_slide_count
         else:
             count_match = re.search(
-                r"\b(\d+)(?:[- ,]+[a-z-]+){0,3}[- ,]+slides?\b|\b(\d+)[- ]slides?\b",
+                r"\b(\d+)\s*[-_]?(?:slides?|pages?|pgs?|screens?|cards?|sections?|parts?)\b"
+                r"|\b(?:deck|presentation|slides?|pages?)\s+of\s+(\d+)\b"
+                r"|\b(?:target|count|length|size)\s*[:=]?\s*(\d+)\b"
+                r"|\b(\d+)\s*[-_]?(?:slide|page)\s+(?:deck|presentation|ppt|pptx)\b",
                 user_prompt,
                 re.IGNORECASE,
             )
+            detected_num = None
             if count_match:
-                detected_count = int(count_match.group(1) or count_match.group(2))
-                slide_count = max(1, min(detected_count, 60))
-            elif reference_asset_count > 10 and grounded_text_length > 5000:
-                # In-depth textbook or extensive reference doc
-                slide_count = 22
+                for grp in count_match.groups():
+                    if grp and grp.isdigit():
+                        detected_num = int(grp)
+                        break
+
+            if detected_num is None:
+                for word, num in NUMBER_WORDS.items():
+                    if re.search(rf"\b{word}\s*[-_]?(?:slides?|pages?|pgs?|screens?|cards?|deck|parts?)\b|\b(?:deck|presentation)\s+of\s+{word}\b", user_prompt, re.IGNORECASE):
+                        detected_num = num
+                        break
+
+            if detected_num is not None:
+                slide_count = max(1, min(detected_num, 60))
             elif "quick" in prompt_lower or "short" in prompt_lower or "summary" in prompt_lower:
                 slide_count = 5
             elif "investor" in prompt_lower or "pitch" in prompt_lower:
                 slide_count = 10
+            elif reference_asset_count > 10 and grounded_text_length > 5000:
+                # In-depth textbook or extensive reference doc default
+                slide_count = 14
             else:
                 slide_count = 8
 
