@@ -25,6 +25,7 @@ from app.services.codecraft_models import (
 )
 from app.services.diagnostics_service import DiagnosticsService
 from app.services.experientiallabs_models import ExperientialLabsModelManager
+from app.services.health_tracker import health_tracker
 from app.services.openrouter_models import OpenRouterModelManager
 
 logger = logging.getLogger(__name__)
@@ -526,20 +527,23 @@ class ProviderRouter:
         job_id: str | None = None,
     ) -> dict[str, Any]:
         """
-        Executes an LLM call through configured providers in descending priority order.
-        For each provider, tries configured models in descending model-priority sequence.
+        Executes an LLM call using adaptive health-aware routing.
+
+        Instead of static priority order, candidates are scored by a composite
+        of base priority (30%), EWMA latency (40%), and reliability (30%).
+        Circuit-broken candidates are skipped automatically.
         """
         now = int(time.time())
 
-        # 1. Ensure providers from environment are synchronized
-        ProviderRouter.sync_environment_providers(db)
-
-        # 2. Get all enabled providers sorted by provider priority (descending)
+        # 1. Get all enabled providers (env sync is done once at startup)
         providers = db.scalars(
             select(AIProvider)
             .where(AIProvider.enabled == 1)
             .order_by(desc(AIProvider.priority))
         ).all()
+
+        # 2. Build a flat list of all (provider, model, key) candidates
+        all_candidates: list[dict[str, Any]] = []
 
         for provider in providers:
             try:
@@ -555,172 +559,228 @@ class ProviderRouter:
                 continue
             key_record, secret_key = active_key_tuple
 
-            # Check if this provider has configured custom models
+            # Determine candidate model IDs
             configured_models = db.scalars(
                 select(AIProviderModel)
                 .where(AIProviderModel.provider_id == provider.id, AIProviderModel.enabled == 1)
                 .order_by(desc(AIProviderModel.priority))
             ).all()
 
-            # Determine list of candidate model IDs to attempt
-            model_candidates: list[str] = []
+            model_candidates: list[tuple[str, int]] = []  # (model_id, base_priority)
             if configured_models:
-                model_candidates = [m.model_id for m in configured_models]
+                model_candidates = [(m.model_id, m.priority) for m in configured_models]
             elif provider.name == "codecraft":
                 effective = CodeCraftModelManager.get_effective_models(
                     api_key=secret_key, base_url=provider_base_url
                 )
-                model_candidates = [m["id"] for m in effective if CodeCraftModelManager.is_available(m["id"])]
+                model_candidates = [
+                    (m["id"], max(100 - (i * 2), 1))
+                    for i, m in enumerate(effective)
+                    if CodeCraftModelManager.is_available(m["id"])
+                ]
             elif provider.name == "experientiallabs":
                 ranked = await ExperientialLabsModelManager.get_ranked_candidates(
                     api_key=secret_key, base_url=provider_base_url
                 )
-                model_candidates = [m["id"] for m in ranked[:5]]
+                model_candidates = [(m["id"], max(100 - (i * 5), 1)) for i, m in enumerate(ranked[:5])]
             elif provider.name == "openrouter":
                 ranked = await OpenRouterModelManager.get_ranked_candidates()
-                model_candidates = [m["id"] for m in ranked[:4]]
+                model_candidates = [(m["id"], max(100 - (i * 5), 1)) for i, m in enumerate(ranked[:4])]
             else:
                 p_name = provider.name.lower()
                 if "groq" in p_name:
-                    model_candidates = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
+                    model_candidates = [("openai/gpt-oss-120b", 90), ("llama-3.3-70b-versatile", 80)]
                 elif "gemini" in p_name:
-                    model_candidates = [settings.gemini_model, "gemini-1.5-flash"]
+                    model_candidates = [(settings.gemini_model, 95), ("gemini-1.5-flash", 85)]
                 elif "openai" in p_name:
-                    model_candidates = ["gpt-4o-mini", "gpt-4o"]
+                    model_candidates = [("gpt-4o-mini", 90), ("gpt-4o", 95)]
                 elif "mistral" in p_name:
-                    model_candidates = ["mistral-small-latest", "mistral-large-latest"]
+                    model_candidates = [("mistral-small-latest", 85), ("mistral-large-latest", 90)]
                 else:
-                    model_candidates = ["default"]
+                    model_candidates = [("default", 50)]
 
-            for model_id in model_candidates:
-                start_time = time.time()
-                logger.info(
-                    "Trying Provider %s model %s for agent %s",
+            for model_id, model_priority in model_candidates:
+                # Combine provider priority with model priority for base score
+                combined_priority = min((provider.priority + model_priority) // 2, 100)
+                all_candidates.append({
+                    "provider_name": provider.name,
+                    "provider": provider,
+                    "provider_base_url": provider_base_url,
+                    "key_record": key_record,
+                    "secret_key": secret_key,
+                    "model_id": model_id,
+                    "base_priority": combined_priority,
+                })
+
+        # 3. Rank candidates by composite health score
+        ranked = health_tracker.rank_candidates(all_candidates)
+
+        if ranked:
+            logger.info(
+                "Adaptive routing for %s: top candidate %s/%s (score=%.1f), %d total candidates",
+                agent_type,
+                ranked[0]["provider_name"],
+                ranked[0]["model_id"],
+                ranked[0].get("composite_score", 0),
+                len(ranked),
+            )
+
+        # 4. Try candidates in ranked order
+        for candidate in ranked:
+            provider = candidate["provider"]
+            provider_base_url = candidate["provider_base_url"]
+            key_record = candidate["key_record"]
+            secret_key = candidate["secret_key"]
+            model_id = candidate["model_id"]
+
+            # Skip if circuit breaker is open
+            if not health_tracker.is_available(provider.name, model_id):
+                logger.debug(
+                    "Skipping circuit-broken %s/%s",
                     provider.name,
                     model_id,
-                    agent_type,
                 )
+                continue
 
-                try:
-                    url = f"{provider_base_url}/chat/completions"
-                    headers = {
-                        "Authorization": f"Bearer {secret_key}",
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": "https://deckpilot.ai",
-                        "X-Title": "deckpilotAI",
-                    }
-                    sys_prompt_final = system_prompt
-                    if response_schema and "json" not in sys_prompt_final.lower():
-                        sys_prompt_final += "\n\nRespond with valid JSON matching the requested structure."
+            start_time = time.time()
+            logger.info(
+                "Trying Provider %s model %s for agent %s (score=%.1f)",
+                provider.name,
+                model_id,
+                agent_type,
+                candidate.get("composite_score", 0),
+            )
 
-                    is_reasoning_model = any(m in model_id.lower() for m in ("o1", "o3", "reasoner", "r1"))
-                    payload: dict[str, Any] = {
-                        "model": model_id,
-                        "messages": [
-                            {"role": "system", "content": sys_prompt_final},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    }
-                    if not is_reasoning_model:
-                        payload["temperature"] = 0.2
+            try:
+                url = f"{provider_base_url}/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {secret_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://deckpilot.ai",
+                    "X-Title": "deckpilotAI",
+                }
+                sys_prompt_final = system_prompt
+                if response_schema and "json" not in sys_prompt_final.lower():
+                    sys_prompt_final += "\n\nRespond with valid JSON matching the requested structure."
 
-                    req_timeout = httpx.Timeout(min(float(settings.llm_read_timeout_seconds), 45.0), connect=5.0)
-                    async with httpx.AsyncClient(timeout=req_timeout) as client:
+                is_reasoning_model = any(m in model_id.lower() for m in ("o1", "o3", "reasoner", "r1"))
+                payload: dict[str, Any] = {
+                    "model": model_id,
+                    "messages": [
+                        {"role": "system", "content": sys_prompt_final},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                }
+                if not is_reasoning_model:
+                    payload["temperature"] = 0.2
+
+                req_timeout = httpx.Timeout(min(float(settings.llm_read_timeout_seconds), 45.0), connect=5.0)
+                async with httpx.AsyncClient(timeout=req_timeout) as client:
+                    resp = await client.post(url, headers=headers, json=payload)
+                    if resp.status_code == 400 and "temperature" in resp.text:
+                        payload.pop("temperature", None)
                         resp = await client.post(url, headers=headers, json=payload)
-                        if resp.status_code == 400 and "temperature" in resp.text:
-                            payload.pop("temperature", None)
-                            resp = await client.post(url, headers=headers, json=payload)
 
-                    latency = int((time.time() - start_time) * 1000)
+                latency = int((time.time() - start_time) * 1000)
 
-                    if resp.status_code == 200:
-                        resp_data = resp.json()
-                        content = resp_data["choices"][0]["message"]["content"]
-                        parsed = _parse_llm_response(content, response_schema)
+                if resp.status_code == 200:
+                    resp_data = resp.json()
+                    content = resp_data["choices"][0]["message"]["content"]
+                    parsed = _parse_llm_response(content, response_schema)
 
-                        if provider.name == "openrouter":
-                            OpenRouterModelManager.mark_model_success(model_id)
-                        elif provider.name == "experientiallabs":
-                            ExperientialLabsModelManager.mark_model_success(model_id)
+                    # Record success in health tracker
+                    health_tracker.record_success(provider.name, model_id, float(latency))
 
-                        key_record.last_used_at = now
-                        key_record.failure_count = 0
-                        db.commit()
-
-                        if user_id:
-                            try:
-                                usage = UsageEvent(
-                                    user_id=user_id,
-                                    job_id=job_id,
-                                    provider_id=provider.id,
-                                    key_id=key_record.id,
-                                    model=model_id,
-                                    event_type="generation",
-                                    latency_ms=latency,
-                                    success=1,
-                                    created_at=now,
-                                    input_units=resp_data.get("usage", {}).get("prompt_tokens", 0),
-                                    output_units=resp_data.get("usage", {}).get("completion_tokens", 0),
-                                )
-                                db.add(usage)
-                                db.commit()
-                            except Exception:
-                                db.rollback()
-                                logger.warning("Failed to persist UsageEvent for %s", provider.name, exc_info=True)
-
-                        logger.info("Provider %s model %s completed in %sms", provider.name, model_id, latency)
-                        if latency > settings.slow_llm_threshold_ms:
-                            DiagnosticsService.log_slow_operation(
-                                component="llm",
-                                operation=f"chat_completions ({agent_type})",
-                                duration_ms=latency,
-                                threshold_ms=settings.slow_llm_threshold_ms,
-                                provider=provider.name,
-                                additional_context={"model": model_id, "user_id": user_id, "job_id": job_id},
-                            )
-                        return parsed
-
-                    else:
-                        raw_text = resp.text if isinstance(getattr(resp, "text", None), str) else ""
-                        if provider.name == "codecraft":
-                            CodeCraftModelManager.mark_rate_limited(model_id, cooldown_seconds=60)
-                        elif provider.name == "openrouter":
-                            OpenRouterModelManager.mark_model_failure(model_id, status_code=resp.status_code)
-                        elif provider.name == "experientiallabs":
-                            is_unpayable = resp.status_code == 429 and ("model_requires_payment" in raw_text or "free credits" in raw_text)
-                            cooldown = 3600 if is_unpayable else 60
-                            ExperientialLabsModelManager.mark_model_failure(model_id, status_code=resp.status_code, cooldown_seconds=cooldown)
-
-                        DiagnosticsService.log_external_api_failure(
-                            provider=provider.name,
-                            operation=f"chat_completions ({agent_type})",
-                            error=f"HTTP {resp.status_code}: {raw_text[:300]}",
-                            model_name=model_id,
-                            provider_status_code=resp.status_code,
-                            duration_ms=latency,
-                            additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
-                        )
-                        logger.warning("Provider %s model %s returned HTTP %s", provider.name, model_id, resp.status_code)
-                        continue
-
-                except Exception as model_err:
-                    if provider.name == "codecraft":
-                        CodeCraftModelManager.mark_rate_limited(model_id, cooldown_seconds=120)
-                    elif provider.name == "openrouter":
-                        OpenRouterModelManager.mark_model_failure(model_id, status_code=500)
+                    if provider.name == "openrouter":
+                        OpenRouterModelManager.mark_model_success(model_id)
                     elif provider.name == "experientiallabs":
-                        ExperientialLabsModelManager.mark_model_failure(model_id, status_code=500, cooldown_seconds=300)
+                        ExperientialLabsModelManager.mark_model_success(model_id)
+
+                    key_record.last_used_at = now
+                    key_record.failure_count = 0
+                    db.commit()
+
+                    if user_id:
+                        try:
+                            usage = UsageEvent(
+                                user_id=user_id,
+                                job_id=job_id,
+                                provider_id=provider.id,
+                                key_id=key_record.id,
+                                model=model_id,
+                                event_type="generation",
+                                latency_ms=latency,
+                                success=1,
+                                created_at=now,
+                                input_units=resp_data.get("usage", {}).get("prompt_tokens", 0),
+                                output_units=resp_data.get("usage", {}).get("completion_tokens", 0),
+                            )
+                            db.add(usage)
+                            db.commit()
+                        except Exception:
+                            db.rollback()
+                            logger.warning("Failed to persist UsageEvent for %s", provider.name, exc_info=True)
+
+                    logger.info("Provider %s model %s completed in %sms", provider.name, model_id, latency)
+                    if latency > settings.slow_llm_threshold_ms:
+                        DiagnosticsService.log_slow_operation(
+                            component="llm",
+                            operation=f"chat_completions ({agent_type})",
+                            duration_ms=latency,
+                            threshold_ms=settings.slow_llm_threshold_ms,
+                            provider=provider.name,
+                            additional_context={"model": model_id, "user_id": user_id, "job_id": job_id},
+                        )
+                    return parsed
+
+                else:
+                    raw_text = resp.text if isinstance(getattr(resp, "text", None), str) else ""
+
+                    # Record failure in health tracker
+                    health_tracker.record_failure(provider.name, model_id)
+
+                    if provider.name == "codecraft":
+                        CodeCraftModelManager.mark_rate_limited(model_id, cooldown_seconds=60)
+                    elif provider.name == "openrouter":
+                        OpenRouterModelManager.mark_model_failure(model_id, status_code=resp.status_code)
+                    elif provider.name == "experientiallabs":
+                        is_unpayable = resp.status_code == 429 and ("model_requires_payment" in raw_text or "free credits" in raw_text)
+                        cooldown = 3600 if is_unpayable else 60
+                        ExperientialLabsModelManager.mark_model_failure(model_id, status_code=resp.status_code, cooldown_seconds=cooldown)
 
                     DiagnosticsService.log_external_api_failure(
                         provider=provider.name,
                         operation=f"chat_completions ({agent_type})",
-                        error=model_err,
+                        error=f"HTTP {resp.status_code}: {raw_text[:300]}",
                         model_name=model_id,
-                        duration_ms=int((time.time() - start_time) * 1000),
+                        provider_status_code=resp.status_code,
+                        duration_ms=latency,
                         additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
                     )
-                    logger.warning("Provider %s model %s failed", provider.name, model_id, exc_info=True)
+                    logger.warning("Provider %s model %s returned HTTP %s", provider.name, model_id, resp.status_code)
                     continue
+
+            except Exception as model_err:
+                # Record failure in health tracker
+                health_tracker.record_failure(provider.name, model_id)
+
+                if provider.name == "codecraft":
+                    CodeCraftModelManager.mark_rate_limited(model_id, cooldown_seconds=120)
+                elif provider.name == "openrouter":
+                    OpenRouterModelManager.mark_model_failure(model_id, status_code=500)
+                elif provider.name == "experientiallabs":
+                    ExperientialLabsModelManager.mark_model_failure(model_id, status_code=500, cooldown_seconds=300)
+
+                DiagnosticsService.log_external_api_failure(
+                    provider=provider.name,
+                    operation=f"chat_completions ({agent_type})",
+                    error=model_err,
+                    model_name=model_id,
+                    duration_ms=int((time.time() - start_time) * 1000),
+                    additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
+                )
+                logger.warning("Provider %s model %s failed", provider.name, model_id, exc_info=True)
+                continue
 
         logger.info("All candidates exhausted for agent_type=%s, engaging deterministic fallback", agent_type)
         return ProviderRouter._fallback_deterministic(agent_type, user_prompt)

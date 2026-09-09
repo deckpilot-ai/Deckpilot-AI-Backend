@@ -654,3 +654,21 @@ def cleanup_logs(
         "deleted_count": deleted,
         "message": f"Cleaned up {deleted} old application logs.",
     }
+
+
+@router.get("/provider-health")
+def get_provider_health(
+    admin: Annotated[User, Depends(require_admin)],
+):
+    """Return live health metrics for all tracked LLM providers and models.
+
+    Shows EWMA latency, circuit breaker state, success rates, and composite
+    routing scores used by the adaptive router to distribute traffic.
+    """
+    from app.services.health_tracker import health_tracker
+
+    return {
+        "success": True,
+        **health_tracker.get_status_overview(),
+    }
+

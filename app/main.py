@@ -23,8 +23,10 @@ from app.db.engine import SessionLocal, engine
 from app.services.background_tasks import (
     background_task_registry,
     fail_interrupted_jobs,
+    start_health_probe_loop,
 )
 from app.services.diagnostics_service import DiagnosticsService
+from app.services.provider_router import ProviderRouter
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,13 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         fail_interrupted_jobs(db)
+        # Sync environment providers once at startup (removed from per-request call_llm hot path)
+        ProviderRouter.sync_environment_providers(db)
+
+    # Start background health probe loop for adaptive LLM routing
+    background_task_registry.create(start_health_probe_loop())
+    logger.info("Background health probe loop launched")
+
     try:
         yield
     finally:
