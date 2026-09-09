@@ -867,11 +867,14 @@ class ProviderRouter:
                         additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
                     )
                     is_provider_outage = (
-                        resp.status_code in (502, 503, 504, 403)
-                        or (resp.status_code == 429 and any(
-                            phrase in raw_text.lower()
-                            for phrase in ("card on file", "insufficient_quota", "requires_purchase", "free tier", "out of credits", "quota_exceeded")
-                        ))
+                        provider.name != "gemini"
+                        and (
+                            resp.status_code in (502, 503, 504, 403)
+                            or (resp.status_code == 429 and any(
+                                phrase in raw_text.lower()
+                                for phrase in ("card on file", "insufficient_quota", "requires_purchase", "free tier", "out of credits")
+                            ))
+                        )
                     )
                     if is_provider_outage:
                         logger.warning(
