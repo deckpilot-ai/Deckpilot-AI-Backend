@@ -23,7 +23,7 @@ jobs:
       - name: Deploy via SSH to AWS Lightsail
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.LIGHTSAIL_HOST || 'deckpilot-ai.duckdns.org' }}
+          host: ${{ secrets.LIGHTSAIL_HOST || '13.206.242.145' }}
           username: ${{ secrets.LIGHTSAIL_USER || 'ubuntu' }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           port: ${{ secrets.LIGHTSAIL_PORT || 22 }}
