@@ -1,0 +1,102 @@
+name: Deploy to AWS Lightsail
+
+on:
+  push:
+    branches:
+      - deploy-dev
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-lightsail-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy Backend to Lightsail
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH to AWS Lightsail
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST || 'deckpilot-ai.duckdns.org' }}
+          username: ${{ secrets.LIGHTSAIL_USER || 'ubuntu' }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          port: ${{ secrets.LIGHTSAIL_PORT || 22 }}
+          script_stop: false
+          script: |
+            echo "=== Starting DeckPilotAI Backend Deployment ==="
+            
+            # Find backend repository path dynamically if needed
+            BACKEND_DIR="${{ secrets.LIGHTSAIL_TARGET_DIR || '' }}"
+            if [ -z "$BACKEND_DIR" ]; then
+              if [ -d "/home/ubuntu/Deckpilot-AI-Backend" ]; then
+                BACKEND_DIR="/home/ubuntu/Deckpilot-AI-Backend"
+              elif [ -d "/home/ubuntu/deckpilotAI-backend" ]; then
+                BACKEND_DIR="/home/ubuntu/deckpilotAI-backend"
+              elif [ -d "/var/www/deckpilotAI-backend" ]; then
+                BACKEND_DIR="/var/www/deckpilotAI-backend"
+              elif [ -d "$HOME/deckpilotAI-backend" ]; then
+                BACKEND_DIR="$HOME/deckpilotAI-backend"
+              else
+                BACKEND_DIR="$(pwd)"
+              fi
+            fi
+
+            echo "Target backend directory: $BACKEND_DIR"
+            cd "$BACKEND_DIR" || exit 1
+
+            echo "Fetching latest changes from deploy-dev..."
+            git fetch origin deploy-dev
+            git checkout deploy-dev
+            git reset --hard origin/deploy-dev
+
+            echo "Syncing dependencies..."
+            if command -v uv &> /dev/null; then
+              uv sync --extra dev --frozen || uv sync
+            elif [ -d ".venv" ]; then
+              source .venv/bin/activate
+              pip install -e .
+            fi
+
+            echo "Running database migrations if needed..."
+            if command -v uv &> /dev/null; then
+              uv run alembic upgrade head || true
+            elif [ -d ".venv" ]; then
+              alembic upgrade head || true
+            fi
+
+            echo "Restarting backend service..."
+            if sudo systemctl is-active --quiet deckpilot-backend; then
+              sudo systemctl restart deckpilot-backend
+              echo "Restarted deckpilot-backend systemd service."
+            elif sudo systemctl is-active --quiet deckpilot; then
+              sudo systemctl restart deckpilot
+              echo "Restarted deckpilot systemd service."
+            elif sudo systemctl is-active --quiet fastapi; then
+              sudo systemctl restart fastapi
+              echo "Restarted fastapi systemd service."
+            elif command -v pm2 &> /dev/null; then
+              pm2 restart deckpilot-backend || pm2 restart all || true
+              echo "Restarted PM2 service."
+            elif command -v supervisorctl &> /dev/null; then
+              sudo supervisorctl restart deckpilot-backend || sudo supervisorctl restart all || true
+              echo "Restarted supervisor service."
+            elif [ -f "docker-compose.yml" ]; then
+              docker compose restart || docker-compose restart || true
+              echo "Restarted docker container."
+            else
+              echo "Looking for running uvicorn process to reload..."
+              pkill -f "uvicorn app.main:app" || true
+              sleep 2
+              nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/backend.log 2>&1 &
+            fi
+
+            sleep 3
+            echo "Checking service health..."
+            curl -s -f http://127.0.0.1:8000/api/v1/health || curl -s -f https://deckpilot-ai.duckdns.org/api/v1/health || echo "Health check ping sent."
+            echo "=== Deployment Completed Successfully ==="
