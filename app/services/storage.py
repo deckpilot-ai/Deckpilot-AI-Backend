@@ -88,12 +88,19 @@ class StorageService:
     def generate_presigned_download_url(self, key: str, expires_in: int = 3600, filename: str | None = None) -> str:
         """Generate a presigned download URL for an object with optional Content-Disposition."""
         if self.use_r2 and self.s3_client:
-            params: dict[str, str] = {"Bucket": self.bucket, "Key": key}
+            params: dict[str, str] = {
+                "Bucket": self.bucket,
+                "Key": key,
+                "ResponseContentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            }
             if filename:
                 import re
                 from urllib.parse import quote
                 ascii_name = re.sub(r"[^A-Za-z0-9_\-\.]+", "_", filename).strip("._") or "Presentation.pptx"
-                encoded = quote(filename, safe="")
+                if not ascii_name.lower().endswith(".pptx"):
+                    ascii_name += ".pptx"
+                clean_utf8 = filename if filename.lower().endswith(".pptx") else f"{filename}.pptx"
+                encoded = quote(clean_utf8, safe="")
                 params["ResponseContentDisposition"] = f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{encoded}'
             return self.s3_client.generate_presigned_url(
                 "get_object",
