@@ -95,13 +95,24 @@ class PPTXRenderer:
         frame.margin_left = frame.margin_right = Inches(0.02)
         frame.margin_top = frame.margin_bottom = Inches(0.02)
 
-        floor = 28 if title and size >= 28 else min(int(round(size)), 11)
+        floor = 18 if title and size >= 24 else min(int(round(size)), 9)
         curr_size = int(round(size))
         while True:
             if cls._fits(text, w, h, curr_size, bullet_list):
                 break
             if curr_size <= floor:
-                raise ValueError("Slide text exceeds its layout budget; shorten the source copy and regenerate")
+                # Text exceeds budget at floor size — trim text progressively until it fits
+                if bullet_list:
+                    lines_list = text.split("\n")
+                    while len(lines_list) > 1 and not cls._fits("\n".join(lines_list), w, h, floor, bullet_list):
+                        lines_list.pop()
+                    text = "\n".join(lines_list)
+                if not cls._fits(text, w, h, floor, bullet_list):
+                    while len(text) > 20 and not cls._fits(text + "…", w, h, floor, bullet_list):
+                        text = text[:-10].rstrip()
+                    text = text.rstrip() + "…"
+                curr_size = floor
+                break
             curr_size -= 1
 
         frame.vertical_anchor = MSO_ANCHOR.MIDDLE if center else MSO_ANCHOR.TOP
