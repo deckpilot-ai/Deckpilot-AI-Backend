@@ -761,15 +761,17 @@ class ProviderRouter:
                 if not is_reasoning_model:
                     payload["temperature"] = 0.2
 
-                # Fast timeout for interactive chat / intelligence, standard timeout for heavy deck generation
                 if agent_type == "copilot_chat":
-                    timeout_val = 5.0
-                    conn_timeout = 2.5
+                    timeout_val = 10.0
+                    conn_timeout = 3.5
                 elif agent_type in ("font_brand_detection", "title_intelligence"):
-                    timeout_val = 6.0
-                    conn_timeout = 3.0
+                    timeout_val = 15.0
+                    conn_timeout = 5.0
+                elif agent_type == "slide_writer":
+                    timeout_val = 40.0
+                    conn_timeout = 6.0
                 else:
-                    timeout_val = float(settings.llm_read_timeout_seconds or 90.0)
+                    timeout_val = float(settings.llm_read_timeout_seconds or 60.0)
                     conn_timeout = 8.0
                 req_timeout = httpx.Timeout(timeout_val, connect=conn_timeout)
                 async with httpx.AsyncClient(timeout=req_timeout) as client:
@@ -908,7 +910,7 @@ class ProviderRouter:
                         additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
                     )
                     is_provider_outage = (
-                        provider.name != "gemini"
+                        provider.name not in ("gemini", "nvidia")
                         and (
                             resp.status_code in (502, 503, 504, 403)
                             or (resp.status_code == 429 and any(
