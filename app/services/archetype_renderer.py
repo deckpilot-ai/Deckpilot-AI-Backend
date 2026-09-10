@@ -67,49 +67,76 @@ class ArchetypeRenderer:
         return False
 
     # ──────────────────────────────────────────────────────────────────────────
-    # A1: Title Cover - Blob Variant
+    # A1: Title Cover - Short Main Title + Subtitle Below + High Contrast
     # ──────────────────────────────────────────────────────────────────────────
     @classmethod
     def _render_a1(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
+        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
-        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
         white = RGBColor(255, 255, 255)
         title_font = ds.typography.title_font.name
         body_font = ds.typography.body_font.name
 
-        # Decorative soft ellipses bleeding off canvas
-        r_cls._shape(slide, MSO_SHAPE.OVAL, 9.6, -2.0, 6.5, 6.5, tint(primary, 0.85), "blob-1")
-        r_cls._shape(slide, MSO_SHAPE.OVAL, 11.0, 3.6, 5.2, 5.2, tint(secondary, 0.88), "blob-2")
-        r_cls._shape(slide, MSO_SHAPE.OVAL, -1.6, 4.6, 4.4, 4.4, tint(primary, 0.90), "blob-3")
+        # 1. Dark ink solid background
+        slide.background.fill.solid()
+        slide.background.fill.fore_color.rgb = ink
 
-        # Eyebrow
-        eyebrow = (data.eyebrow or "CONSULTING PERSPECTIVE").upper()
-        r_cls._text(slide, eyebrow, 0.9, 1.4, 8.0, 0.35, primary, body_font, 14, bold=True)
+        # 2. Extract clean short main title & subtitle below
+        raw_title = clean_text(data.headline or data.key_message or "Presentation Title")
+        raw_subtitle = clean_text(data.takeaway or data.subtitle or "")
 
-        # Large Headline Title
-        title = data.headline or data.key_message or "Strategic Presentation"
-        r_cls._text(slide, title, 0.85, 1.85, 11.5, 1.9, primary, title_font, 48, title=True)
+        if ":" in raw_title and len(raw_title) > 16:
+            parts = raw_title.split(":", 1)
+            main_title = parts[0].strip()
+            sub_cand = parts[1].strip()
+            if not raw_subtitle:
+                raw_subtitle = sub_cand
+            elif sub_cand.lower() not in raw_subtitle.lower():
+                raw_subtitle = f"{sub_cand} — {raw_subtitle}"
+        elif len(raw_title.split()) > 5 and not raw_subtitle:
+            words = raw_title.split()
+            main_title = " ".join(words[:4])
+            raw_subtitle = " ".join(words[4:])
+        else:
+            main_title = raw_title
 
-        # Subtitle / Takeaway
-        subtitle = data.takeaway or data.subtitle or (data.bullets[0] if data.bullets else "")
-        if subtitle:
-            r_cls._text(slide, subtitle, 0.9, 3.85, 10.5, 0.8, hex_to_rgb(ds.colors.text_secondary), body_font, 18)
+        # 3. Subtle geometric corner accents (far in corners, never blocking text or title)
+        r_cls._shape(slide, MSO_SHAPE.OVAL, 11.2, -1.8, 3.8, 3.8, tint(ink, 0.12), "corner-accent-tr")
+        r_cls._shape(slide, MSO_SHAPE.OVAL, -1.2, 5.8, 2.6, 2.6, tint(ink, 0.10), "corner-accent-bl")
 
-        # Topic Pills
+        # 4. Eyebrow (Saffron/Gold accent color, tracked uppercase)
+        eyebrow = (data.eyebrow or "CURATED EDUCATIONAL & STRATEGIC BRIEFING").upper()
+        r_cls._text(slide, eyebrow, 0.75, 1.30, 11.5, 0.35, accent, body_font, 13, bold=True)
+
+        # 5. Main Title (Short words, 50-56pt Cambria, Pure Crisp White)
+        title_size = 54 if len(main_title) < 28 else (46 if len(main_title) < 45 else 38)
+        r_cls._text(slide, main_title, 0.70, 1.75, 11.5, 1.60, white, title_font, title_size, title=True)
+
+        # 6. Accent Tick (1.6" wide in accent color)
+        r_cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.75, 3.45, 1.6, 0.06, accent, "title-accent-tick")
+
+        # 7. Subtitle (Directly below title, crisp high-contrast light tone, 17-19pt Calibri)
+        if raw_subtitle:
+            sub_col = tint(white, 0.12)  # Soft high-contrast light tone (#E2EEEC / #F0E4DA)
+            r_cls._text(slide, raw_subtitle, 0.75, 3.68, 11.2, 0.95, sub_col, body_font, 18)
+
+        # 8. Topic Badges / Category Pills (Dark glass pill background, pure white bold text)
         pills = data.bullets[:4] if data.bullets else ["Strategic Foundations", "Operational Delivery", "Institutional Impact"]
-        pill_y = 4.95
-        px = 0.9
+        pill_y = 4.88
+        px = 0.75
         for p in pills:
             label = clean_text(p).split(":")[0].strip()[:35]
-            pw = max(1.8, min(3.5, len(label) * 0.12 + 0.5))
-            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, px, pill_y, pw, 0.45, tint(primary, 0.88), "topic-pill", corner_radius=0.2)
-            r_cls._text(slide, label, px, pill_y + 0.05, pw, 0.35, primary, body_font, 11, bold=True, center=True)
+            pw = max(2.0, min(3.6, len(label) * 0.11 + 0.6))
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, px, pill_y, pw, 0.45, tint(ink, 0.28), "topic-pill", corner_radius=0.25)
+            r_cls._text(slide, label, px, pill_y + 0.05, pw, 0.35, white, body_font, 11.5, bold=True, center=True)
             px += pw + 0.25
 
-        # Footer note / Badge
-        r_cls._shape(slide, MSO_SHAPE.OVAL, 0.9, 6.25, 0.55, 0.55, primary, "seal")
-        r_cls._text(slide, "★", 0.9, 6.25, 0.55, 0.55, white, body_font, 14, bold=True, center=True)
-        r_cls._text(slide, "Executive Advisory & Comprehensive Evaluation", 1.6, 6.32, 9.5, 0.4, hex_to_rgb(ds.colors.text_secondary), body_font, 12)
+        # 9. Footer category note
+        footer_note = "Executive Advisory & Comprehensive Research Presentation"
+        if data.speaker_notes and ":" in data.speaker_notes:
+            footer_note = data.speaker_notes.split(":")[0].strip()[:65]
+        r_cls._text(slide, footer_note, 0.75, 6.35, 9.5, 0.35, tint(white, 0.38), body_font, 12)
 
     # ──────────────────────────────────────────────────────────────────────────
     # A2: Title Cover - Split Panel
@@ -118,36 +145,62 @@ class ArchetypeRenderer:
     def _render_a2(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
         ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
         white = RGBColor(255, 255, 255)
         title_font = ds.typography.title_font.name
         body_font = ds.typography.body_font.name
 
+        # Solid ink background
+        slide.background.fill.solid()
+        slide.background.fill.fore_color.rgb = ink
+
+        # Title & subtitle parsing
+        raw_title = clean_text(data.headline or data.key_message or "Executive Briefing")
+        raw_subtitle = clean_text(data.takeaway or (data.bullets[0] if data.bullets else ""))
+
+        if ":" in raw_title and len(raw_title) > 16:
+            parts = raw_title.split(":", 1)
+            main_title = parts[0].strip()
+            sub_cand = parts[1].strip()
+            if not raw_subtitle:
+                raw_subtitle = sub_cand
+            elif sub_cand.lower() not in raw_subtitle.lower():
+                raw_subtitle = f"{sub_cand} — {raw_subtitle}"
+        elif len(raw_title.split()) > 5 and not raw_subtitle:
+            words = raw_title.split()
+            main_title = " ".join(words[:4])
+            raw_subtitle = " ".join(words[4:])
+        else:
+            main_title = raw_title
+
         # Left 55%: text narrative
         eyebrow = (data.eyebrow or "CASE STUDY & ANALYSIS").upper()
-        r_cls._text(slide, eyebrow, 0.65, 1.25, 6.5, 0.35, primary, body_font, 13, bold=True)
+        r_cls._text(slide, eyebrow, 0.70, 1.30, 6.6, 0.35, accent, body_font, 13, bold=True)
 
-        title = data.headline or data.key_message or "Executive Briefing"
-        r_cls._text(slide, title, 0.65, 1.75, 6.6, 2.1, ink, title_font, 42, title=True)
+        title_size = 48 if len(main_title) < 28 else 40
+        r_cls._text(slide, main_title, 0.65, 1.75, 6.6, 1.8, white, title_font, title_size, title=True)
 
-        # 1.7" Accent Tick
-        r_cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.65, 3.95, 1.7, 0.07, primary, "accent-tick")
+        # 1.6" Accent Tick
+        r_cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.70, 3.65, 1.6, 0.06, accent, "accent-tick")
 
-        subtitle = data.takeaway or (data.bullets[0] if data.bullets else "")
-        if subtitle:
-            r_cls._text(slide, subtitle, 0.65, 4.2, 6.5, 1.2, hex_to_rgb(ds.colors.text_secondary), body_font, 15)
+        if raw_subtitle:
+            sub_col = tint(white, 0.12)
+            r_cls._text(slide, raw_subtitle, 0.70, 3.88, 6.5, 1.5, sub_col, body_font, 16.5)
 
-        r_cls._text(slide, "COMPREHENSIVE RESEARCH EVALUATION", 0.65, 6.2, 6.5, 0.35, primary, body_font, 11, bold=True)
+        r_cls._text(slide, "COMPREHENSIVE RESEARCH EVALUATION", 0.70, 6.30, 6.5, 0.35, tint(white, 0.38), body_font, 11, bold=True)
 
         # Right 45%: Framed Hero Photo with Mat in Ink Block
-        r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.6, 0.8, 5.15, 5.8, ink, "photo-container", corner_radius=0.03)
+        r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.6, 1.1, 5.15, 5.2, tint(ink, 0.25), "photo-container", corner_radius=0.03)
         if img:
-            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.85, 1.1, 4.65, 4.5, tint_a, "photo-mat", corner_radius=0.02)
-            r_cls._render_picture(slide, img, 7.95, 1.2, 4.45, 4.3)
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.85, 1.25, 4.65, 4.2, tint_a, "photo-mat", corner_radius=0.02)
+            r_cls._render_picture(slide, img, 7.95, 1.35, 4.45, 4.0)
             caption = data.image_caption or "Documentary reference figure"
-            r_cls._text(slide, caption[:80], 7.85, 5.8, 4.65, 0.5, white, body_font, 10, italic=True, center=True)
+            r_cls._text(slide, caption[:80], 7.85, 5.65, 4.65, 0.45, white, body_font, 10, italic=True, center=True)
         else:
-            r_cls._text(slide, "Strategic Focus", 8.0, 3.2, 4.35, 0.8, white, title_font, 22, bold=True, center=True)
+            r_cls._shape(slide, MSO_SHAPE.OVAL, 9.6, 2.3, 1.2, 1.2, accent, "center-badge")
+            r_cls._text(slide, "★", 9.6, 2.3, 1.2, 1.2, white, body_font, 30, center=True)
+            r_cls._text(slide, "Strategic Focus", 8.0, 3.8, 4.35, 0.8, white, title_font, 22, bold=True, center=True)
 
     # ──────────────────────────────────────────────────────────────────────────
     # A3: Section Divider - Photo Hero

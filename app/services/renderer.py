@@ -130,6 +130,13 @@ class PPTXRenderer:
             p.font.color.rgb = color
             p.alignment = PP_ALIGN.CENTER if center else PP_ALIGN.LEFT
 
+            for r in p.runs:
+                r.font.name = font_name
+                r.font.size = Pt(curr_size)
+                r.font.bold = bold or title
+                r.font.italic = italic
+                r.font.color.rgb = color
+
             if bullet_list:
                 properties = p._p.get_or_add_pPr()
                 properties.set("marL", str(Inches(0.23)))
@@ -209,7 +216,9 @@ class PPTXRenderer:
         effective_title = title or deck_title
 
         images = source_images or {}
+        ink = hex_to_rgb(getattr(design_system.colors, "ink", design_system.colors.primary))
         primary = hex_to_rgb(design_system.colors.primary)
+        secondary = hex_to_rgb(getattr(design_system.colors, "secondary", design_system.colors.primary))
         accent = hex_to_rgb(design_system.colors.accent)
         card_fill = hex_to_rgb(design_system.colors.card_fill)
         neutral = hex_to_rgb(design_system.colors.neutral)
@@ -223,23 +232,6 @@ class PPTXRenderer:
         for index, slide_data in enumerate(slide_specs):
             slide = prs.slides.add_slide(prs.slide_layouts[6])
             layout = slide_data.layout_family
-            dark = slide_data.dark_background or (layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE) and design_system.subject_domain != "markets")
-
-            slide.background.fill.solid()
-            slide.background.fill.fore_color.rgb = primary if dark else paper
-
-            fg = white if dark else text_primary
-            body_col = tint(primary, 0.84) if dark else text_secondary
-            fill = tint(primary, 0.14) if dark else card_fill
-
-            title = slide_data.headline or slide_data.key_message or slide_data.objective
-            eyebrow = slide_data.eyebrow or f"CHAPTER {(index // 4) + 1}"
-            bullets = [b for b in slide_data.bullets if isinstance(b, str) and b.strip()]
-            image_bytes = images.get(slide_data.image_artifact_id or "")
-
-            from app.services.archetype_renderer import ArchetypeRenderer
-
-            # Check archetype ID
             arch_id = getattr(slide_data, "archetype_id", None)
             if not arch_id and hasattr(layout, "value") and str(layout.value).startswith("A") and str(layout.value)[1:].isdigit():
                 arch_id = str(layout.value)
@@ -248,18 +240,39 @@ class PPTXRenderer:
                 if cand[1:].isdigit():
                     arch_id = cand
 
-            # Eyebrow & Title & Accent Tick (Skip for custom cover/divider archetypes)
             is_standalone_cover = layout in (LayoutFamily.HERO, LayoutFamily.CLOSING) or arch_id in ("A1", "A2", "A3")
+            dark = slide_data.dark_background or (layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE) and design_system.subject_domain != "markets") or arch_id in ("A1", "A3")
+
+            slide.background.fill.solid()
+            slide.background.fill.fore_color.rgb = ink if dark else paper
+
+            fg = white if dark else text_primary
+            body_col = tint(white, 0.18) if dark else text_secondary
+            fill = tint(ink, 0.18) if dark else card_fill
+
+            title = slide_data.headline or slide_data.key_message or slide_data.objective
+            eyebrow = slide_data.eyebrow or f"CHAPTER {(index // 4) + 1}"
+            bullets = [b for b in slide_data.bullets if isinstance(b, str) and b.strip()]
+            image_bytes = images.get(slide_data.image_artifact_id or "")
+
+            from app.services.archetype_renderer import ArchetypeRenderer
+
+            # Eyebrow & Title & Accent Tick (Skip for custom cover/divider archetypes)
             if not is_standalone_cover:
                 cls._text(slide, eyebrow.upper(), 0.6, 0.45, 12.1, 0.32, primary if not dark else accent, body_font, 12, bold=True)
                 cls._text(slide, title, 0.6, 0.82, 12.1, 0.85, fg, title_font, 28, title=True)
                 cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.6, 1.72, 0.6, 0.06, accent if not dark else tint(primary, 0.6), "accent-tick")
 
             # Footer
-            footer_text = f"{deck_title.upper()} · {eyebrow.upper()}"
-            cls._text(slide, footer_text[:140], 0.6, 7.05, 11.4, 0.28, body_col, body_font, 9.5)
-            cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.2, 6.95, 0.5, 0.35, tint(primary, 0.12) if not dark else tint(primary, 0.3), "page-pill", corner_radius=0.2)
-            cls._text(slide, str(index + 1), 12.2, 6.95, 0.5, 0.35, primary if not dark else white, body_font, 10, bold=True, center=True)
+            if not is_standalone_cover:
+                footer_text = f"{deck_title.upper()} · {eyebrow.upper()}"
+                cls._text(slide, footer_text[:140], 0.6, 7.05, 11.4, 0.28, body_col, body_font, 9.5)
+
+            # Persistent Page Number Pill
+            pill_bg = tint(ink, 0.28) if dark else tint(primary, 0.12)
+            pill_fg = white if dark else ink
+            cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
+            cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True)
 
             # Speaker Notes
             notes = slide_data.speaker_notes or f"Presenter guidance for Slide {index + 1}: {title}"
@@ -268,6 +281,9 @@ class PPTXRenderer:
             # --- Consulting Archetype Dispatch ---
             if arch_id and ArchetypeRenderer.can_render(arch_id):
                 if ArchetypeRenderer.render(slide, arch_id, slide_data, design_system, image_bytes, cls):
+                    # Redraw page pill on top to ensure never obscured
+                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
+                    cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True)
                     continue
 
             # --- Layout Routing ---
