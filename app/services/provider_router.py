@@ -69,6 +69,7 @@ class ProviderRouter:
     def sync_environment_providers(db: Session) -> None:
         """Auto-synchronize system AI providers and API keys from settings / environment into database."""
         provider_configs = [
+            ("routeway", settings.routeway_base_url or "https://api.routeway.ai/v1", settings.routeway_api_key, 30),
             ("bazaarlink", settings.bazaarlink_base_url or "https://api.bazaarlink.ai/v1", settings.bazaarlink_api_key, 28),
             ("nvidia", settings.nvidia_base_url or "https://integrate.api.nvidia.com/v1", settings.nvidia_api_key, 25),
             ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 18),
@@ -104,7 +105,17 @@ class ProviderRouter:
                 existing_models = db.scalars(select(AIProviderModel).where(AIProviderModel.provider_id == provider.id)).all()
                 if not existing_models:
                     default_models = []
-                    if name == "bazaarlink":
+                    if name == "routeway":
+                        default_models = [
+                            {"model_id": "deepseek-v4-flash:free", "display_name": "DeepSeek V4 Flash (Free)", "priority": 100, "enabled": 1, "context_length": 128000},
+                            {"model_id": "minimax-m2.7:free", "display_name": "MiniMax M2.7 (Free)", "priority": 98, "enabled": 1, "context_length": 128000},
+                            {"model_id": "muse-glimmer-30b:free", "display_name": "Meta Glimmer 30B (Free)", "priority": 96, "enabled": 1, "context_length": 128000},
+                            {"model_id": "kimi-k2.6:free", "display_name": "Moonshot Kimi K2.6 (Free)", "priority": 94, "enabled": 1, "context_length": 128000},
+                            {"model_id": "deepseek-v4-flash", "display_name": "DeepSeek V4 Flash", "priority": 92, "enabled": 1, "context_length": 128000},
+                            {"model_id": "qwen3.8-max", "display_name": "Qwen 3.8 Max", "priority": 90, "enabled": 1, "context_length": 1000000},
+                            {"model_id": "claude-fable-5-1", "display_name": "Claude Fable 5.1", "priority": 88, "enabled": 1, "context_length": 200000},
+                        ]
+                    elif name == "bazaarlink":
                         default_models = [
                             {"model_id": "auto:free", "display_name": "Auto Router (Free)", "priority": 100, "enabled": 1, "context_length": 128000},
                             {"model_id": "qwen/qwen3.7-flash:free", "display_name": "Qwen 3.7 Flash (Free)", "priority": 98, "enabled": 1, "context_length": 128000},
@@ -661,6 +672,16 @@ class ProviderRouter:
                         ("nvidia/ising-calibration-1.5-31b", 90),
                         ("meta/llama-3.2-11b-vision-instruct", 88),
                     ]
+                elif "routeway" in p_name:
+                    model_candidates = [
+                        ("deepseek-v4-flash:free", 100),
+                        ("minimax-m2.7:free", 98),
+                        ("muse-glimmer-30b:free", 96),
+                        ("kimi-k2.6:free", 94),
+                        ("deepseek-v4-flash", 92),
+                        ("qwen3.8-max", 90),
+                        ("claude-fable-5-1", 88),
+                    ]
                 elif "bazaarlink" in p_name:
                     model_candidates = [
                         ("auto:free", 100),
@@ -933,14 +954,14 @@ class ProviderRouter:
                         additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
                     )
                     is_provider_outage = (
-                        (provider.name == "bazaarlink" and resp.status_code == 402)
+                        (provider.name in ("bazaarlink", "routeway") and resp.status_code == 402)
                         or (
-                            provider.name not in ("gemini", "nvidia", "bazaarlink")
+                            provider.name not in ("gemini", "nvidia", "bazaarlink", "routeway")
                             and (
                                 resp.status_code in (502, 503, 504, 403)
                                 or (resp.status_code == 429 and any(
                                     phrase in raw_text.lower()
-                                    for phrase in ("card on file", "insufficient_quota", "requires_purchase", "free tier", "out of credits")
+                                    for phrase in ("card on file", "insufficient_quota", "requires_purchase", "free tier", "out of credits", "insufficient funds")
                                 ))
                             )
                         )
