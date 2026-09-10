@@ -70,6 +70,7 @@ class ProviderRouter:
         """Auto-synchronize system AI providers and API keys from settings / environment into database."""
         provider_configs = [
             ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 18),
+            ("nvidia", settings.nvidia_base_url or "https://integrate.api.nvidia.com/v1", settings.nvidia_api_key, 17),
             ("codecraft", settings.codecraft_base_url or "https://codecraftapi.com/v1", settings.codecraft_api_key, 15),
             ("experientiallabs", settings.experientiallabs_base_url or "https://api.experientiallabs.ai/v1", settings.effective_experientiallabs_api_key, 11),
             ("openrouter", "https://openrouter.ai/api/v1", settings.openrouter_api_key, 10),
@@ -111,6 +112,16 @@ class ProviderRouter:
                             {"model_id": "gemini-3.5-flash-lite", "display_name": "Gemini 3.5 Flash Lite", "priority": 92, "enabled": 1, "context_length": 1000000},
                             {"model_id": "gemini-2.5-flash-lite", "display_name": "Gemini 2.5 Flash Lite", "priority": 90, "enabled": 1, "context_length": 1000000},
                             {"model_id": "gemini-3.1-flash-lite-preview", "display_name": "Gemini 3.1 Flash Lite Preview", "priority": 88, "enabled": 1, "context_length": 1000000},
+                        ]
+                    elif name == "nvidia":
+                        default_models = [
+                            {"model_id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "display_name": "Nemotron 3 Nano Omni 30B (Reasoning)", "priority": 100, "enabled": 1, "context_length": 128000},
+                            {"model_id": "poolside/laguna-xs-2.1", "display_name": "Laguna XS 2.1 (Ultra-Fast)", "priority": 98, "enabled": 1, "context_length": 128000},
+                            {"model_id": "nvidia/nemotron-3-super-120b-a12b", "display_name": "Nemotron 3 Super 120B (Flagship)", "priority": 96, "enabled": 1, "context_length": 128000},
+                            {"model_id": "nvidia/nemotron-3.5-lightning-30b-a3b", "display_name": "Nemotron 3.5 Lightning 30B", "priority": 94, "enabled": 1, "context_length": 128000},
+                            {"model_id": "openai/gpt-oss-20b", "display_name": "GPT OSS 20B", "priority": 92, "enabled": 1, "context_length": 128000},
+                            {"model_id": "nvidia/ising-calibration-1.5-31b", "display_name": "Ising Calibration 1.5 31B", "priority": 90, "enabled": 1, "context_length": 128000},
+                            {"model_id": "meta/llama-3.2-11b-vision-instruct", "display_name": "Llama 3.2 11B Vision Instruct", "priority": 88, "enabled": 1, "context_length": 128000},
                         ]
                     elif name == "codecraft":
                         default_models = [
@@ -442,6 +453,26 @@ class ProviderRouter:
                 {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "context_length": 128000, "description": "Fast high-quality multimodal reasoning engine", "default_priority": 90},
                 {"id": "o3-mini", "name": "o3 Mini", "context_length": 200000, "description": "STEM reasoning model", "default_priority": 85},
             ]
+        elif "nvidia" in cleaned_url:
+            nvidia_curated = [
+                ("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "Nemotron 3 Nano Omni 30B (Reasoning)", 128000, "Ultra-fast reasoning model with precise JSON output", 100),
+                ("poolside/laguna-xs-2.1", "Laguna XS 2.1 (Ultra-Fast)", 128000, "Sub-500ms low-latency model", 98),
+                ("nvidia/nemotron-3-super-120b-a12b", "Nemotron 3 Super 120B (Flagship)", 128000, "NVIDIA 120B Flagship model for high-depth tasks", 96),
+                ("nvidia/nemotron-3.5-lightning-30b-a3b", "Nemotron 3.5 Lightning 30B", 128000, "NVIDIA Nemotron 3.5 Lightning architecture", 94),
+                ("openai/gpt-oss-20b", "GPT OSS 20B", 128000, "OpenAI architecture running on NVIDIA NIM", 92),
+                ("nvidia/ising-calibration-1.5-31b", "Ising Calibration 1.5 31B", 128000, "31B parameter high precision model", 90),
+                ("meta/llama-3.2-11b-vision-instruct", "Llama 3.2 11B Vision Instruct", 128000, "Multimodal vision & text instruction tuned", 88),
+            ]
+            return [
+                {
+                    "id": mid,
+                    "name": mname,
+                    "context_length": ctx,
+                    "description": desc,
+                    "default_priority": prio,
+                }
+                for mid, mname, ctx, desc, prio in nvidia_curated
+            ]
 
         raise ValueError(f"Failed to fetch models: {last_error}")
 
@@ -607,6 +638,16 @@ class ProviderRouter:
                         ("gemini-2.5-flash", 94),
                         ("gemini-3.5-flash-lite", 92),
                         ("gemini-2.5-flash-lite", 90),
+                    ]
+                elif "nvidia" in p_name:
+                    model_candidates = [
+                        ("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", 100),
+                        ("poolside/laguna-xs-2.1", 98),
+                        ("nvidia/nemotron-3-super-120b-a12b", 96),
+                        ("nvidia/nemotron-3.5-lightning-30b-a3b", 94),
+                        ("openai/gpt-oss-20b", 92),
+                        ("nvidia/ising-calibration-1.5-31b", 90),
+                        ("meta/llama-3.2-11b-vision-instruct", 88),
                     ]
                 elif "openai" in p_name:
                     model_candidates = [("gpt-4o-mini", 90), ("gpt-4o", 95)]
