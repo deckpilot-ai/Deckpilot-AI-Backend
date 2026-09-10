@@ -8,7 +8,11 @@ import logging
 import re
 from typing import Any
 
-from app.schemas.generation_state import AssetMetadata, SlideSpec
+from app.schemas.generation_state import (
+    AssetMetadata,
+    SlideSpec,
+    normalize_bullet_items,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +130,9 @@ class ImageMatcher:
             if isinstance(slide, SlideSpec):
                 slide_text = f"{slide.headline} {slide.objective} {slide.takeaway} {' '.join(slide.bullets or [])}"
             else:
-                slide_text = f"{slide.get('headline', '')} {slide.get('purpose', '')} {slide.get('takeaway', '')} {' '.join(slide.get('bullets', []))}"
+                bullets = normalize_bullet_items(slide.get("bullets"))
+                slide["bullets"] = bullets
+                slide_text = f"{slide.get('headline', '')} {slide.get('purpose', '')} {slide.get('takeaway', '')} {' '.join(bullets)}"
 
             for a_idx, asset in enumerate(assets_list):
                 score = cls.calculate_relevance(slide_text, asset["caption"])

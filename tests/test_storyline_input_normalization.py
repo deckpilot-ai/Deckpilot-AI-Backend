@@ -1,5 +1,6 @@
 from app.agents.storyline_agent import StorylineAgent
-from app.schemas.generation_state import PresentationGoal, SlideSpec
+from app.schemas.generation_state import AssetMetadata, PresentationGoal, SlideSpec
+from app.services.image_matcher import ImageMatcher
 
 
 def test_slide_spec_normalizes_structured_bullets() -> None:
@@ -45,3 +46,25 @@ def test_storyline_accepts_provider_structured_bullets() -> None:
         "Valabhi: 480 CE",
         "Vikramashila: 783–820 CE",
     ]
+
+
+def test_image_matcher_normalizes_provider_bullets_before_joining() -> None:
+    slides = [
+        {
+            "headline": "Major centres of learning",
+            "purpose": "Compare founding dates",
+            "layoutHint": "image_focus",
+            "bullets": [{"label": "Nalanda", "value": "427 CE"}],
+        }
+    ]
+    assets = [
+        AssetMetadata(
+            asset_id="nalanda-image",
+            caption="Nalanda major centre of learning",
+        )
+    ]
+
+    ImageMatcher.assign_images_semantically(slides, assets)
+
+    assert slides[0]["bullets"] == ["Nalanda: 427 CE"]
+    assert slides[0]["imageArtifactId"] == "nalanda-image"
