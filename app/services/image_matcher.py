@@ -24,6 +24,8 @@ STOPWORDS = {
     "were", "be", "been", "being", "have", "has", "had", "do", "does", "did",
     "fig", "figure", "photo", "plate", "image", "source", "reference", "study",
     "chapter", "section", "part", "detail", "notice", "that", "this", "these",
+    "ancient", "empire", "imperial", "india", "indian", "kingdom", "mauryan",
+    "region", "ruler", "state", "territory",
 }
 
 

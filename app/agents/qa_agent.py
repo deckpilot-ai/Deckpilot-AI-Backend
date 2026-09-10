@@ -360,10 +360,21 @@ class PresentationQAAgent:
 
         if assets and slides:
             image_slides = sum(1 for s in slides if s.image_artifact_id)
-            if image_slides == 0:
+            assignable_slides = sum(
+                any(
+                    ImageMatcher.calculate_relevance(
+                        " ".join([slide.headline, slide.objective, slide.takeaway, *slide.bullets]),
+                        f"{asset.caption} {asset.nearby_text} {asset.semantic_summary}",
+                    ) >= MIN_SEMANTIC_RELEVANCE
+                    for asset in assets
+                )
+                for slide in slides
+            )
+            expected_visuals = min(max(2, len(slides) // 4), assignable_slides, len(assets))
+            if image_slides == 0 and expected_visuals > 0:
                 issues.append(cls._issue("no_visuals", ValidationSeverity.HIGH, ValidationCategory.DESIGN, 1, "No available source visual is used", slides[0].slide_id))
-            elif len(slides) >= 6 and image_slides < max(2, len(slides) // 4):
-                issues.append(cls._issue("sparse_visual_pacing", ValidationSeverity.MEDIUM, ValidationCategory.DESIGN, 1, f"Only {image_slides} of {len(slides)} slides use available images", slides[0].slide_id))
+            elif len(slides) >= 6 and image_slides < expected_visuals:
+                issues.append(cls._issue("sparse_visual_pacing", ValidationSeverity.MEDIUM, ValidationCategory.DESIGN, 1, f"Only {image_slides} of {expected_visuals} semantically matchable slides use available images", slides[0].slide_id))
 
         run = 1
         image_run = 1

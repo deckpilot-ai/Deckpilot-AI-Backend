@@ -128,3 +128,25 @@ def test_numbered_process_preserves_complete_unsplit_sentences() -> None:
 
     for bullet in bullets:
         assert bullet in text
+
+
+def test_numbered_columns_preserve_complete_unsplit_sentences() -> None:
+    goal = PresentationGoal(topic="Empire legacy", target_slide_count=1)
+    design = DesignIntelligenceAgent.generate_design_system(goal)
+    bullets = [
+        "Mauryan, Persian, and Greek empires shaped civilizations.",
+        "Their influence remains visible in governance, culture, and administration.",
+        "Understanding their legacies helps us understand modern society.",
+    ]
+    slide = SlideSpec(
+        headline="Enduring legacies",
+        bullets=bullets,
+        layout_hint="numbered_columns",
+    )
+
+    payload = PPTXRenderer.render_presentation([slide], design)
+    rendered = Presentation(io.BytesIO(payload))
+    text = "\n".join(shape.text for shape in rendered.slides[0].shapes if getattr(shape, "has_text_frame", False))
+
+    for bullet in bullets:
+        assert bullet in text

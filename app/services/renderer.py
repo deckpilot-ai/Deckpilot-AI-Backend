@@ -452,14 +452,18 @@ class PPTXRenderer:
                 cls._text(slide, quote_text, 8.15, 4.15, 4.35, 1.9, white, title_font, 15, bold=True, center=True, italic=True)
 
             elif slide_data.layout_hint in ("big_questions", "numbered_columns") or (layout == LayoutFamily.CARD_GRID and len(bullets) == 4 and any("?" in b for b in bullets)):
-                for j, item in enumerate(bullets[:4]):
-                    x = 0.6 + j * (2.8 + 0.3)
+                numbered_items = bullets[:4]
+                numbered_count = max(1, len(numbered_items))
+                numbered_width = (12.1 - 0.3 * (numbered_count - 1)) / numbered_count
+                for j, item in enumerate(numbered_items):
+                    x = 0.6 + j * (numbered_width + 0.3)
                     y = 2.05
-                    w = 2.8
+                    w = numbered_width
                     h = 4.65
                     cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, h, fill, f"card-{j+1}", corner_radius=0.04)
-                    cls._shape(slide, MSO_SHAPE.OVAL, x + 0.8, y + 0.3, 1.2, 1.2, primary, f"badge-{j+1}")
-                    cls._text(slide, f"0{j+1}", x + 0.8, y + 0.3, 1.2, 1.2, white, title_font, 28, bold=True, center=True)
+                    badge_x = x + (w - 1.2) / 2
+                    cls._shape(slide, MSO_SHAPE.OVAL, badge_x, y + 0.3, 1.2, 1.2, primary, f"badge-{j+1}")
+                    cls._text(slide, f"0{j+1}", badge_x, y + 0.3, 1.2, 1.2, white, title_font, 28, bold=True, center=True)
                     if "\n" in item:
                         parts = item.split("\n", 1)
                     elif ":" in item:
@@ -468,17 +472,15 @@ class PPTXRenderer:
                         parts = item.split("?", 1)
                         parts[0] = parts[0] + "?"
                     else:
-                        parts = [item[:45], item[45:]]
+                        parts = [item]
                     q_t = parts[0].strip()
                     q_b = parts[1].strip() if len(parts) > 1 else ""
-                    if len(q_t) > 48:
-                        q_t = q_t[:45].rsplit(" ", 1)[0] + "..."
-                    cls._text(slide, q_t, x + 0.15, y + 1.65, w - 0.3, 0.85, primary, title_font, 12.5, bold=True, center=True)
-                    cls._shape(slide, MSO_SHAPE.RECTANGLE, x + 0.8, y + 2.55, 1.2, 0.04, accent, "rule")
+                    cls._text(slide, q_t, x + 0.2, y + 1.65, w - 0.4, 1.3, primary, title_font, 16, bold=bool(q_b), center=True)
+                    cls._shape(slide, MSO_SHAPE.RECTANGLE, x + (w - 1.2) / 2, y + 3.0, 1.2, 0.04, accent, "rule")
                     if q_b:
                         if len(q_b) > 180:
                             q_b = q_b[:175].rsplit(" ", 1)[0] + "..."
-                        cls._text(slide, q_b, x + 0.2, y + 2.7, w - 0.4, 1.8, body_col, body_font, 11, center=True)
+                        cls._text(slide, q_b, x + 0.2, y + 3.15, w - 0.4, 1.15, body_col, body_font, 15, center=True)
 
             elif slide_data.layout_hint in ("saptanga", "hub_spoke") or getattr(slide_data.diagram_spec, "diagram_type", "") in ("saptanga", "hub_spoke"):
                 cx, cy, cw, ch = 5.25, 2.35, 2.85, 2.95
@@ -676,9 +678,9 @@ class PPTXRenderer:
         brand_style: dict[str, Any] | None = None,
         source_images: dict[str, bytes] | None = None,
     ) -> bytes:
-        from app.schemas.generation_state import PresentationGoal
         from app.agents.design_intelligence import DesignIntelligenceAgent
         from app.agents.storyline_agent import StorylineAgent
+        from app.schemas.generation_state import PresentationGoal
 
         title = deck_spec.get("deckTitle", "Presentation")
         brand = normalize_brand(brand_style or deck_spec.get("brandStyle"), title)
