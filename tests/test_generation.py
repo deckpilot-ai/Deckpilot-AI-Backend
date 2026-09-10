@@ -131,7 +131,7 @@ def test_reexport_preserves_written_slides_and_uses_standalone_cover(client: Tes
     headers = create_authenticated_user(client, 'reexport@deckpilot.ai')
     pid = client.post('/api/v1/projects', json={'title': 'History'}, headers=headers).json()['id']
     base = f'/api/v1/projects/{pid}'
-    first = client.post(base + '/jobs', json={'prompt': 'Create 4 slides on history'}, headers=headers)
+    first = client.post(base + '/jobs', json={'prompt': 'Create 5 slides on history'}, headers=headers)
     assert first.status_code == 201
     original = client.get(base + '/decks/1', headers=headers).json()['spec']['slides']
     im = Image.new('RGB', (300, 180), '#bca785')
@@ -149,6 +149,7 @@ def test_reexport_preserves_written_slides_and_uses_standalone_cover(client: Tes
     result = client.post(base + '/jobs', json={'prompt': 'Re-export the existing deck', 'mode': 'export'}, headers=headers)
     assert result.status_code == 201 and result.json()['status'] == 'completed'
     updated = client.get(base + '/decks/2', headers=headers).json()['spec']['slides']
+    assert len(original) == len(updated) == 5
     assert [(s.get('message'), s.get('bullets')) for s in original] == [(s.get('message'), s.get('bullets')) for s in updated]
     assert updated[0]['imageArtifactId']
     payload = client.get(base + '/decks/2/download', headers=headers).content

@@ -939,6 +939,17 @@ class JobOrchestrator:
                         slide.pop("imageArtifactId", None)
 
                 goal_obj = context.get("presentation_goal") or RequirementsAgent.analyze_requirements(user_prompt)
+                if job_mode == "export":
+                    # Export must preserve the saved deck, regardless of whether
+                    # the short export prompt mentions a slide count.  Otherwise
+                    # requirements defaults can silently truncate a 25-slide deck.
+                    saved_slide_count = len(context.get("deck_spec", {}).get("slides", []))
+                    goal_obj = goal_obj.model_copy(
+                        update={
+                            "target_slide_count": saved_slide_count,
+                            "topic": context.get("deck_spec", {}).get("deckTitle") or goal_obj.topic,
+                        }
+                    )
                 ds_obj = context.get("design_system") or DesignIntelligenceAgent.generate_design_system(goal_obj)
 
                 # Convert to SlideSpec models
@@ -1091,6 +1102,22 @@ class JobOrchestrator:
                             "qa_summary": _qa_snapshot(qa_report, qa_report.repair_iterations + 1),
                             "stage_progress": 1.0,
                         },
+                    )
+
+                expected_slide_count = len(context.get("deck_spec", {}).get("slides", []))
+                package_validation = await run_in_threadpool(
+                    PPTXRenderer.validate_deck,
+                    pptx_bytes,
+                    expected_slide_count,
+                )
+                if package_validation.get("slides") != expected_slide_count:
+                    _fail_step(
+                        "pptx_renderer",
+                        RuntimeError(
+                            f"Rendered slide count {package_validation.get('slides')} does not match "
+                            f"the requested {expected_slide_count} slides"
+                        ),
+                        "slide_count_mismatch",
                     )
 
                 # Store Final Output
