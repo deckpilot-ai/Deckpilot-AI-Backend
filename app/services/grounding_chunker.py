@@ -17,8 +17,7 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Sequence
-
+from collections.abc import Sequence
 
 # ---------------------------------------------------------------------------
 # Tuning constants
@@ -27,7 +26,7 @@ _CHUNK_SIZE_CHARS = 900          # target chars per chunk (before overlap)
 _CHUNK_OVERLAP_CHARS = 120       # chars of trailing context carried into next chunk
 _MAX_PLANNER_CHARS = 5000        # max chars for the compressed planning summary
 _MAX_SLIDE_CONTEXT_CHARS = 700   # max chars of grounding to attach per slide
-_MIN_CHUNK_SCORE = 0.05          # minimum relevance score to include a chunk
+_MIN_CHUNK_SCORE = 0.0           # any lexical match is useful; scores are TF-normalised
 
 
 # ---------------------------------------------------------------------------
@@ -209,50 +208,98 @@ class GroundingChunker:
         if not chunks:
             return text[:max_chars_total]
 
-        query_tokens: set[str] = set()
-        for topic in slide_topics:
-            query_tokens.update(_tokenise(topic))
-
-        scored = [
-            (chunk, _score_relevance(chunk["tokens"], query_tokens))
-            for chunk in chunks
-        ]
-        scored.sort(key=lambda x: x[1], reverse=True)
-
-        selected_indices: set[int] = set()
-        total = 0
-        for chunk, score in scored:
-            if score < _MIN_CHUNK_SCORE:
-                break
-            if total + len(chunk["text"]) > max_chars_total:
-                remaining = max_chars_total - total
-                if remaining > 150:
-                    selected_indices.add(chunk["index"])
-                break
-            selected_indices.add(chunk["index"])
-            total += len(chunk["text"]) + 2
-
-        if not selected_indices:
-            return text[:max_chars_total]
-
         result_parts: list[str] = []
+        selected_indices: set[int] = set()
         running = 0
-        for chunk in chunks:
-            if chunk["index"] not in selected_indices:
+
+        # Rank independently for each slide. Combining all batch terms diluted
+        # relevance scores below the old threshold and silently returned page 1.
+        for topic in slide_topics:
+            query_terms = set(_tokenise(topic))
+            if not query_terms:
                 continue
-            excerpt = chunk["text"]
-            if running + len(excerpt) > max_chars_total:
-                excerpt = excerpt[: max_chars_total - running] + "\u2026"
-            heading = chunk["heading"]
+
+            ranked = sorted(
+                ((chunk, _score_relevance(chunk["tokens"], query_terms)) for chunk in chunks),
+                key=lambda item: item[1],
+                reverse=True,
+            )
+            best = next(
+                (
+                    chunk
+                    for chunk, score in ranked
+                    if score > _MIN_CHUNK_SCORE and chunk["index"] not in selected_indices
+                ),
+                None,
+            )
+            if best is None:
+                continue
+
+            remaining = max_chars_total - running
+            if remaining <= 0:
+                break
+            excerpt_limit = min(max_chars_per_topic, remaining)
+            excerpt = best["text"]
+            if len(excerpt) > excerpt_limit:
+                excerpt = excerpt[: max(1, excerpt_limit - 1)].rstrip() + "\u2026"
+            heading = best["heading"]
             if heading:
                 result_parts.append(f"[{heading}]\n{excerpt}")
             else:
                 result_parts.append(excerpt)
-            running += len(excerpt) + 2
-            if running >= max_chars_total:
-                break
+            selected_indices.add(best["index"])
+            running += len(result_parts[-1]) + 2
 
-        return "\n\n".join(result_parts)
+        if result_parts:
+            return "\n\n".join(result_parts)
+
+        # An unsupported topic should not be paired with the first page and
+        # presented as if it were relevant evidence.
+        return GroundingChunker.compress_for_planning(text, max_chars=max_chars_total)
+
+    @staticmethod
+    def extract_evidence_points(
+        text: str,
+        topic: str,
+        max_points: int = 3,
+    ) -> list[str]:
+        """Turn a retrieved source excerpt into concise, grounded fallback bullets."""
+        if not text or max_points <= 0:
+            return []
+
+        cleaned = re.sub(r"\[Source[^\]]*\]:?", " ", text, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\[[A-Z][^\]]{2,80}\]", " ", cleaned)
+        cleaned = cleaned.replace("\\n", " ").replace("\n", " ")
+        cleaned = re.sub(r"\bReprint\s+\d{4}[-–]\d{2,4}\b", " ", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(' \"{}')
+
+        candidates = re.split(r"(?<=[.!?])\s+", cleaned)
+        topic_terms = set(_tokenise(topic))
+        ranked: list[tuple[float, int, str]] = []
+        for index, sentence in enumerate(candidates):
+            point = re.sub(r"^(?:Fig\.?\s*[\d.]+\.?\s*)", "", sentence, flags=re.IGNORECASE)
+            point = re.sub(r"^\d+\s+", "", point).strip(' \"{},')
+            if not 35 <= len(point) <= 260:
+                continue
+            lowered = point.lower()
+            if "exploring society:" in lowered or lowered.startswith("source image"):
+                continue
+            tokens = set(_tokenise(point))
+            overlap = len(tokens & topic_terms)
+            ranked.append((float(overlap), -index, point))
+
+        ranked.sort(reverse=True)
+        points: list[str] = []
+        seen: set[str] = set()
+        for _score, _position, point in ranked:
+            fingerprint = re.sub(r"\W+", " ", point.lower()).strip()
+            if not fingerprint or fingerprint in seen:
+                continue
+            seen.add(fingerprint)
+            points.append(point)
+            if len(points) >= max_points:
+                break
+        return points
 
     @staticmethod
     def compress_prompt_for_retry(

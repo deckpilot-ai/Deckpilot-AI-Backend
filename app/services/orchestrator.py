@@ -814,10 +814,27 @@ class JobOrchestrator:
                             if field in slide_data:
                                 slide[field] = slide_data[field]
 
+                    if not slide.get("bullets") and _raw_grounding:
+                        offline_excerpt = GroundingChunker.retrieve_for_slides(
+                            _raw_grounding,
+                            [slide.get("headline", ""), slide.get("purpose", "")],
+                            max_chars_total=1800,
+                            max_chars_per_topic=900,
+                        )
+                        offline_points = GroundingChunker.extract_evidence_points(
+                            offline_excerpt,
+                            f"{slide.get('headline', '')} {slide.get('purpose', '')}",
+                        )
+                        if offline_points:
+                            slide["bullets"] = [f"Evidence: {point}" for point in offline_points]
+
                     if not slide.get("bullets"):
                         topic = slide.get("headline") or slide.get("purpose") or "Core Insights"
                         formula_idx = idx % 4
-                        if getattr(goal, "presentation_type", None) == PresentationType.RESEARCH_EDUCATION:
+                        if (
+                            getattr(goal, "presentation_type", None) == PresentationType.RESEARCH_EDUCATION
+                            or bool(getattr(goal, "has_reference_docs", False))
+                        ):
                             if formula_idx == 0:
                                 slide["bullets"] = [
                                     f"Foundational Thesis: Comprehensive assessment of {str(topic).lower()}.",
