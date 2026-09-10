@@ -58,6 +58,17 @@ class GenerationAlreadyRunningError(RuntimeError):
 
 
 class JobOrchestrator:
+    PIPELINE_STAGES = (
+        "reference_intake",
+        "source_grounding",
+        "font_brand_detection",
+        "deck_planner",
+        "slide_writer",
+        "pptx_renderer",
+        "visual_qa",
+        "gatekeeper",
+    )
+
     @staticmethod
     def create_job(
         db: Session,
@@ -249,18 +260,91 @@ class JobOrchestrator:
             "project_id": project_id,
         }
 
+        event_sequence = int(time.time() * 1000)
+
         def _emit(agent_name: str, status: str, message: str, extra: dict | None = None):
+            nonlocal event_sequence
+            event_sequence += 1
+            event_extra = dict(extra or {})
+            stage_progress = max(0.0, min(1.0, float(event_extra.pop("stage_progress", 0.5))))
+            try:
+                stage_index = JobOrchestrator.PIPELINE_STAGES.index(agent_name)
+            except ValueError:
+                stage_index = 0
+            progress_percent = round(
+                min(100.0, ((stage_index + stage_progress) / len(JobOrchestrator.PIPELINE_STAGES)) * 100),
+                1,
+            )
+            if status == "completed":
+                progress_percent = round(
+                    min(100.0, ((stage_index + 1) / len(JobOrchestrator.PIPELINE_STAGES)) * 100),
+                    1,
+                )
+            event = {
+                "event_id": f"{job_id}:{event_sequence}",
+                "sequence": event_sequence,
+                "timestamp": int(time.time()),
+                "agent_type": agent_name,
+                "status": status,
+                "message": message,
+                "current_step": stage_index + 1,
+                "total_steps": len(JobOrchestrator.PIPELINE_STAGES),
+                "progress_percent": progress_percent,
+                **event_extra,
+            }
             payload = {
                 "type": "agent_task",
                 "job_id": job_id,
                 "project_id": project_id,
-                "agent_type": agent_name,
-                "status": status,
-                "message": message,
+                **event,
             }
-            if extra:
-                payload.update(extra)
+
+            # Persist the live message and event history so polling and
+            # reconnecting clients see the same end-to-end timeline as the
+            # WebSocket stream. AgentTask.output_artifacts_json was reserved
+            # for task output metadata and is otherwise unused.
+            task = db.scalar(
+                select(AgentTask).where(
+                    AgentTask.job_id == job_id,
+                    AgentTask.agent_type == agent_name,
+                )
+            )
+            if task is not None:
+                try:
+                    stored = json.loads(task.output_artifacts_json or "{}")
+                except (TypeError, ValueError):
+                    stored = {}
+                if not isinstance(stored, dict):
+                    stored = {}
+                events = stored.get("progress_events", [])
+                if not isinstance(events, list):
+                    events = []
+                events.append(event)
+                stored.update({"live_message": message, "progress_events": events[-200:]})
+                task.output_artifacts_json = json.dumps(stored)
+                db.commit()
             ws_manager.broadcast_sync(project_id, payload)
+
+        def _qa_snapshot(report: QAReport, pass_number: int) -> dict[str, Any]:
+            return {
+                "pass_number": pass_number,
+                "score": report.overall_quality_score,
+                "status": report.status,
+                "checkpoints_total": report.checkpoints_total,
+                "checkpoints_passed": report.checkpoints_passed,
+                "checkpoints_failed": report.checkpoints_failed,
+                "repair_triggered": report.repair_triggered,
+                "findings": [
+                    {
+                        "checkpoint_id": issue.checkpoint_id,
+                        "severity": issue.severity.value,
+                        "slide_number": issue.slide_number,
+                        "message": issue.message,
+                        "repair_action": issue.repair_action,
+                    }
+                    for issue in report.issues
+                ],
+            }
 
         try:
             existing_artifacts: list[Artifact] = []
@@ -876,7 +960,12 @@ class JobOrchestrator:
                 # 7. Presentation QA & Self-Correction Loop
                 if "visual_qa" in task_types:
                     _update_task("visual_qa", "running", started=True)
-                    _emit("visual_qa", "running", "Evaluating presentation geometry, narrative flow, chart data, and visual balance...")
+                    _emit(
+                        "visual_qa",
+                        "running",
+                        "QA pass 1: running 120 content, typography, geometry, whitespace, image, and integrity checks...",
+                        {"phase": "checking", "pass_number": 1, "stage_progress": 0.08},
+                    )
 
                     qa_report: QAReport = await run_in_threadpool(
                         PresentationQAAgent.evaluate_presentation,
@@ -886,6 +975,13 @@ class JobOrchestrator:
                         source_images,
                         available_asset_metadata,
                     )
+                    initial_snapshot = _qa_snapshot(qa_report, 1)
+                    _emit(
+                        "visual_qa",
+                        "running",
+                        f"QA pass 1 finished: {qa_report.checkpoints_passed}/{qa_report.checkpoints_total} checks passed, {len(qa_report.issues)} findings, score {qa_report.overall_quality_score}/100.",
+                        {"phase": "results", "qa_summary": initial_snapshot, "stage_progress": 0.22},
+                    )
 
                     # Bounded repair/re-render/recheck loop. Three passes allow a
                     # duplicate image replacement to be checked for relevance in
@@ -893,7 +989,19 @@ class JobOrchestrator:
                     repair_iterations = 0
                     while qa_report.repair_triggered and repair_iterations < 3:
                         repair_iterations += 1
-                        _emit("visual_qa", "running", f"Self-correction pass {repair_iterations}/3: repairing flagged slides and rechecking the rendered deck...")
+                        qa_pass = repair_iterations + 1
+                        current_snapshot = _qa_snapshot(qa_report, repair_iterations)
+                        _emit(
+                            "visual_qa",
+                            "running",
+                            f"Repair pass {repair_iterations}/3: applying {len(qa_report.issues)} QA findings to flagged slides.",
+                            {
+                                "phase": "repairing",
+                                "repair_iteration": repair_iterations,
+                                "qa_summary": current_snapshot,
+                                "stage_progress": 0.22 + repair_iterations * 0.16,
+                            },
+                        )
                         slide_specs = RepairAgent.apply_corrections(
                             slide_specs=slide_specs,
                             qa_report=qa_report,
@@ -903,12 +1011,33 @@ class JobOrchestrator:
                             design_system=ds_obj,
                         )
                         # Re-render with corrections
+                        _emit(
+                            "visual_qa",
+                            "running",
+                            f"Repair pass {repair_iterations}/3: re-rendering the corrected PowerPoint.",
+                            {
+                                "phase": "rerendering",
+                                "repair_iteration": repair_iterations,
+                                "stage_progress": 0.30 + repair_iterations * 0.16,
+                            },
+                        )
                         pptx_bytes = await run_in_threadpool(
                             PPTXRenderer.render_presentation,
                             slide_specs,
                             ds_obj,
                             source_images,
                             context["deck_spec"].get("deckTitle", "Presentation"),
+                        )
+                        _emit(
+                            "visual_qa",
+                            "running",
+                            f"QA pass {qa_pass}: rechecking all 120 checkpoints after repair.",
+                            {
+                                "phase": "rechecking",
+                                "pass_number": qa_pass,
+                                "repair_iteration": repair_iterations,
+                                "stage_progress": 0.36 + repair_iterations * 0.16,
+                            },
                         )
                         qa_report = await run_in_threadpool(
                             PresentationQAAgent.evaluate_presentation,
@@ -919,11 +1048,33 @@ class JobOrchestrator:
                             available_asset_metadata,
                         )
                         qa_report.repair_iterations = repair_iterations
+                        repaired_snapshot = _qa_snapshot(qa_report, qa_pass)
+                        _emit(
+                            "visual_qa",
+                            "running",
+                            f"QA pass {qa_pass} finished: {qa_report.checkpoints_passed}/{qa_report.checkpoints_total} checks passed, {len(qa_report.issues)} findings, score {qa_report.overall_quality_score}/100.",
+                            {
+                                "phase": "results",
+                                "pass_number": qa_pass,
+                                "repair_iteration": repair_iterations,
+                                "qa_summary": repaired_snapshot,
+                                "stage_progress": 0.42 + repair_iterations * 0.16,
+                            },
+                        )
 
                     context["deck_spec"]["qaReport"] = qa_report.model_dump()
                     _update_task("visual_qa", "completed", completed=True)
                     qa_summary = "passed" if qa_report.status == "passed" else "completed with remaining non-blocking findings"
-                    _emit("visual_qa", "completed", f"Quality checks {qa_summary} (Score: {qa_report.overall_quality_score}/100, {qa_report.checkpoints_total} checkpoints, {qa_report.repair_iterations} repair passes).")
+                    _emit(
+                        "visual_qa",
+                        "completed",
+                        f"Quality checks {qa_summary} (Score: {qa_report.overall_quality_score}/100, {qa_report.checkpoints_passed}/{qa_report.checkpoints_total} passed, {qa_report.repair_iterations} repair passes).",
+                        {
+                            "phase": "completed",
+                            "qa_summary": _qa_snapshot(qa_report, qa_report.repair_iterations + 1),
+                            "stage_progress": 1.0,
+                        },
+                    )
 
                 # Store Final Output
                 storage_key = f"projects/{project_id}/decks/deck_job_{job_id}.pptx"

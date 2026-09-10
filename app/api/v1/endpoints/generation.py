@@ -26,6 +26,62 @@ router = APIRouter(tags=["generation"])
 logger = logging.getLogger(__name__)
 
 
+def _task_progress(task: AgentTask) -> dict:
+    try:
+        value = json.loads(task.output_artifacts_json or "{}")
+    except (TypeError, ValueError):
+        value = {}
+    return value if isinstance(value, dict) else {}
+
+
+def _serialize_job(job: GenerationJob, tasks: list[AgentTask]) -> dict:
+    task_payloads = []
+    all_events: list[dict] = []
+    for task in tasks:
+        progress = _task_progress(task)
+        events = progress.get("progress_events", [])
+        if not isinstance(events, list):
+            events = []
+        all_events.extend(event for event in events if isinstance(event, dict))
+        task_payloads.append({
+            "id": task.id,
+            "agent_type": task.agent_type,
+            "status": task.status,
+            "started_at": task.started_at,
+            "completed_at": task.completed_at,
+            "live_message": progress.get("live_message"),
+            "progress_events": events,
+        })
+
+    all_events.sort(key=lambda event: (event.get("sequence", 0), event.get("timestamp", 0)))
+    latest = all_events[-1] if all_events else {}
+    qa_events = [event for event in all_events if event.get("agent_type") == "visual_qa" and event.get("qa_summary")]
+    completed_count = sum(task.status == "completed" for task in tasks)
+    total_steps = len(JobOrchestrator.PIPELINE_STAGES)
+    current_step = int(latest.get("current_step") or min(completed_count + 1, total_steps))
+    progress_percent = float(latest.get("progress_percent") or (100 if job.status == "completed" else completed_count / max(1, total_steps) * 100))
+    if job.status == "completed":
+        current_step = total_steps
+        progress_percent = 100.0
+
+    return {
+        "id": job.id,
+        "project_id": job.project_id,
+        "status": job.status,
+        "mode": job.mode,
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+        "tasks": task_payloads,
+        "live_message": latest.get("message"),
+        "live_agent": latest.get("agent_type"),
+        "current_step": current_step,
+        "total_steps": total_steps,
+        "progress_percent": progress_percent,
+        "progress_events": all_events,
+        "qa_summary": qa_events[-1].get("qa_summary") if qa_events else None,
+    }
+
+
 class CreateJobRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid", str_strip_whitespace=True)
 
@@ -174,24 +230,7 @@ def get_active_project_job(
     tasks = db.scalars(select(AgentTask).where(AgentTask.job_id == job.id)).all()
     return {
         "active": job.status in ("queued", "running"),
-        "job": {
-            "id": job.id,
-            "project_id": job.project_id,
-            "status": job.status,
-            "mode": job.mode,
-            "started_at": job.started_at,
-            "completed_at": job.completed_at,
-            "tasks": [
-                {
-                    "id": t.id,
-                    "agent_type": t.agent_type,
-                    "status": t.status,
-                    "started_at": t.started_at,
-                    "completed_at": t.completed_at,
-                }
-                for t in tasks
-            ],
-        },
+        "job": _serialize_job(job, list(tasks)),
     }
 
 
@@ -212,24 +251,7 @@ def get_job(
 
     tasks = db.scalars(select(AgentTask).where(AgentTask.job_id == job_id)).all()
 
-    return {
-        "id": job.id,
-        "project_id": job.project_id,
-        "status": job.status,
-        "mode": job.mode,
-        "started_at": job.started_at,
-        "completed_at": job.completed_at,
-        "tasks": [
-            {
-                "id": t.id,
-                "agent_type": t.agent_type,
-                "status": t.status,
-                "started_at": t.started_at,
-                "completed_at": t.completed_at,
-            }
-            for t in tasks
-        ],
-    }
+    return _serialize_job(job, list(tasks))
 
 
 @router.get("/projects/{project_id}/decks/{version}")

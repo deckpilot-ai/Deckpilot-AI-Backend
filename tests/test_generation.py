@@ -66,6 +66,21 @@ def test_generation_pipeline_and_pptx_export(client: TestClient, db_session: Ses
     assert len(job_detail["tasks"]) == 8
     for task in job_detail["tasks"]:
         assert task["status"] == "completed"
+    assert job_detail["current_step"] == 8
+    assert job_detail["total_steps"] == 8
+    assert job_detail["progress_percent"] == 100
+    assert job_detail["live_message"]
+    assert job_detail["progress_events"]
+    qa_events = [
+        event for event in job_detail["progress_events"]
+        if event["agent_type"] == "visual_qa"
+    ]
+    assert qa_events
+    assert any(event.get("phase") == "checking" for event in qa_events)
+    assert any(event.get("phase") == "results" for event in qa_events)
+    assert any(event.get("phase") == "completed" for event in qa_events)
+    assert job_detail["qa_summary"]["checkpoints_total"] == 120
+    assert job_detail["qa_summary"]["checkpoints_passed"] >= 1
 
     # 5. Fetch Deck Version
     deck_resp = client.get(f"/api/v1/projects/{proj_id}/decks/1", headers=headers)
