@@ -40,10 +40,14 @@ class StorylineAgent:
         slides_input = (llm_plan_spec or {}).get("slides", [])
         planned_specs: list[SlideSpec] = []
 
+        # Semantically match available assets to slides first, preventing wrong image assignment
+        if assets and slides_input:
+            from app.services.image_matcher import ImageMatcher
+            ImageMatcher.assign_images_semantically(slides_input, assets, min_relevance_threshold=1.5)
+
         # Layout rhythm tracker
         recent_layouts: list[LayoutFamily] = []
         recent_archetypes: list[str] = []
-        asset_cursor = 0
 
         for i in range(count):
             slide_id = f"s{i+1:02d}"
@@ -62,21 +66,22 @@ class StorylineAgent:
             chosen_layout = cls._determine_layout(
                 i, count, layout_hint, recent_layouts, raw_slide, assets, goal
             )
-            recent_layouts.append(chosen_layout)
 
             # 3. Associate Visual Assets (Images / Figures)
             img_id = raw_slide.get("imageArtifactId") or raw_slide.get("image_artifact_id")
             caption = raw_slide.get("imageCaption") or raw_slide.get("image_caption") or ""
 
-            if not img_id and assets and chosen_layout in (LayoutFamily.IMAGE_FOCUS, LayoutFamily.TEXT_IMAGE, LayoutFamily.HERO):
-                cand_idx = asset_cursor % len(assets)
-                img_id = assets[cand_idx].asset_id
-                caption = caption or assets[cand_idx].caption or f"Documentary Reference: {headline[:45]}"
-                asset_cursor += 1
-            elif img_id and not caption and assets:
+            if img_id and not caption and assets:
                 match = next((a for a in assets if a.asset_id == img_id), None)
                 if match and match.caption:
                     caption = match.caption
+
+            # If layout is IMAGE_FOCUS but no image was semantically matched, fall back to analytical layout
+            if chosen_layout in (LayoutFamily.IMAGE_FOCUS, LayoutFamily.TEXT_IMAGE) and not img_id and not is_first:
+                alternatives = [LayoutFamily.TWO_COLUMN, LayoutFamily.CARD_GRID, LayoutFamily.COMPARISON, LayoutFamily.METRICS_GRID]
+                chosen_layout = alternatives[i % len(alternatives)]
+
+            recent_layouts.append(chosen_layout)
 
             # 4. Associate Charts if data / metrics present
             chart_spec = None
@@ -261,14 +266,8 @@ class StorylineAgent:
             return LayoutFamily.CHART_FOCUS
         if raw_slide.get("table"):
             return LayoutFamily.TABLE_FOCUS
-        if raw_slide.get("imageArtifactId"):
+        if raw_slide.get("imageArtifactId") or raw_slide.get("image_artifact_id"):
             return LayoutFamily.IMAGE_FOCUS
-        if assets and 0 < index < total_slides - 1:
-            # Distribute images periodically across content slides (every 2-3 slides)
-            # Avoid placing image layout back-to-back with another image layout
-            prev_is_img = bool(recent and recent[-1] in (LayoutFamily.IMAGE_FOCUS, LayoutFamily.TEXT_IMAGE))
-            if not prev_is_img and (index % 3 == 1 or (len(assets) >= 6 and index % 2 == 1)):
-                return LayoutFamily.IMAGE_FOCUS
         if "process" in raw_slide.get("purpose", "").lower() or "step" in raw_slide.get("purpose", "").lower():
             return LayoutFamily.PROCESS_STEPS
         if "timeline" in raw_slide.get("purpose", "").lower() or "chronology" in raw_slide.get("purpose", "").lower():

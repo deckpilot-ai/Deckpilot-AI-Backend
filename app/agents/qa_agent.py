@@ -140,6 +140,63 @@ class PresentationQAAgent:
                     suggested_fix="Distribute unique visual figures without repeats across candidate slides",
                 ))
 
+            # 4b. Semantic Image Relevance Check
+            from app.services.image_matcher import ImageMatcher
+            for idx, slide in enumerate(slide_specs):
+                if slide.image_artifact_id and idx > 0:
+                    caption = slide.image_caption or ""
+                    slide_text = f"{slide.headline} {slide.objective} {slide.takeaway} {' '.join(slide.bullets or [])}"
+                    score = ImageMatcher.calculate_relevance(slide_text, caption)
+                    if score < 1.5:
+                        issues.append(ValidationIssue(
+                            severity=ValidationSeverity.HIGH,
+                            category=ValidationCategory.DESIGN,
+                            slide_number=idx + 1,
+                            slide_id=slide.slide_id,
+                            message=f"Semantic image mismatch on Slide {idx + 1}: Image '{slide.image_artifact_id}' ('{caption[:45]}...') has low semantic relevance (score={score:.1f}) to slide topic '{slide.headline[:45]}'",
+                            suggested_fix="Re-match image using semantic keyword scoring or switch away from image_focus layout",
+                        ))
+
+        # 4c. Repetitive Boilerplate Structure Check across deck
+        lead_phrases: dict[str, list[int]] = {}
+        for idx, slide in enumerate(slide_specs):
+            for b in (slide.bullets or []):
+                cleaned = str(b).strip()
+                if ":" in cleaned:
+                    lead = cleaned.split(":", 1)[0].strip().lower()
+                    if len(lead) >= 6:
+                        lead_phrases.setdefault(lead, []).append(idx + 1)
+
+        repetitive_leads = {k: v for k, v in lead_phrases.items() if len(set(v)) >= 3}
+        if repetitive_leads:
+            threshold = max(3, len(slide_specs) // 4)
+            for lead, affected_slides in repetitive_leads.items():
+                distinct_slides = sorted(list(set(affected_slides)))
+                if len(distinct_slides) >= threshold:
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.HIGH,
+                        category=ValidationCategory.CONTENT,
+                        slide_number=distinct_slides[0],
+                        slide_id=slide_specs[distinct_slides[0] - 1].slide_id if distinct_slides[0] - 1 < len(slide_specs) else "s01",
+                        message=f"Repetitive boilerplate text structure detected: Lead phrase '{lead.title()}:' repeated across {len(distinct_slides)} slides {distinct_slides[:5]}",
+                        suggested_fix="Synthesize domain-specific, diverse structural bullets tailored to each slide's topic",
+                    ))
+
+        # 4d. Typographic Hierarchy Check
+        for idx, slide in enumerate(slide_specs):
+            bullets = slide.bullets or []
+            if bullets and len(bullets) >= 2:
+                has_hierarchy = any((":" in str(b)) or ("**" in str(b)) for b in bullets)
+                if not has_hierarchy and slide.layout_family in (LayoutFamily.IMAGE_FOCUS, LayoutFamily.TWO_COLUMN, LayoutFamily.CARD_GRID):
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.MEDIUM,
+                        category=ValidationCategory.DESIGN,
+                        slide_number=idx + 1,
+                        slide_id=slide.slide_id,
+                        message=f"Slide {idx + 1} lacks typographic hierarchy: uniform text without bold lead tags or structural segmentation",
+                        suggested_fix="Structure bullet points with distinct bold lead tags (e.g. 'Driver: Detail')",
+                    ))
+
         # 5. Visual Rhythm QA
         layouts = [s.layout_family for s in slide_specs]
         consecutive_same = 1
@@ -190,6 +247,27 @@ class PresentationQAAgent:
                             slide_number=idx + 1,
                             message=f"Slide {idx + 1} is missing persistent page number pill",
                             suggested_fix="Ensure persistent page number pill is rendered on top z-order layer",
+                        ))
+
+                # Check Slide 1 signature decorative circles (layered OVAL shapes)
+                if len(prs.slides) > 0:
+                    s0 = prs.slides[0]
+                    oval_count = 0
+                    for sh in s0.shapes:
+                        if sh.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE:
+                            try:
+                                if sh.auto_shape_type == pptx.enum.shapes.MSO_SHAPE.OVAL:
+                                    oval_count += 1
+                            except Exception:
+                                pass
+                    if oval_count < 2:
+                        issues.append(ValidationIssue(
+                            severity=ValidationSeverity.HIGH,
+                            category=ValidationCategory.DESIGN,
+                            slide_number=1,
+                            slide_id=slide_specs[0].slide_id if slide_specs else "s01",
+                            message=f"Slide 1 missing signature decorative circular geometry (found {oval_count} OVAL shapes, expected >= 2 layered accent circles from benchmark design)",
+                            suggested_fix="Ensure Slide 1 renders layered corner and background OVAL accent shapes matching benchmark PPTX",
                         ))
             except Exception as e:
                 logger.warning("Shape inspection warning: %s", e)

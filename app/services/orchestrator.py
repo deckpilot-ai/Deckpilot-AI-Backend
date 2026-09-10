@@ -732,18 +732,57 @@ class JobOrchestrator:
 
                     if not slide.get("bullets"):
                         topic = slide.get("headline") or slide.get("purpose") or "Core Insights"
+                        formula_idx = idx % 4
                         if getattr(goal, "presentation_type", None) == PresentationType.RESEARCH_EDUCATION:
-                            slide["bullets"] = [
-                                f"Historical Foundations: Critical examination of primary evidence and historical records for {str(topic).lower()}.",
-                                "Institutional Analysis: Structural developments in governance, trade networks, and societal organization.",
-                                "Enduring Significance: Lasting cultural, architectural, and ethical contributions that shaped civilization."
-                            ]
+                            if formula_idx == 0:
+                                slide["bullets"] = [
+                                    f"Foundational Thesis: Comprehensive assessment of {str(topic).lower()}.",
+                                    "Empirical Evidence: Documented primary records, epigraphic testimony, and regional findings.",
+                                    "Civilizational Impact: Structural shifts reshaping political, economic, and cultural paradigms."
+                                ]
+                            elif formula_idx == 1:
+                                slide["bullets"] = [
+                                    f"Strategic Driver: Critical dynamics driving {str(topic).lower()}.",
+                                    "Operational Mechanism: Institutional systems, resource control, and statecraft enforcement.",
+                                    "Measurable Outcome: Concrete benchmarks and regional transformations established."
+                                ]
+                            elif formula_idx == 2:
+                                slide["bullets"] = [
+                                    f"Core Pillar: Structural consolidation underpinning {str(topic).lower()}.",
+                                    "Policy Execution: Administrative governance, logistical deployment, and legal frameworks.",
+                                    "Enduring Heritage: Long-term institutional legacy informing regional civilization."
+                                ]
+                            else:
+                                slide["bullets"] = [
+                                    f"Key Dimension: In-depth analysis of {str(topic).lower()} and its strategic imperatives.",
+                                    "Systemic Architecture: Integration of economic networks, societal welfare, and defense.",
+                                    "Strategic Takeaway: Essential historical lessons for governance and statecraft."
+                                ]
                         else:
-                            slide["bullets"] = [
-                                f"Key Focus: Accelerate disciplined progress across {str(topic).lower()}.",
-                                "Performance Driver: Leverage integrated cross-functional systems and modern toolchains.",
-                                "Measurable Impact: Deliver high-confidence milestone outcomes with continuous stakeholder alignment."
-                            ]
+                            if formula_idx == 0:
+                                slide["bullets"] = [
+                                    f"Executive Focus: Accelerate disciplined execution across {str(topic).lower()}.",
+                                    "Performance Driver: Leverage integrated cross-functional systems and modern toolchains.",
+                                    "Measurable Impact: Deliver high-confidence milestone outcomes with continuous alignment."
+                                ]
+                            elif formula_idx == 1:
+                                slide["bullets"] = [
+                                    f"Operational Enabler: Scalable architecture advancing {str(topic).lower()}.",
+                                    "Execution Rigor: Real-time telemetry, automated guardrails, and rapid feedback loops.",
+                                    "Strategic ROI: Unlock predictable velocity and sustainable margin expansion."
+                                ]
+                            elif formula_idx == 2:
+                                slide["bullets"] = [
+                                    f"Core Priority: Optimize capability delivery for {str(topic).lower()}.",
+                                    "Cross-Functional Lever: Align organizational incentives with clear accountability.",
+                                    "Target Benchmark: Consistently outperform industry baselines across core SLAs."
+                                ]
+                            else:
+                                slide["bullets"] = [
+                                    f"Strategic Pillar: Strengthen foundational resilience in {str(topic).lower()}.",
+                                    "Implementation Vector: Modernize workflows with targeted automation.",
+                                    "Long-Term Value: Institutionalize scalable operating advantage."
+                                ]
 
                     if not slide.get("speakerNotes"):
                         slide["speakerNotes"] = f"Presenter note for Slide {idx + 1}: Emphasize the core takeaways and operational milestones."
@@ -780,28 +819,19 @@ class JobOrchestrator:
                         except Exception:
                             logger.warning("Source image %s unavailable", art.id)
 
-                # Distribute available documentary source_images to slides if not explicitly assigned
+                # Semantically match available documentary source_images to slides
                 if source_images:
-                    available_img_ids = list(source_images.keys())
+                    from app.services.image_matcher import ImageMatcher
                     raw_slides = context.get("deck_spec", {}).get("slides", [])
-                    img_idx = 0
-                    for s_idx, slide in enumerate(raw_slides):
-                        if img_idx >= len(available_img_ids):
-                            break
-                        if not slide.get("imageArtifactId"):
-                            should_assign = (
-                                (s_idx == 0) or
-                                (s_idx % 2 == 1) or
-                                (len(raw_slides) <= len(available_img_ids))
-                            )
-                            if should_assign:
-                                art_id = available_img_ids[img_idx]
-                                slide["imageArtifactId"] = art_id
-                                meta = json.loads(next((a.json_data for a in existing_artifacts if a.id == art_id), "{}"))
-                                slide["imageCaption"] = meta.get("caption") or "Source document illustration"
-                                if s_idx > 0 and slide.get("layoutHint") in (None, "default", "two_column"):
-                                    slide["layoutHint"] = "image_focus"
-                                img_idx += 1
+                    available_assets_meta = [
+                        AssetMetadata(
+                            asset_id=art.id,
+                            source_file=art.source_locator or "doc",
+                            caption=json.loads(art.json_data or "{}").get("caption", ""),
+                            storage_key=art.storage_key or "",
+                        ) for art in existing_artifacts if art.type == "image" and art.id in source_images
+                    ]
+                    ImageMatcher.assign_images_semantically(raw_slides, available_assets_meta, min_relevance_threshold=1.5)
 
                 for slide in context.get("deck_spec", {}).get("slides", []):
                     if slide.get("imageArtifactId") and slide.get("imageArtifactId") not in source_images:

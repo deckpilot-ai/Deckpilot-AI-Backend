@@ -101,9 +101,10 @@ class ArchetypeRenderer:
         else:
             main_title = raw_title
 
-        # 3. Subtle geometric corner accents (far in corners, never blocking text or title)
-        r_cls._shape(slide, MSO_SHAPE.OVAL, 11.2, -1.8, 3.8, 3.8, tint(ink, 0.12), "corner-accent-tr")
-        r_cls._shape(slide, MSO_SHAPE.OVAL, -1.2, 5.8, 2.6, 2.6, tint(ink, 0.10), "corner-accent-bl")
+        # 3. Signature decorative organic circles (matches Expected PPT benchmark)
+        r_cls._shape(slide, MSO_SHAPE.OVAL, 9.60, -2.20, 6.50, 6.50, tint(ink, 0.12), "accent-circle-tr")
+        r_cls._shape(slide, MSO_SHAPE.OVAL, 11.00, 3.60, 5.20, 5.20, tint(ink, 0.10), "accent-circle-mr")
+        r_cls._shape(slide, MSO_SHAPE.OVAL, -1.60, 4.60, 4.40, 4.40, tint(ink, 0.10), "accent-circle-bl")
 
         # 4. Eyebrow (Saffron/Gold accent color, tracked uppercase)
         eyebrow = (data.eyebrow or "CURATED EDUCATIONAL & STRATEGIC BRIEFING").upper()
@@ -173,6 +174,10 @@ class ArchetypeRenderer:
             raw_subtitle = " ".join(words[4:])
         else:
             main_title = raw_title
+
+        # Signature decorative background circles (matches Expected PPT benchmark)
+        r_cls._shape(slide, MSO_SHAPE.OVAL, -0.90, -0.90, 2.60, 2.60, tint(ink, 0.14), "accent-circle-tl")
+        r_cls._shape(slide, MSO_SHAPE.OVAL, 0.20, 5.90, 1.70, 1.70, tint(ink, 0.12), "accent-circle-bl")
 
         # Left 55%: text narrative
         eyebrow = (data.eyebrow or "CASE STUDY & ANALYSIS").upper()
