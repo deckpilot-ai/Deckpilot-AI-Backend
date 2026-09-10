@@ -470,7 +470,7 @@ class PPTXRenderer:
                     cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, h, fill, f"card-{j+1}", corner_radius=0.04)
                     badge_x = x + (w - 1.2) / 2
                     cls._shape(slide, MSO_SHAPE.OVAL, badge_x, y + 0.3, 1.2, 1.2, primary, f"badge-{j+1}")
-                    cls._text(slide, f"0{j+1}", badge_x, y + 0.3, 1.2, 1.2, white, title_font, 28, bold=True, center=True)
+                    cls._text(slide, f"0{j+1}", badge_x, y + 0.3, 1.2, 1.2, white, title_font, 28, bold=True, center=True, name=f"badge-number-{j+1}")
                     if "\n" in item:
                         parts = item.split("\n", 1)
                     elif ":" in item:

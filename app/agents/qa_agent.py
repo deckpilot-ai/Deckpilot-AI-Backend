@@ -173,7 +173,7 @@ class PresentationQAAgent:
                 issues.append(cls._issue("duplicate_title", ValidationSeverity.HIGH, ValidationCategory.CONTENT, idx, f"Title duplicates Slide {seen_titles[_normalized(title)]}", sid))
             else:
                 seen_titles[_normalized(title)] = idx
-            if len(title) > 90 or len(title.split()) > 13:
+            if len(title) > 100 or len(title.split()) > 16:
                 issues.append(cls._issue("title_too_long", ValidationSeverity.MEDIUM, ValidationCategory.CONTENT, idx, f"Title contains {len(title.split())} words", sid))
             if title and len(title.split()) == 1 and len(title) < 6 and idx > 1:
                 issues.append(cls._issue("title_too_short", ValidationSeverity.LOW, ValidationCategory.CONTENT, idx, f"Title '{title}' is too vague", sid))
@@ -369,6 +369,7 @@ class PresentationQAAgent:
                     for asset in assets
                 )
                 for slide in slides
+                if slide.layout_family in _IMAGE_LAYOUTS
             )
             expected_visuals = min(max(2, len(slides) // 4), assignable_slides, len(assets))
             if image_slides == 0 and expected_visuals > 0:
@@ -449,7 +450,7 @@ class PresentationQAAgent:
                     evidence_card_heights[match.group(1)] = int(shape.height)
                 if match := re.fullmatch(r"evidence-text-(\d+)", name):
                     evidence_text_metrics[match.group(1)] = (int(shape.height), [])
-                decorative = any(tag in name for tag in ("accent", "backdrop", "background", "page-pill", "photo-container", "photo-mat", "image-frame", "card", "chip", "disc"))
+                decorative = any(tag in name for tag in ("accent", "backdrop", "background", "page-pill", "photo-container", "photo-mat", "image-frame", "card", "chip", "disc", "badge"))
                 decorative_count += int(decorative)
                 outside = shape.left < -1000 or shape.top < -1000 or shape.left + shape.width > slide_w + 1000 or shape.top + shape.height > slide_h + 1000
                 intentional_bleed = any(tag in name for tag in ("bleed", "accent-circle", "corner-accent", "backdrop"))

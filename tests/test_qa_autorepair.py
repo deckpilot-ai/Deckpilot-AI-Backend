@@ -179,3 +179,55 @@ def test_page_and_figure_citations_do_not_trigger_numeric_chart_check():
 
     report = PresentationQAAgent.evaluate_presentation([slide], DesignSystem())
     assert "QA-079" not in {issue.checkpoint_id for issue in report.issues}
+
+
+def test_relevant_images_are_expected_only_on_image_capable_layouts():
+    assets = [AssetMetadata(asset_id=f"empire-{idx}", caption="Ancient empire map and monuments") for idx in range(6)]
+    slides = [
+        SlideSpec(
+            slide_id=f"s{idx + 1:02d}",
+            slide_number=idx + 1,
+            headline="Ancient empire map and monuments",
+            bullets=["Evidence about ancient empire map and monuments."],
+            layout_family=LayoutFamily.TEXT_IMAGE if idx < 2 else LayoutFamily.TWO_COLUMN,
+            image_artifact_id=f"empire-{idx}" if idx < 2 else None,
+            image_caption="Ancient empire map and monuments" if idx < 2 else "",
+        )
+        for idx in range(6)
+    ]
+
+    report = PresentationQAAgent.evaluate_presentation(slides, DesignSystem(), available_assets=assets)
+    assert "QA-074" not in {issue.checkpoint_id for issue in report.issues}
+
+
+def test_two_line_professional_title_is_not_destructively_shortened():
+    slide = SlideSpec(
+        slide_id="s01",
+        slide_number=1,
+        headline="An empire is a political unit where a central ruler commands diverse peoples and territories",
+        bullets=["A grounded definition."],
+        layout_family=LayoutFamily.TWO_COLUMN,
+    )
+
+    report = PresentationQAAgent.evaluate_presentation([slide], DesignSystem())
+    assert "QA-003" not in {issue.checkpoint_id for issue in report.issues}
+
+
+def test_number_badges_do_not_create_a_false_body_font_range_failure():
+    slide = SlideSpec(
+        slide_id="s01",
+        slide_number=1,
+        headline="What forces drive empire formation?",
+        bullets=[
+            "Leadership united territories.",
+            "Trade generated resources.",
+            "Armies secured borders.",
+            "Institutions maintained order.",
+        ],
+        layout_family=LayoutFamily.CARD_GRID,
+        layout_hint="numbered_columns",
+    )
+    payload = PPTXRenderer.render_presentation([slide], DesignSystem(), deck_title="Empires")
+
+    report = PresentationQAAgent.evaluate_presentation([slide], DesignSystem(), pptx_bytes=payload)
+    assert "QA-029" not in {issue.checkpoint_id for issue in report.issues}
