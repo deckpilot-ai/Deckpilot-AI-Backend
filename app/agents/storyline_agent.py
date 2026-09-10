@@ -43,6 +43,7 @@ class StorylineAgent:
         # Layout rhythm tracker
         recent_layouts: list[LayoutFamily] = []
         recent_archetypes: list[str] = []
+        asset_cursor = 0
 
         for i in range(count):
             slide_id = f"s{i+1:02d}"
@@ -68,10 +69,14 @@ class StorylineAgent:
             caption = raw_slide.get("imageCaption") or raw_slide.get("image_caption") or ""
 
             if not img_id and assets and chosen_layout in (LayoutFamily.IMAGE_FOCUS, LayoutFamily.TEXT_IMAGE, LayoutFamily.HERO):
-                # Match closest asset
-                cand_idx = i % len(assets)
+                cand_idx = asset_cursor % len(assets)
                 img_id = assets[cand_idx].asset_id
-                caption = caption or assets[cand_idx].caption or "Documentary Reference Figure"
+                caption = caption or assets[cand_idx].caption or f"Documentary Reference: {headline[:45]}"
+                asset_cursor += 1
+            elif img_id and not caption and assets:
+                match = next((a for a in assets if a.asset_id == img_id), None)
+                if match and match.caption:
+                    caption = match.caption
 
             # 4. Associate Charts if data / metrics present
             chart_spec = None
@@ -256,8 +261,14 @@ class StorylineAgent:
             return LayoutFamily.CHART_FOCUS
         if raw_slide.get("table"):
             return LayoutFamily.TABLE_FOCUS
-        if raw_slide.get("imageArtifactId") or (assets and index in (1, 3, 7)):
+        if raw_slide.get("imageArtifactId"):
             return LayoutFamily.IMAGE_FOCUS
+        if assets and 0 < index < total_slides - 1:
+            # Distribute images periodically across content slides (every 2-3 slides)
+            # Avoid placing image layout back-to-back with another image layout
+            prev_is_img = bool(recent and recent[-1] in (LayoutFamily.IMAGE_FOCUS, LayoutFamily.TEXT_IMAGE))
+            if not prev_is_img and (index % 3 == 1 or (len(assets) >= 6 and index % 2 == 1)):
+                return LayoutFamily.IMAGE_FOCUS
         if "process" in raw_slide.get("purpose", "").lower() or "step" in raw_slide.get("purpose", "").lower():
             return LayoutFamily.PROCESS_STEPS
         if "timeline" in raw_slide.get("purpose", "").lower() or "chronology" in raw_slide.get("purpose", "").lower():

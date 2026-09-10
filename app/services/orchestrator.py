@@ -783,16 +783,25 @@ class JobOrchestrator:
                 # Distribute available documentary source_images to slides if not explicitly assigned
                 if source_images:
                     available_img_ids = list(source_images.keys())
+                    raw_slides = context.get("deck_spec", {}).get("slides", [])
                     img_idx = 0
-                    for slide in context.get("deck_spec", {}).get("slides", []):
-                        if not slide.get("imageArtifactId") and img_idx < len(available_img_ids):
-                            art_id = available_img_ids[img_idx]
-                            slide["imageArtifactId"] = art_id
-                            meta = json.loads(next((a.json_data for a in existing_artifacts if a.id == art_id), "{}"))
-                            slide["imageCaption"] = meta.get("caption") or "Source document illustration"
-                            if slide.get("layoutHint") in (None, "default", "two_column"):
-                                slide["layoutHint"] = "image_focus"
-                            img_idx += 1
+                    for s_idx, slide in enumerate(raw_slides):
+                        if img_idx >= len(available_img_ids):
+                            break
+                        if not slide.get("imageArtifactId"):
+                            should_assign = (
+                                (s_idx == 0) or
+                                (s_idx % 2 == 1) or
+                                (len(raw_slides) <= len(available_img_ids))
+                            )
+                            if should_assign:
+                                art_id = available_img_ids[img_idx]
+                                slide["imageArtifactId"] = art_id
+                                meta = json.loads(next((a.json_data for a in existing_artifacts if a.id == art_id), "{}"))
+                                slide["imageCaption"] = meta.get("caption") or "Source document illustration"
+                                if s_idx > 0 and slide.get("layoutHint") in (None, "default", "two_column"):
+                                    slide["layoutHint"] = "image_focus"
+                                img_idx += 1
 
                 for slide in context.get("deck_spec", {}).get("slides", []):
                     if slide.get("imageArtifactId") and slide.get("imageArtifactId") not in source_images:
@@ -820,10 +829,11 @@ class JobOrchestrator:
 
                 try:
                     pptx_bytes = await run_in_threadpool(
-                        PPTXRenderer.render_deck,
-                        context["deck_spec"],
-                        context.get("brand_style"),
+                        PPTXRenderer.render_presentation,
+                        slide_specs,
+                        ds_obj,
                         source_images,
+                        context["deck_spec"].get("deckTitle", "Presentation"),
                     )
                 except Exception as _e:
                     _fail_step("pptx_renderer", _e, "render_failed")
@@ -838,15 +848,18 @@ class JobOrchestrator:
                         slide_specs,
                         ds_obj,
                         pptx_bytes,
+                        source_images,
                     )
 
                     # Trigger repair if issues detected
                     if qa_report.repair_triggered:
-                        _emit("visual_qa", "running", "Self-correction triggered: refining slide copy, layouts, and data series...")
+                        _emit("visual_qa", "running", "Self-correction triggered: refining slide copy, layouts, visual pacing, and data series...")
                         slide_specs = RepairAgent.apply_corrections(
                             slide_specs=slide_specs,
                             qa_report=qa_report,
                             topic=context["deck_spec"].get("deckTitle", "Presentation"),
+                            source_images=source_images,
+                            design_system=ds_obj,
                         )
                         # Re-render with corrections
                         pptx_bytes = await run_in_threadpool(
@@ -861,6 +874,7 @@ class JobOrchestrator:
                             slide_specs,
                             ds_obj,
                             pptx_bytes,
+                            source_images,
                         )
 
                     context["deck_spec"]["qaReport"] = qa_report.model_dump()

@@ -469,11 +469,21 @@ class PPTXRenderer:
                     cls._card(slide, item, x_c, y_c, w_card, h_card, fill, body_col, primary, body_font, j + 1)
 
             else:
-                # Two Column / Comparison default
-                midpoint = max(1, math.ceil(len(bullets) / 2))
-                groups = [bullets[:midpoint], bullets[midpoint:]]
-                for j, group in enumerate(groups):
-                    cls._card(slide, "\n".join(group), 0.6 + j * 6.225, 2.25, 5.875, 4.0, fill, body_col, accent, body_font)
+                # If image_bytes is present, prioritize visual framed layout
+                if image_bytes:
+                    cls._text(slide, "\n".join(bullets), 0.6, 2.25, 5.85, 4.15, body_col, body_font, 15, bullet_list=True)
+                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 6.75, 2.2, 5.95, 4.25, white, "image-frame")
+                    cls._render_picture(slide, image_bytes, 6.85, 2.3, 5.75, 3.45)
+                    caption = slide_data.image_caption or "Source document illustration"
+                    if not re.match(r"^(?:Fig|Figure|Map)\b", caption, re.I):
+                        caption = f"Fig. {index + 1} - {caption}"
+                    cls._text(slide, caption[:95], 6.85, 5.85, 5.75, 0.5, primary, body_font, 10.5, italic=True, center=True)
+                else:
+                    # Two Column / Comparison default
+                    midpoint = max(1, math.ceil(len(bullets) / 2))
+                    groups = [bullets[:midpoint], bullets[midpoint:]]
+                    for j, group in enumerate(groups):
+                        cls._card(slide, "\n".join(group), 0.6 + j * 6.225, 2.25, 5.875, 4.0, fill, body_col, accent, body_font)
 
             # Speaker Notes
             notes = slide_data.speaker_notes or f"Presenter guidance for Slide {index + 1}: {title}"
@@ -527,7 +537,22 @@ class PPTXRenderer:
             ds.colors.accent = brand["colors"]["accent"]
             ds.colors.neutral = brand["colors"]["neutral"]
 
-        specs = StorylineAgent.create_storyline_plan(goal, llm_plan_spec=deck_spec)
+        available_assets = None
+        if source_images:
+            from app.schemas.generation_state import AssetMetadata
+            available_assets = [
+                AssetMetadata(
+                    asset_id=k,
+                    source_file="source_image",
+                    caption="",
+                    storage_key="",
+                )
+                for k in source_images.keys()
+            ]
+
+        specs = StorylineAgent.create_storyline_plan(
+            goal, llm_plan_spec=deck_spec, available_assets=available_assets
+        )
         return cls.render_presentation(specs, ds, source_images, deck_title=title)
 
     @classmethod
