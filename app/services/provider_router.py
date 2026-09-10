@@ -69,15 +69,15 @@ class ProviderRouter:
     def sync_environment_providers(db: Session) -> None:
         """Auto-synchronize system AI providers and API keys from settings / environment into database."""
         provider_configs = [
-            ("routeway", settings.routeway_base_url or "https://api.routeway.ai/v1", settings.routeway_api_key, 30),
-            ("bazaarlink", settings.bazaarlink_base_url or "https://api.bazaarlink.ai/v1", settings.bazaarlink_api_key, 28),
+            ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 35),
+            ("groq", "https://api.groq.com/openai/v1", settings.groq_api_key, 32),
             ("nvidia", settings.nvidia_base_url or "https://integrate.api.nvidia.com/v1", settings.nvidia_api_key, 25),
-            ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 18),
+            ("bazaarlink", settings.bazaarlink_base_url or "https://api.bazaarlink.ai/v1", settings.bazaarlink_api_key, 20),
+            ("routeway", settings.routeway_base_url or "https://api.routeway.ai/v1", settings.routeway_api_key, 18),
             ("codecraft", settings.codecraft_base_url or "https://codecraftapi.com/v1", settings.codecraft_api_key, 15),
-            ("experientiallabs", settings.experientiallabs_base_url or "https://api.experientiallabs.ai/v1", settings.effective_experientiallabs_api_key, 11),
+            ("experientiallabs", settings.experientiallabs_base_url or "https://api.experientiallabs.ai/v1", settings.effective_experientiallabs_api_key, 12),
             ("openrouter", "https://openrouter.ai/api/v1", settings.openrouter_api_key, 10),
             ("openai", "https://api.openai.com/v1", settings.openai_api_key, 8),
-            ("groq", "https://api.groq.com/openai/v1", settings.groq_api_key, 7),
             ("mistral", "https://api.mistral.ai/v1", settings.mistral_api_key, 6),
             ("anthropic", "https://api.anthropic.com/v1", settings.anthropic_api_key, 5),
         ]
@@ -101,79 +101,79 @@ class ProviderRouter:
                         provider.priority = priority
                         db.commit()
 
-                # Seed initial default models if this provider has none configured
-                existing_models = db.scalars(select(AIProviderModel).where(AIProviderModel.provider_id == provider.id)).all()
-                if not existing_models:
-                    default_models = []
-                    if name == "routeway":
-                        default_models = [
-                            {"model_id": "deepseek-v4-flash:free", "display_name": "DeepSeek V4 Flash (Free)", "priority": 100, "enabled": 1, "context_length": 128000},
-                            {"model_id": "minimax-m2.7:free", "display_name": "MiniMax M2.7 (Free)", "priority": 98, "enabled": 1, "context_length": 128000},
-                            {"model_id": "muse-glimmer-30b:free", "display_name": "Meta Glimmer 30B (Free)", "priority": 96, "enabled": 1, "context_length": 128000},
-                            {"model_id": "kimi-k2.6:free", "display_name": "Moonshot Kimi K2.6 (Free)", "priority": 94, "enabled": 1, "context_length": 128000},
-                            {"model_id": "deepseek-v4-flash", "display_name": "DeepSeek V4 Flash", "priority": 92, "enabled": 1, "context_length": 128000},
-                            {"model_id": "qwen3.8-max", "display_name": "Qwen 3.8 Max", "priority": 90, "enabled": 1, "context_length": 1000000},
-                            {"model_id": "claude-fable-5-1", "display_name": "Claude Fable 5.1", "priority": 88, "enabled": 1, "context_length": 200000},
-                        ]
-                    elif name == "bazaarlink":
-                        default_models = [
-                            {"model_id": "auto:free", "display_name": "Auto Router (Free)", "priority": 100, "enabled": 1, "context_length": 128000},
-                            {"model_id": "qwen/qwen3.7-flash:free", "display_name": "Qwen 3.7 Flash (Free)", "priority": 98, "enabled": 1, "context_length": 128000},
-                            {"model_id": "auto", "display_name": "Auto Router", "priority": 96, "enabled": 1, "context_length": 128000},
-                            {"model_id": "deepseek-v4-flash", "display_name": "DeepSeek V4 Flash", "priority": 94, "enabled": 1, "context_length": 128000},
-                            {"model_id": "qwen3.8-max", "display_name": "Qwen 3.8 Max", "priority": 92, "enabled": 1, "context_length": 1000000},
-                            {"model_id": "claude-sonnet-4.6", "display_name": "Claude Sonnet 4.6", "priority": 90, "enabled": 1, "context_length": 200000},
-                            {"model_id": "glm-5", "display_name": "GLM 5", "priority": 88, "enabled": 1, "context_length": 128000},
-                        ]
-                    elif name == "gemini":
-                        default_models = [
-                            {"model_id": "gemini-3.8-flash", "display_name": "Gemini 3.8 Flash", "priority": 100, "enabled": 1, "context_length": 1000000},
-                            {"model_id": "gemini-3.7-flash", "display_name": "Gemini 3.7 Flash", "priority": 98, "enabled": 1, "context_length": 1000000},
-                            {"model_id": "gemini-3.5-flash", "display_name": "Gemini 3.5 Flash", "priority": 96, "enabled": 1, "context_length": 1000000},
-                            {"model_id": "gemini-2.5-flash", "display_name": "Gemini 2.5 Flash", "priority": 94, "enabled": 1, "context_length": 1000000},
-                            {"model_id": "gemini-3.5-flash-lite", "display_name": "Gemini 3.5 Flash Lite", "priority": 92, "enabled": 1, "context_length": 1000000},
-                            {"model_id": "gemini-2.5-flash-lite", "display_name": "Gemini 2.5 Flash Lite", "priority": 90, "enabled": 1, "context_length": 1000000},
-                            {"model_id": "gemini-3.1-flash-lite-preview", "display_name": "Gemini 3.1 Flash Lite Preview", "priority": 88, "enabled": 1, "context_length": 1000000},
-                        ]
-                    elif name == "nvidia":
-                        default_models = [
-                            {"model_id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "display_name": "Nemotron 3 Nano Omni 30B (Reasoning)", "priority": 100, "enabled": 1, "context_length": 128000},
-                            {"model_id": "poolside/laguna-xs-2.1", "display_name": "Laguna XS 2.1 (Ultra-Fast)", "priority": 98, "enabled": 1, "context_length": 128000},
-                            {"model_id": "nvidia/nemotron-3-super-120b-a12b", "display_name": "Nemotron 3 Super 120B (Flagship)", "priority": 96, "enabled": 1, "context_length": 128000},
-                            {"model_id": "nvidia/nemotron-3.5-lightning-30b-a3b", "display_name": "Nemotron 3.5 Lightning 30B", "priority": 94, "enabled": 1, "context_length": 128000},
-                            {"model_id": "openai/gpt-oss-20b", "display_name": "GPT OSS 20B", "priority": 92, "enabled": 1, "context_length": 128000},
-                            {"model_id": "nvidia/ising-calibration-1.5-31b", "display_name": "Ising Calibration 1.5 31B", "priority": 90, "enabled": 1, "context_length": 128000},
-                            {"model_id": "meta/llama-3.2-11b-vision-instruct", "display_name": "Llama 3.2 11B Vision Instruct", "priority": 88, "enabled": 1, "context_length": 128000},
-                        ]
-                    elif name == "codecraft":
-                        default_models = [
-                            {"model_id": m["id"], "display_name": m["name"], "priority": max(100 - (i * 2), 1), "enabled": 1, "context_length": m.get("context_length")}
-                            for i, m in enumerate(CURATED_CODECRAFT_MODELS)
-                        ]
-                    elif name == "openrouter":
-                        from app.services.openrouter_models import CURATED_FREE_MODELS
-                        default_models = [
-                            {"model_id": m["id"], "display_name": m["name"], "priority": 100 - (i * 5), "enabled": 1, "context_length": m.get("context_length")}
-                            for i, m in enumerate(CURATED_FREE_MODELS[:10])
-                        ]
-                    elif name == "experientiallabs":
-                        from app.services.experientiallabs_models import CURATED_EXPERIENTIALLABS_FREE_MODELS
-                        default_models = [
-                            {"model_id": m["id"], "display_name": m["name"], "priority": 100 - (i * 5), "enabled": 1, "context_length": m.get("context_length")}
-                            for i, m in enumerate(CURATED_EXPERIENTIALLABS_FREE_MODELS[:10])
-                        ]
-                    elif name == "openai":
-                        default_models = [
-                            {"model_id": "gpt-4o", "display_name": "GPT-4o (Flagship)", "priority": 95, "enabled": 1, "context_length": 128000},
-                            {"model_id": "gpt-4o-mini", "display_name": "GPT-4o Mini", "priority": 90, "enabled": 1, "context_length": 128000},
-                        ]
-                    elif name == "groq":
-                        default_models = [
-                            {"model_id": "llama-3.3-70b-versatile", "display_name": "Llama 3.3 70B (Versatile)", "priority": 90, "enabled": 1, "context_length": 128000},
-                        ]
+                # Curated default models for each provider (always upsert to keep current)
+                default_models = []
+                if name == "gemini":
+                    default_models = [
+                        {"model_id": "gemini-2.5-flash", "display_name": "Gemini 2.5 Flash", "priority": 100, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gemini-flash-latest", "display_name": "Gemini Flash Latest", "priority": 98, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gemini-2.5-flash-lite", "display_name": "Gemini 2.5 Flash Lite", "priority": 95, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gemini-2.5-pro", "display_name": "Gemini 2.5 Pro", "priority": 90, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gemini-3.8-flash", "display_name": "Gemini 3.8 Flash (Deprecated)", "priority": 1, "enabled": 0, "context_length": 1000000},
+                        {"model_id": "gemini-3.7-flash", "display_name": "Gemini 3.7 Flash (Deprecated)", "priority": 1, "enabled": 0, "context_length": 1000000},
+                        {"model_id": "gemini-3.5-flash", "display_name": "Gemini 3.5 Flash (Deprecated)", "priority": 1, "enabled": 0, "context_length": 1000000},
+                    ]
+                elif name == "groq":
+                    default_models = [
+                        {"model_id": "openai/gpt-oss-120b", "display_name": "GPT-OSS 120B (Ultra-Fast)", "priority": 100, "enabled": 1, "context_length": 131072},
+                        {"model_id": "qwen/qwen3.8-27b", "display_name": "Qwen 3.8 27B", "priority": 95, "enabled": 1, "context_length": 131072},
+                        {"model_id": "openai/gpt-oss-20b", "display_name": "GPT-OSS 20B", "priority": 90, "enabled": 1, "context_length": 131072},
+                        {"model_id": "groq/compound-mini", "display_name": "Compound Mini", "priority": 85, "enabled": 1, "context_length": 131072},
+                        {"model_id": "llama-3.3-70b-versatile", "display_name": "Llama 3.3 70B (Deprecated)", "priority": 1, "enabled": 0, "context_length": 128000},
+                        {"model_id": "allam-2-7b", "display_name": "Allam 2 7B (Deprecated)", "priority": 1, "enabled": 0, "context_length": 4096},
+                    ]
+                elif name == "nvidia":
+                    default_models = [
+                        {"model_id": "deepseek-ai/deepseek-v4-flash-0731", "display_name": "DeepSeek V4 Flash 0731", "priority": 98, "enabled": 1, "context_length": 128000},
+                        {"model_id": "google/gemma-3-12b-it", "display_name": "Gemma 3 12B IT", "priority": 95, "enabled": 1, "context_length": 128000},
+                        {"model_id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "display_name": "Nemotron 3 Nano Omni 30B", "priority": 90, "enabled": 1, "context_length": 128000},
+                        {"model_id": "meta/llama-3.2-11b-vision-instruct", "display_name": "Llama 3.2 11B Vision Instruct", "priority": 85, "enabled": 1, "context_length": 128000},
+                    ]
+                elif name == "bazaarlink":
+                    default_models = [
+                        {"model_id": "auto:free", "display_name": "Auto Router (Free)", "priority": 100, "enabled": 1, "context_length": 128000},
+                        {"model_id": "qwen/qwen3.7-flash:free", "display_name": "Qwen 3.7 Flash (Free)", "priority": 98, "enabled": 1, "context_length": 128000},
+                        {"model_id": "auto", "display_name": "Auto Router", "priority": 96, "enabled": 1, "context_length": 128000},
+                        {"model_id": "deepseek-v4-flash", "display_name": "DeepSeek V4 Flash", "priority": 94, "enabled": 1, "context_length": 128000},
+                        {"model_id": "qwen3.8-max", "display_name": "Qwen 3.8 Max", "priority": 92, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "claude-sonnet-4.6", "display_name": "Claude Sonnet 4.6", "priority": 90, "enabled": 1, "context_length": 200000},
+                        {"model_id": "glm-5", "display_name": "GLM 5", "priority": 88, "enabled": 1, "context_length": 128000},
+                    ]
+                elif name == "routeway":
+                    default_models = [
+                        {"model_id": "deepseek-v4-flash:free", "display_name": "DeepSeek V4 Flash (Free)", "priority": 100, "enabled": 1, "context_length": 128000},
+                        {"model_id": "minimax-m2.7:free", "display_name": "MiniMax M2.7 (Free)", "priority": 98, "enabled": 1, "context_length": 128000},
+                        {"model_id": "muse-glimmer-30b:free", "display_name": "Meta Glimmer 30B (Free)", "priority": 96, "enabled": 1, "context_length": 128000},
+                        {"model_id": "kimi-k2.6:free", "display_name": "Moonshot Kimi K2.6 (Free)", "priority": 94, "enabled": 1, "context_length": 128000},
+                        {"model_id": "deepseek-v4-flash", "display_name": "DeepSeek V4 Flash", "priority": 92, "enabled": 1, "context_length": 128000},
+                        {"model_id": "qwen3.8-max", "display_name": "Qwen 3.8 Max", "priority": 90, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "claude-fable-5-1", "display_name": "Claude Fable 5.1", "priority": 88, "enabled": 1, "context_length": 200000},
+                    ]
+                elif name == "codecraft":
+                    default_models = [
+                        {"model_id": m["id"], "display_name": m["name"], "priority": max(100 - (i * 2), 1), "enabled": 1, "context_length": m.get("context_length")}
+                        for i, m in enumerate(CURATED_CODECRAFT_MODELS)
+                    ]
+                elif name == "openrouter":
+                    from app.services.openrouter_models import CURATED_FREE_MODELS
+                    default_models = [
+                        {"model_id": m["id"], "display_name": m["name"], "priority": 100 - (i * 5), "enabled": 1, "context_length": m.get("context_length")}
+                        for i, m in enumerate(CURATED_FREE_MODELS[:10])
+                    ]
+                elif name == "experientiallabs":
+                    from app.services.experientiallabs_models import CURATED_EXPERIENTIALLABS_FREE_MODELS
+                    default_models = [
+                        {"model_id": m["id"], "display_name": m["name"], "priority": 100 - (i * 5), "enabled": 1, "context_length": m.get("context_length")}
+                        for i, m in enumerate(CURATED_EXPERIENTIALLABS_FREE_MODELS[:10])
+                    ]
+                elif name == "openai":
+                    default_models = [
+                        {"model_id": "gpt-4o", "display_name": "GPT-4o (Flagship)", "priority": 95, "enabled": 1, "context_length": 128000},
+                        {"model_id": "gpt-4o-mini", "display_name": "GPT-4o Mini", "priority": 90, "enabled": 1, "context_length": 128000},
+                    ]
 
-                    if default_models:
-                        ProviderRouter.save_provider_models(db, provider.id, default_models)
+                if default_models:
+                    ProviderRouter.save_provider_models(db, provider.id, default_models)
 
                 # Sync environment key if configured
                 if key_secret and key_secret.strip():
@@ -652,25 +652,24 @@ class ProviderRouter:
             else:
                 p_name = provider.name.lower()
                 if "groq" in p_name:
-                    model_candidates = [("openai/gpt-oss-120b", 90), ("llama-3.3-70b-versatile", 80)]
+                    model_candidates = [
+                        ("openai/gpt-oss-120b", 100),
+                        ("qwen/qwen3.8-27b", 95),
+                        ("openai/gpt-oss-20b", 90),
+                    ]
                 elif "gemini" in p_name:
                     model_candidates = [
-                        (settings.gemini_model or "gemini-3.8-flash", 100),
-                        ("gemini-3.7-flash", 98),
-                        ("gemini-3.5-flash", 96),
-                        ("gemini-2.5-flash", 94),
-                        ("gemini-3.5-flash-lite", 92),
-                        ("gemini-2.5-flash-lite", 90),
+                        ("gemini-2.5-flash", 100),
+                        ("gemini-flash-latest", 98),
+                        ("gemini-2.5-flash-lite", 95),
+                        ("gemini-2.5-pro", 90),
                     ]
                 elif "nvidia" in p_name:
                     model_candidates = [
-                        ("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", 100),
-                        ("poolside/laguna-xs-2.1", 98),
-                        ("nvidia/nemotron-3-super-120b-a12b", 96),
-                        ("nvidia/nemotron-3.5-lightning-30b-a3b", 94),
-                        ("openai/gpt-oss-20b", 92),
-                        ("nvidia/ising-calibration-1.5-31b", 90),
-                        ("meta/llama-3.2-11b-vision-instruct", 88),
+                        ("deepseek-ai/deepseek-v4-flash-0731", 98),
+                        ("google/gemma-3-12b-it", 95),
+                        ("nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", 90),
+                        ("meta/llama-3.2-11b-vision-instruct", 85),
                     ]
                 elif "routeway" in p_name:
                     model_candidates = [
@@ -810,13 +809,13 @@ class ProviderRouter:
                     conn_timeout = 3.5
                 elif agent_type in ("font_brand_detection", "title_intelligence"):
                     timeout_val = 15.0
-                    conn_timeout = 5.0
+                    conn_timeout = 4.0
                 elif agent_type == "slide_writer":
-                    timeout_val = 40.0
-                    conn_timeout = 6.0
+                    timeout_val = 18.0
+                    conn_timeout = 4.0
                 else:
-                    timeout_val = float(settings.llm_read_timeout_seconds or 60.0)
-                    conn_timeout = 8.0
+                    timeout_val = float(min(settings.llm_read_timeout_seconds or 25.0, 25.0))
+                    conn_timeout = 4.0
                 req_timeout = httpx.Timeout(timeout_val, connect=conn_timeout)
                 async with httpx.AsyncClient(timeout=req_timeout) as client:
                     resp = await client.post(url, headers=headers, json=payload)
@@ -953,18 +952,24 @@ class ProviderRouter:
                         duration_ms=latency,
                         additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
                     )
+                    raw_lower = raw_text.lower()
+                    is_rate_or_quota_error = (
+                        resp.status_code in (402, 429, 502, 503, 504)
+                        and any(phrase in raw_lower for phrase in (
+                            "insufficient funds", "insufficient credits", "insufficient_quota",
+                            "free_global_rate_limited", "site-wide free-model capacity",
+                            "capacity is currently full", "per-minute rate limit", "rate limit exceeded",
+                            "out of credits", "no credits remaining", "requires_purchase", "card on file",
+                            "worker local total request limit reached", "all workers are busy",
+                            "service temporarily overloaded", "overloaded", "model_overloaded"
+                        ))
+                    )
                     is_provider_outage = (
-                        (provider.name in ("bazaarlink", "routeway") and resp.status_code == 402)
-                        or (
-                            provider.name not in ("gemini", "nvidia", "bazaarlink", "routeway")
-                            and (
-                                resp.status_code in (502, 503, 504, 403)
-                                or (resp.status_code == 429 and any(
-                                    phrase in raw_text.lower()
-                                    for phrase in ("card on file", "insufficient_quota", "requires_purchase", "free tier", "out of credits", "insufficient funds")
-                                ))
-                            )
-                        )
+                        resp.status_code == 402
+                        or (provider.name in ("bazaarlink", "routeway", "openai", "openrouter", "experientiallabs") and resp.status_code in (402, 429))
+                        or (provider.name == "nvidia" and resp.status_code in (503, 429))
+                        or (resp.status_code in (502, 503, 504, 403) and provider.name not in ("gemini", "groq"))
+                        or is_rate_or_quota_error
                     )
                     if is_provider_outage:
                         logger.warning(
@@ -980,9 +985,9 @@ class ProviderRouter:
                 # Record failure in health tracker
                 health_tracker.record_failure(provider.name, model_id)
 
-                if isinstance(model_err, (httpx.ConnectError, httpx.ConnectTimeout)):
+                if isinstance(model_err, (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.TimeoutException)):
                     logger.warning(
-                        "Provider %s connection error (%s). Skipping remaining models for this provider.",
+                        "Provider %s timeout/connection error (%s). Skipping remaining models for this provider.",
                         provider.name, model_err,
                     )
                     skipped_providers.add(provider.name)

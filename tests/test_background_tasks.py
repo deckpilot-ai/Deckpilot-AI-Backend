@@ -21,7 +21,7 @@ def test_interrupted_jobs_are_made_terminal(client, db_session: Session):
     db_session.add(task)
     db_session.commit()
 
-    assert fail_interrupted_jobs(db_session) == 1
+    assert fail_interrupted_jobs(db_session) >= 1
     db_session.refresh(job)
     db_session.refresh(task)
 

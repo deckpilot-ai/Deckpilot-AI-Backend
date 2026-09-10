@@ -609,7 +609,7 @@ class JobOrchestrator:
                             user_id=user_id,
                             job_id=job_id,
                         ),
-                        timeout=120.0,
+                        timeout=50.0,
                     )
 
                     ws_list = []
