@@ -1,6 +1,9 @@
-"""Automated self-correction and slide repair agent."""
+"""Deterministic, checkpoint-driven presentation repair engine."""
 
-import logging
+from __future__ import annotations
+
+import re
+from difflib import SequenceMatcher
 from typing import Any
 
 from app.schemas.generation_state import (
@@ -8,17 +11,43 @@ from app.schemas.generation_state import (
     LayoutFamily,
     QAReport,
     SlideSpec,
-    ValidationCategory,
-    ValidationIssue,
     ValidationSeverity,
 )
 from app.services.image_matcher import ImageMatcher
 
-logger = logging.getLogger(__name__)
+
+def _clean_text(text: Any) -> str:
+    value = str(text or "")
+    value = value.replace("Â·", " • ").replace("â€”", " - ").replace("�", "")
+    value = re.sub(r"\b(\w{3,})\s+\1\b", r"\1", value, flags=re.IGNORECASE)
+    value = re.sub(r"([!?.,])\1+", r"\1", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _norm(text: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", _clean_text(text).lower()).strip()
+
+
+def _similar(a: str, b: str) -> float:
+    return SequenceMatcher(None, _norm(a), _norm(b)).ratio() if _norm(a) and _norm(b) else 0.0
 
 
 class RepairAgent:
-    """Applies deterministic and strategic corrections to problematic slides based on QA issues."""
+    """Applies safe repairs using stable ``repair_action`` values from QA."""
+
+    @staticmethod
+    def _normalize_assets(source_images: dict[str, bytes] | None, available_assets: list[Any] | None) -> list[AssetMetadata]:
+        result: list[AssetMetadata] = []
+        for asset in available_assets or []:
+            if isinstance(asset, AssetMetadata):
+                result.append(asset)
+            elif isinstance(asset, dict):
+                result.append(AssetMetadata.model_validate(asset))
+        known = {a.asset_id for a in result}
+        for asset_id in source_images or {}:
+            if asset_id not in known:
+                result.append(AssetMetadata(asset_id=asset_id, caption=""))
+        return result
 
     @classmethod
     def apply_corrections(
@@ -30,169 +59,245 @@ class RepairAgent:
         available_assets: list[Any] | None = None,
         design_system: Any = None,
     ) -> list[SlideSpec]:
-        repaired_specs = [s.model_copy(deep=True) for s in slide_specs]
-        slide_map = {s.slide_number: s for s in repaired_specs}
+        slides = [slide.model_copy(deep=True) for slide in slide_specs]
+        slide_map = {slide.slide_number: slide for slide in slides}
+        assets = cls._normalize_assets(source_images, available_assets)
+        asset_by_id = {a.asset_id: a for a in assets}
 
-        # Normalize available assets
-        normalized_assets: list[AssetMetadata] = []
-        if available_assets:
-            for a in available_assets:
-                if isinstance(a, AssetMetadata):
-                    normalized_assets.append(a)
-                elif isinstance(a, dict):
-                    normalized_assets.append(
-                        AssetMetadata(
-                            asset_id=a.get("asset_id") or a.get("id"),
-                            source_file=a.get("source_file", "doc"),
-                            caption=a.get("caption", ""),
-                            storage_key=a.get("storage_key", ""),
-                        )
-                    )
-        elif source_images:
-            for k in source_images:
-                normalized_assets.append(
-                    AssetMetadata(
-                        asset_id=k,
-                        source_file="doc",
-                        caption=f"Documentary asset {k}",
-                        storage_key="",
-                    )
-                )
+        # Always-safe copy cleanup prevents doubled words/spacing from surviving.
+        for idx, slide in enumerate(slides, 1):
+            slide.slide_number = idx
+            slide.slide_id = f"s{idx:02d}" if not slide.slide_id or sum(s.slide_id == slide.slide_id for s in slides) > 1 else slide.slide_id
+            slide.headline = _clean_text(slide.headline)
+            slide.key_message = _clean_text(slide.key_message)
+            slide.takeaway = _clean_text(slide.takeaway)
+            cleaned_bullets: list[str] = []
+            for bullet in slide.bullets:
+                cleaned = _clean_text(bullet)
+                if not cleaned or any(_similar(cleaned, existing) >= 0.88 for existing in cleaned_bullets):
+                    continue
+                cleaned_bullets.append(cleaned)
+            slide.bullets = cleaned_bullets
 
-        asset_keys = [a.asset_id for a in normalized_assets]
-
+        processed_deck_actions: set[str] = set()
+        images_rematched = False
         for issue in qa_report.issues:
-            if issue.severity not in (ValidationSeverity.CRITICAL, ValidationSeverity.HIGH, ValidationSeverity.MEDIUM):
+            if not issue.auto_fixable or issue.severity == ValidationSeverity.LOW:
                 continue
+            slide = slide_map.get(issue.slide_number)
+            action = issue.repair_action or cls._legacy_action(issue.message)
 
-            target_slide = slide_map.get(issue.slide_number)
-            msg_lower = issue.message.lower()
+            if action in {"assign_visuals", "vary_structure", "normalize_font_family", "normalize_palette"}:
+                if action in processed_deck_actions:
+                    continue
+                processed_deck_actions.add(action)
 
-            # 1. Handle Slide 1 Cover Title & Subtitle Separation
-            if issue.slide_number == 1 and "main title is too long" in msg_lower and target_slide:
-                raw_title = target_slide.headline or target_slide.key_message or topic
-                if ":" in raw_title:
-                    parts = raw_title.split(":", 1)
-                    target_slide.headline = parts[0].strip()
-                    target_slide.takeaway = parts[1].strip()
-                elif len(raw_title.split()) > 4:
-                    words = raw_title.split()
-                    target_slide.headline = " ".join(words[:4])
-                    target_slide.takeaway = " ".join(words[4:])
-                target_slide.dark_background = True
-                target_slide.archetype_id = "A2" if target_slide.image_artifact_id else "A1"
-                logger.info("Repaired Slide 1 title hierarchy: headline='%s', takeaway='%s'", target_slide.headline, target_slide.takeaway)
-
-            # 2. Handle Slide 1 Missing Signature Circles
-            if issue.slide_number == 1 and "missing signature decorative circular geometry" in msg_lower and target_slide:
-                target_slide.dark_background = True
-                target_slide.archetype_id = "A2" if target_slide.image_artifact_id else "A1"
-                logger.info("Repaired Slide 1 signature circles: ensured archetype='%s' with dark background", target_slide.archetype_id)
-
-            # 3. Handle Semantic Image Mismatch
-            if "semantic image mismatch" in msg_lower and target_slide:
-                # Attempt to re-match semantically against all available assets
-                best_asset = None
-                best_score = 0.0
-                slide_text = f"{target_slide.headline} {target_slide.objective} {target_slide.takeaway} {' '.join(target_slide.bullets or [])}"
-                already_used = {s.image_artifact_id for s in repaired_specs if s.slide_number != target_slide.slide_number and s.image_artifact_id}
-
-                for a in normalized_assets:
-                    if a.asset_id in already_used:
-                        continue
-                    score = ImageMatcher.calculate_relevance(slide_text, a.caption or "")
-                    if score > best_score:
-                        best_score = score
-                        best_asset = a
-
-                if best_asset and best_score >= 1.5:
-                    target_slide.image_artifact_id = best_asset.asset_id
-                    target_slide.image_caption = best_asset.caption
-                    target_slide.layout_family = LayoutFamily.IMAGE_FOCUS
-                    target_slide.layout_hint = "image_focus"
-                    logger.info("Repaired Slide %s: re-matched to asset '%s' (score=%.1f)", target_slide.slide_number, best_asset.asset_id, best_score)
+            if action == "restore_title" and slide:
+                slide.headline = _clean_text(slide.section or slide.objective or topic)[:70]
+            elif action == "differentiate_title" and slide:
+                base = _clean_text(slide.headline or slide.key_message or slide.objective or topic)
+                qualifier = _clean_text(slide.section or slide.objective)
+                slide.headline = f"{base}: {qualifier}"[:82] if qualifier and _norm(qualifier) not in _norm(base) else f"{base} ({slide.slide_number})"
+            elif action == "shorten_title" and slide:
+                raw = _clean_text(slide.headline or slide.key_message)
+                slide.headline = " ".join(raw.split()[:10]).rstrip(" ,:;-")
+            elif action in {"trim_bullets", "shorten_bullets", "shorten_and_reflow"} and slide:
+                slide.bullets = [cls._shorten(b, 22) for b in slide.bullets[:5]]
+                slide.archetype_fields["qa_font_scale"] = max(1.08, float(slide.archetype_fields.get("qa_font_scale", 1.0)))
+            elif action == "dedupe_text" and slide:
+                cls._dedupe_slide(slide)
+            elif action in {"normalize_spacing", "normalize_punctuation", "repair_encoding"} and slide:
+                slide.headline = _clean_text(slide.headline)
+                slide.takeaway = _clean_text(slide.takeaway)
+                slide.bullets = [_clean_text(b) for b in slide.bullets]
+            elif action in {"remove_placeholder", "remove_note_leak", "remove_fragment"} and slide:
+                slide.bullets = [b for b in slide.bullets if not cls._bad_placeholder(b)]
+                if cls._bad_placeholder(slide.headline):
+                    slide.headline = _clean_text(slide.objective or slide.section or topic)
+            elif action == "vary_structure":
+                cls._vary_repeated_leads(slides)
+            elif action in {"increase_font", "normalize_font", "enlarge_object"} and slide:
+                slide.archetype_fields["qa_font_scale"] = max(1.15, float(slide.archetype_fields.get("qa_font_scale", 1.0)))
+            elif action == "add_hierarchy" and slide:
+                # A flatter layout reads uniform bullets cleanly without
+                # manufacturing generic lead labels from the first two words.
+                slide.layout_family = LayoutFamily.TWO_COLUMN
+                slide.layout_hint = LayoutFamily.TWO_COLUMN.value
+                slide.archetype_id = None
+            elif action in {"expand_layout", "rebalance_layout", "reduce_padding", "use_compact_layout"} and slide:
+                slide.archetype_fields["qa_expand_layout"] = True
+                slide.archetype_fields["qa_font_scale"] = max(1.12, float(slide.archetype_fields.get("qa_font_scale", 1.0)))
+                cls._choose_content_layout(slide, force_different=True)
+            elif action in {"rematch_image", "replace_duplicate_image", "replace_image", "replace_or_shrink_image"} and slide:
+                if not images_rematched:
+                    ImageMatcher.rematch_images_semantically(slides, assets, min_relevance_threshold=1.5)
+                    images_rematched = True
+            elif action in {"change_layout", "vary_layout", "simplify_layout", "route_to_process"} and slide:
+                cls._choose_content_layout(slide, force_different=True)
+            elif action == "assign_visuals":
+                ImageMatcher.assign_images_semantically(slides, assets, min_relevance_threshold=1.5)
+                cls._remove_duplicate_images(slides, assets)
+            elif action in {"add_caption", "improve_caption"} and slide and slide.image_artifact_id:
+                asset = asset_by_id.get(slide.image_artifact_id)
+                candidate = _clean_text((asset.caption if asset else "") or "")
+                if not candidate or re.fullmatch(r"fig(?:ure)?\.?\s*\d+(?:\.\d+)*\.?", candidate, re.IGNORECASE):
+                    candidate = f"Source figure: {slide.headline}"
+                slide.image_caption = candidate
+            elif action in {"remove_invalid_chart", "align_chart_data"} and slide and slide.chart_spec:
+                chart = slide.chart_spec
+                if not chart.categories or not chart.series:
+                    slide.chart_spec = None
+                    cls._choose_content_layout(slide)
                 else:
-                    # No semantically relevant image exists: change layout to analytical without image
-                    target_slide.image_artifact_id = None
-                    target_slide.image_caption = None
-                    target_slide.layout_family = LayoutFamily.TWO_COLUMN if target_slide.slide_number % 2 == 0 else LayoutFamily.CARD_GRID
-                    target_slide.layout_hint = target_slide.layout_family.value
-                    logger.info("Repaired Slide %s: removed mismatched image and switched layout to '%s'", target_slide.slide_number, target_slide.layout_family.value)
+                    size = min([len(chart.categories)] + [len(s.get("values", [])) for s in chart.series])
+                    chart.categories = chart.categories[:size]
+                    for series in chart.series:
+                        series["values"] = [v for v in series.get("values", [])[:size] if isinstance(v, (int, float))]
+            elif action == "align_table_rows" and slide and slide.table_spec:
+                width = len(slide.table_spec.headers)
+                slide.table_spec.rows = [(row + [""] * width)[:width] for row in slide.table_spec.rows]
+            elif action == "simplify_table" and slide and slide.table_spec:
+                slide.table_spec.headers = slide.table_spec.headers[:6]
+                slide.table_spec.rows = [row[:6] for row in slide.table_spec.rows[:10]]
+            elif action == "dedupe_metrics" and slide:
+                seen: set[str] = set()
+                slide.metrics = [m for m in slide.metrics if not ((_norm(m.get("label")) + ":" + _norm(m.get("value"))) in seen or seen.add(_norm(m.get("label")) + ":" + _norm(m.get("value"))))]
+            elif action == "remove_invalid_metric" and slide:
+                slide.metrics = [m for m in slide.metrics if _clean_text(m.get("label")) and _clean_text(m.get("value"))]
+            elif action == "renumber_slides":
+                for idx, item in enumerate(slides, 1):
+                    item.slide_number, item.slide_id = idx, f"s{idx:02d}"
+            elif action in {"constrain_bounds", "resolve_overlap", "align_columns", "normalize_gutters", "restore_aspect_ratio"} and slide:
+                slide.archetype_fields["qa_safe_geometry"] = True
+                cls._choose_content_layout(slide)
+            elif action == "change_to_divider" and slide:
+                slide.layout_family = LayoutFamily.SECTION_DIVIDER
+                slide.layout_hint = LayoutFamily.SECTION_DIVIDER.value
+            elif action == "restore_notes" and slide:
+                slide.speaker_notes = f"Presenter guidance: {slide.headline or slide.key_message or topic}"
 
-            # 4. Handle Repetitive Boilerplate Structure
-            if "repetitive boilerplate text structure" in msg_lower:
-                for s_idx, s in enumerate(repaired_specs):
-                    if s.slide_number == 1:
-                        continue
-                    subj = s.headline or s.objective or "Strategic Insight"
-                    clean_subj = subj.split(":", 1)[-1].strip() if ":" in subj else subj
-                    f_idx = s_idx % 3
-                    if f_idx == 0:
-                        s.bullets = [
-                            f"Core Pillar: In-depth examination of {clean_subj.lower()}.",
-                            "Empirical Anchor: Corroborated by archaeological findings, inscriptions, and literature.",
-                            "Civilizational Impact: Structural shifts establishing lasting institutional stability."
-                        ]
-                    elif f_idx == 1:
-                        s.bullets = [
-                            f"Strategic Driver: Critical operational factors advancing {clean_subj.lower()}.",
-                            "Governance Mechanism: Standardized administrative directives, state monopolies, and logistics.",
-                            "Measurable Outcome: Regional integration and durable socio-economic cohesion."
-                        ]
-                    else:
-                        s.bullets = [
-                            f"Key Dimension: Systematic evaluation of {clean_subj.lower()} and sovereign policies.",
-                            "Institutional Framework: Strategic deployment of resource networks and defense infrastructure.",
-                            "Enduring Heritage: Foundational civilizational practices shaping modern subcontinental identity."
-                        ]
-                logger.info("Repaired repetitive boilerplate text structure across all slides with varied domain formulas")
+        cls._remove_duplicate_images(slides, assets)
+        cls._normalize_layout_rhythm(slides)
+        return slides
 
-            # 5. Handle Missing or Sparse Visual Images
-            if ("no images were assigned" in msg_lower or "zero embedded pictures" in msg_lower or "image pacing is sparse" in msg_lower) and normalized_assets:
-                # Use semantic matching rather than cursor-based assignment
-                ImageMatcher.assign_images_semantically(repaired_specs, normalized_assets, min_relevance_threshold=1.5)
-                logger.info("Repaired visual asset pacing semantically across %s slides", len(repaired_specs))
+    @staticmethod
+    def _legacy_action(message: str) -> str:
+        msg = message.lower()
+        if "semantic image mismatch" in msg:
+            return "rematch_image"
+        if "duplicate" in msg:
+            return "dedupe_text"
+        if "bullet" in msg and "exceed" in msg:
+            return "trim_bullets"
+        if "consecutively" in msg:
+            return "vary_layout"
+        return ""
 
-            # 6. Handle Flat Typography Hierarchy
-            if "lacks typographic hierarchy" in msg_lower and target_slide:
-                reformatted = []
-                for b in (target_slide.bullets or []):
-                    b_str = str(b).strip()
-                    if ":" not in b_str and "**" not in b_str:
-                        words = b_str.split()
-                        lead = " ".join(words[:2]).title()
-                        rest = " ".join(words[2:])
-                        reformatted.append(f"{lead}: {rest}")
-                    else:
-                        reformatted.append(b_str)
-                target_slide.bullets = reformatted
-                logger.info("Repaired typographic hierarchy on Slide %s", target_slide.slide_number)
+    @staticmethod
+    def _shorten(text: str, max_words: int) -> str:
+        words = _clean_text(text).split()
+        return " ".join(words[:max_words]).rstrip(" ,:;-") + ("…" if len(words) > max_words else "")
 
-            if not target_slide:
+    @staticmethod
+    def _bad_placeholder(text: str) -> bool:
+        lowered = _clean_text(text).lower()
+        return any(marker in lowered for marker in ("lorem ipsum", "[insert", "todo:", "placeholder", "your text here"))
+
+    @classmethod
+    def _dedupe_slide(cls, slide: SlideSpec) -> None:
+        result: list[str] = []
+        for bullet in slide.bullets:
+            if not any(_similar(bullet, existing) >= 0.86 for existing in result):
+                result.append(bullet)
+        slide.bullets = result
+        if slide.takeaway and (_similar(slide.takeaway, slide.headline) >= 0.88 or any(_similar(slide.takeaway, b) >= 0.88 for b in result)):
+            slide.takeaway = ""
+
+    @staticmethod
+    def _vary_repeated_leads(slides: list[SlideSpec]) -> None:
+        for slide in slides:
+            varied: list[str] = []
+            for bullet in slide.bullets:
+                if ":" in bullet:
+                    _lead, detail = bullet.split(":", 1)
+                    varied.append(detail.strip().capitalize())
+                else:
+                    varied.append(bullet)
+            slide.bullets = varied
+
+    @staticmethod
+    def _choose_content_layout(slide: SlideSpec, force_different: bool = False) -> None:
+        old = slide.layout_family
+        if slide.chart_spec:
+            new = LayoutFamily.CHART_FOCUS
+        elif slide.table_spec:
+            new = LayoutFamily.TABLE_FOCUS
+        elif slide.diagram_spec:
+            new = LayoutFamily.PROCESS_STEPS
+        elif slide.image_artifact_id:
+            new = LayoutFamily.TEXT_IMAGE
+        elif slide.metrics:
+            new = LayoutFamily.METRICS_GRID
+        elif len(slide.bullets) >= 4:
+            new = LayoutFamily.CARD_GRID
+        else:
+            new = LayoutFamily.TWO_COLUMN
+        if force_different and new == old:
+            new = LayoutFamily.COMPARISON if new == LayoutFamily.TWO_COLUMN else LayoutFamily.TWO_COLUMN
+        slide.layout_family = new
+        slide.layout_hint = new.value
+        slide.archetype_id = None
+
+    @classmethod
+    def _rematch_or_remove_image(cls, slide: SlideSpec, slides: list[SlideSpec], assets: list[AssetMetadata], asset_by_id: dict[str, AssetMetadata]) -> None:
+        used_elsewhere = {s.image_artifact_id for s in slides if s is not slide and s.image_artifact_id}
+        slide_text = " ".join([slide.headline, slide.objective, slide.takeaway, *slide.bullets])
+        candidates: list[tuple[float, AssetMetadata]] = []
+        for asset in assets:
+            if asset.asset_id in used_elsewhere or asset.quality_score < 0.5:
                 continue
+            evidence = f"{asset.caption} {asset.nearby_text} {asset.semantic_summary}"
+            candidates.append((ImageMatcher.calculate_relevance(slide_text, evidence), asset))
+        candidates.sort(key=lambda pair: pair[0], reverse=True)
+        if candidates and candidates[0][0] >= 1.5:
+            best = candidates[0][1]
+            slide.image_artifact_id = best.asset_id
+            slide.image_caption = best.caption or best.semantic_summary
+            slide.layout_family = LayoutFamily.TEXT_IMAGE
+            slide.layout_hint = LayoutFamily.TEXT_IMAGE.value
+        else:
+            slide.image_artifact_id = None
+            slide.image_caption = ""
+            cls._choose_content_layout(slide)
 
-            # 7. Handle Duplicate / Generic Title Issues
-            if issue.category == ValidationCategory.CONTENT and "duplicate" in msg_lower:
-                target_slide.headline = f"{target_slide.headline} — Strategic Focus"
-                logger.info("Repaired duplicate title on slide %s", target_slide.slide_number)
+    @classmethod
+    def _remove_duplicate_images(cls, slides: list[SlideSpec], assets: list[AssetMetadata]) -> None:
+        seen: set[str] = set()
+        asset_by_id = {a.asset_id: a for a in assets}
+        for slide in slides:
+            asset_id = slide.image_artifact_id
+            if not asset_id:
+                continue
+            if asset_id in seen:
+                cls._rematch_or_remove_image(slide, slides, assets, asset_by_id)
+            if slide.image_artifact_id:
+                seen.add(slide.image_artifact_id)
 
-            # 8. Handle Text Overflow / Bullet Count Issues
-            if issue.category in (ValidationCategory.CONTENT, ValidationCategory.GEOMETRY) and len(target_slide.bullets) > 6:
-                target_slide.bullets = target_slide.bullets[:4]
-                logger.info("Repaired bullet overflow on slide %s (capped to 4)", target_slide.slide_number)
-
-            # 9. Handle Missing Chart Data
-            if issue.category == ValidationCategory.DATA and target_slide.chart_spec:
-                if not target_slide.chart_spec.categories or not target_slide.chart_spec.series:
-                    target_slide.chart_spec.categories = ["Q1", "Q2", "Q3", "Q4"]
-                    target_slide.chart_spec.series = [{"name": "Growth Performance", "values": [25.0, 45.0, 68.0, 95.0]}]
-                    logger.info("Repaired missing chart series on slide %s", target_slide.slide_number)
-
-            # 10. Handle Repetitive Layouts
-            if issue.category == ValidationCategory.DESIGN and "consecutively" in msg_lower:
-                alternatives = [LayoutFamily.CARD_GRID, LayoutFamily.COMPARISON, LayoutFamily.METRICS_GRID, LayoutFamily.PROCESS_STEPS]
-                target_slide.layout_family = alternatives[target_slide.slide_number % len(alternatives)]
-                target_slide.layout_hint = target_slide.layout_family.value
-                logger.info("Repaired repetitive layout on slide %s -> %s", target_slide.slide_number, target_slide.layout_family.value)
-
-        return repaired_specs
+    @classmethod
+    def _normalize_layout_rhythm(cls, slides: list[SlideSpec]) -> None:
+        image_layouts = {LayoutFamily.IMAGE_FOCUS, LayoutFamily.TEXT_IMAGE}
+        for idx in range(2, len(slides)):
+            current = slides[idx]
+            if current.layout_family == slides[idx - 1].layout_family == slides[idx - 2].layout_family:
+                if current.image_artifact_id:
+                    current.image_artifact_id = None
+                    current.image_caption = ""
+                current.layout_family = LayoutFamily.COMPARISON if idx % 2 else LayoutFamily.TWO_COLUMN
+                current.layout_hint = current.layout_family.value
+                current.archetype_id = None
+            if all(slides[pos].layout_family in image_layouts for pos in (idx - 2, idx - 1, idx)):
+                current.image_artifact_id = None
+                current.image_caption = ""
+                current.layout_family = LayoutFamily.COMPARISON
+                current.layout_hint = LayoutFamily.COMPARISON.value
+                current.archetype_id = None

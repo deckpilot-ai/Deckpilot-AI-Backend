@@ -201,7 +201,7 @@ class DiagramEngine:
                     p_item = tb_body.text_frame.paragraphs[0] if n_idx == 0 else tb_body.text_frame.add_paragraph()
                     p_item.text = f"• {n.label}" + (f": {n.subtext}" if n.subtext else "")
                     p_item.font.name = ds.typography.body_font.name
-                    p_item.font.size = Pt(10.5)
+                    p_item.font.size = Pt(11)
                     p_item.font.color.rgb = text_secondary
                 created_shapes.append(tb_body)
 

@@ -36,7 +36,10 @@ class StorageService:
             )
         else:
             # Fallback for local development when R2 is not configured
-            self.local_storage_dir = Path(settings.local_storage_dir)
+            # Pin the fallback root at construction time. Background workers
+            # must not reinterpret a relative storage root if process state
+            # (notably the working directory) changes while extraction runs.
+            self.local_storage_dir = Path(settings.local_storage_dir).resolve()
             self.local_storage_dir.mkdir(parents=True, exist_ok=True)
             self.s3_client = None
 

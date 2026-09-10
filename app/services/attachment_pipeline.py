@@ -12,6 +12,7 @@ Status lifecycle: pending -> extracting -> ready | failed
 import asyncio
 import json
 import logging
+import threading
 import time
 from collections.abc import Callable
 
@@ -32,6 +33,8 @@ PENDING_STATUSES = ("pending", "extracting")
 # Mirrors JobOrchestrator's injectable session factory so tests can point the
 # detached pipeline at the test database.
 _session_factory: sessionmaker | None = None
+_attachment_locks: dict[str, threading.Lock] = {}
+_attachment_locks_guard = threading.Lock()
 
 
 def set_session_factory(factory: sessionmaker) -> None:
@@ -60,19 +63,28 @@ async def process_attachment(attachment_id: str, db: Session | None = None) -> N
     the orchestrator's inline fallback); otherwise a dedicated session from
     the session factory is opened (background task path).
     """
-    if db is not None:
-        await _process_with_session(db, attachment_id)
-        return
-    factory = get_session_factory()
-    session = factory()
+    # The upload endpoint starts extraction immediately, while the orchestrator
+    # may request the same attachment inline. Serialize those calls so one run
+    # cannot remove or overwrite another run's deterministic asset files.
+    with _attachment_locks_guard:
+        attachment_lock = _attachment_locks.setdefault(attachment_id, threading.Lock())
+    await run_in_threadpool(attachment_lock.acquire)
     try:
-        await _process_with_session(session, attachment_id)
+        if db is not None:
+            await _process_with_session(db, attachment_id)
+            return
+        factory = get_session_factory()
+        session = factory()
+        try:
+            await _process_with_session(session, attachment_id)
+        finally:
+            session.close()
     finally:
-        session.close()
+        attachment_lock.release()
 
 
 async def _process_with_session(db: Session, attachment_id: str) -> None:
-    attachment = db.get(Attachment, attachment_id)
+    attachment = db.get(Attachment, attachment_id, populate_existing=True)
     if attachment is None or attachment.status == "ready":
         return
 

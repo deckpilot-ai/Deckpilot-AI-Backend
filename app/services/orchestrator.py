@@ -841,18 +841,23 @@ class JobOrchestrator:
                 ds_obj = context.get("design_system") or DesignIntelligenceAgent.generate_design_system(goal_obj)
 
                 # Convert to SlideSpec models
+                available_asset_metadata = [
+                    AssetMetadata(
+                        asset_id=art.id,
+                        source_file=art.source_locator or "doc",
+                        caption=json.loads(art.json_data or "{}").get("caption", ""),
+                        nearby_text=json.loads(art.json_data or "{}").get("nearby_text", ""),
+                        semantic_summary=json.loads(art.json_data or "{}").get("semantic_summary", ""),
+                        quality_score=float(json.loads(art.json_data or "{}").get("quality_score", 1.0)),
+                        storage_key=art.storage_key or "",
+                    ) for art in existing_artifacts if art.type == "image"
+                ]
+
                 try:
                     slide_specs = StorylineAgent.create_storyline_plan(
                         goal=goal_obj,
                         llm_plan_spec=context["deck_spec"],
-                        available_assets=[
-                            AssetMetadata(
-                                asset_id=art.id,
-                                source_file=art.source_locator or "doc",
-                                caption=json.loads(art.json_data or "{}").get("caption", ""),
-                                storage_key=art.storage_key or "",
-                            ) for art in existing_artifacts if art.type == "image"
-                        ],
+                        available_assets=available_asset_metadata,
                     )
                 except Exception as _e:
                     _fail_step("pptx_renderer", _e, "storyline_plan_failed")
@@ -879,16 +884,22 @@ class JobOrchestrator:
                         ds_obj,
                         pptx_bytes,
                         source_images,
+                        available_asset_metadata,
                     )
 
-                    # Trigger repair if issues detected
-                    if qa_report.repair_triggered:
-                        _emit("visual_qa", "running", "Self-correction triggered: refining slide copy, layouts, visual pacing, and data series...")
+                    # Bounded repair/re-render/recheck loop. Three passes allow a
+                    # duplicate image replacement to be checked for relevance in
+                    # the following pass rather than shipping after one attempt.
+                    repair_iterations = 0
+                    while qa_report.repair_triggered and repair_iterations < 3:
+                        repair_iterations += 1
+                        _emit("visual_qa", "running", f"Self-correction pass {repair_iterations}/3: repairing flagged slides and rechecking the rendered deck...")
                         slide_specs = RepairAgent.apply_corrections(
                             slide_specs=slide_specs,
                             qa_report=qa_report,
                             topic=context["deck_spec"].get("deckTitle", "Presentation"),
                             source_images=source_images,
+                            available_assets=available_asset_metadata,
                             design_system=ds_obj,
                         )
                         # Re-render with corrections
@@ -905,11 +916,14 @@ class JobOrchestrator:
                             ds_obj,
                             pptx_bytes,
                             source_images,
+                            available_asset_metadata,
                         )
+                        qa_report.repair_iterations = repair_iterations
 
                     context["deck_spec"]["qaReport"] = qa_report.model_dump()
                     _update_task("visual_qa", "completed", completed=True)
-                    _emit("visual_qa", "completed", f"Quality checks passed (Score: {qa_report.overall_quality_score}/100 across {qa_report.slide_count} slides).")
+                    qa_summary = "passed" if qa_report.status == "passed" else "completed with remaining non-blocking findings"
+                    _emit("visual_qa", "completed", f"Quality checks {qa_summary} (Score: {qa_report.overall_quality_score}/100, {qa_report.checkpoints_total} checkpoints, {qa_report.repair_iterations} repair passes).")
 
                 # Store Final Output
                 storage_key = f"projects/{project_id}/decks/deck_job_{job_id}.pptx"

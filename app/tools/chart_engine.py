@@ -83,7 +83,7 @@ class ChartEngine:
             chart.legend.include_in_layout = False
             if chart.legend.font:
                 chart.legend.font.name = design_system.typography.body_font.name
-                chart.legend.font.size = Pt(10)
+                chart.legend.font.size = Pt(11)
 
         # Style chart title if specified
         if chart_spec.title:

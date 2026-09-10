@@ -4,9 +4,9 @@ import csv
 import hashlib
 import io
 import logging
-import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import openpyxl
 import pymupdf
@@ -212,7 +212,10 @@ class DocumentAssetExtractor:
                     "area": img_area,
                 })
 
-        # Process and extract pixmaps
+        # Process and extract pixmaps. Xrefs are not stable deduplication keys:
+        # some PDFs embed identical template or scan layers under different
+        # xrefs on every page, so gate on normalized bytes as well.
+        seen_sha256: set[str] = set()
         for cand in extracted_candidates:
             xref = cand["xref"]
             try:
@@ -237,6 +240,9 @@ class DocumentAssetExtractor:
                 ext = "png" if pix.alpha else "jpg"
                 img_bytes = pix.tobytes("png") if pix.alpha else pix.tobytes("jpg", jpg_quality=92)
                 sha256 = hashlib.sha256(img_bytes).hexdigest()
+                if sha256 in seen_sha256:
+                    continue
+                seen_sha256.add(sha256)
                 storage_key = f"extracted/{Path(filename).stem}_p{cand['page']}_img{cand['img_idx']}.{ext}"
 
                 aspect_ratio = round(pix.width / max(1, pix.height), 3)

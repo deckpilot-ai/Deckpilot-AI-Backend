@@ -91,7 +91,7 @@ class TableEngine:
                 p = cell.text_frame.paragraphs[0]
                 p.text = cell_value
                 p.font.name = font_name
-                p.font.size = Pt(10.5)
+                p.font.size = Pt(11)
                 p.font.color.rgb = text_primary
 
                 # Align right if numeric/currency/percent

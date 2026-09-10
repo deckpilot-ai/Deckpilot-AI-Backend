@@ -91,9 +91,38 @@ class ImageMatcher:
                     "key": a.get("storage_key", ""),
                 })
 
+        # Preserve explicit image choices and reserve those assets. QA will
+        # independently remove a choice if its source context is irrelevant.
+        assigned_slides: set[int] = set()
+        assigned_assets: set[int] = set()
+        asset_index_by_id = {asset["id"]: idx for idx, asset in enumerate(assets_list)}
+        for s_idx, slide in enumerate(slides):
+            existing_id = (
+                slide.image_artifact_id
+                if isinstance(slide, SlideSpec)
+                else slide.get("imageArtifactId") or slide.get("image_artifact_id")
+            )
+            if existing_id in asset_index_by_id:
+                assigned_slides.add(s_idx)
+                assigned_assets.add(asset_index_by_id[existing_id])
+
         # Calculate score matrix (slide_idx, asset_idx) -> score
         scored_pairs = []
         for s_idx, slide in enumerate(slides):
+            if s_idx in assigned_slides:
+                continue
+            if isinstance(slide, SlideSpec):
+                image_eligible = slide.layout_family.value in {
+                    "hero", "image_focus", "text_image", "A2", "A3", "A8"
+                }
+            else:
+                hint = str(slide.get("layoutHint") or slide.get("layout_hint") or "").lower()
+                image_eligible = not hint or hint in {
+                    "hero", "hero_visual", "image_focus", "text_image",
+                    "image_and_text", "text_and_image", "a2", "a3", "a8",
+                }
+            if not image_eligible:
+                continue
             if isinstance(slide, SlideSpec):
                 slide_text = f"{slide.headline} {slide.objective} {slide.takeaway} {' '.join(slide.bullets or [])}"
             else:
@@ -106,9 +135,6 @@ class ImageMatcher:
 
         # Sort by highest relevance score first (Greedy Assignment)
         scored_pairs.sort(key=lambda x: x[0], reverse=True)
-
-        assigned_slides = set()
-        assigned_assets = set()
 
         for score, s_idx, a_idx in scored_pairs:
             if s_idx in assigned_slides or a_idx in assigned_assets:
@@ -130,17 +156,56 @@ class ImageMatcher:
             assigned_assets.add(a_idx)
             logger.info("Semantically matched Slide %s to asset '%s' (score=%.1f, caption='%s')", s_idx + 1, asset['id'], score, asset['caption'][:50])
 
-        # If Slide 1 (Cover) has no image and a general title hero asset exists, assign the best remaining hero image
-        if 0 not in assigned_slides and assets_list:
-            unused_assets = [a for i, a in enumerate(assets_list) if i not in assigned_assets]
-            if unused_assets:
-                cover_asset = unused_assets[0]
-                slide0 = slides[0]
-                if isinstance(slide0, SlideSpec):
-                    slide0.image_artifact_id = cover_asset["id"]
-                    slide0.image_caption = cover_asset["caption"]
-                else:
-                    slide0["imageArtifactId"] = cover_asset["id"]
-                    slide0["imageCaption"] = cover_asset["caption"]
-                assigned_slides.add(0)
-                logger.info("Assigned cover asset '%s' to Slide 1", cover_asset['id'])
+        # Do not force an arbitrary image onto the cover. A cover image is used
+        # only when it clears the same semantic threshold as every other slide.
+
+    @classmethod
+    def rematch_images_semantically(
+        cls,
+        slides: list[SlideSpec],
+        available_assets: list[AssetMetadata],
+        min_relevance_threshold: float = 1.5,
+    ) -> None:
+        """Recompute one-to-one assignments for existing image-capable slides.
+
+        Unlike ``assign_images_semantically``, this deliberately releases current
+        assignments. It is used by the repair loop to avoid slide-by-slide swaps
+        that can oscillate between two otherwise suitable assets.
+        """
+        image_layouts = {"hero", "image_focus", "text_image", "A2", "A3", "A8"}
+        reserved_asset_ids = {
+            slide.image_artifact_id
+            for idx, slide in enumerate(slides)
+            if idx == 0 and slide.image_artifact_id
+        }
+        eligible = [
+            (idx, slide)
+            for idx, slide in enumerate(slides)
+            if idx > 0 and (slide.image_artifact_id or slide.layout_family.value in image_layouts)
+        ]
+        pairs: list[tuple[float, int, int]] = []
+        for slide_idx, slide in eligible:
+            slide_text = f"{slide.headline} {slide.objective} {slide.takeaway} {' '.join(slide.bullets or [])}"
+            for asset_idx, asset in enumerate(available_assets):
+                if asset.asset_id in reserved_asset_ids:
+                    continue
+                evidence = f"{asset.caption} {asset.nearby_text} {asset.semantic_summary}"
+                score = cls.calculate_relevance(slide_text, evidence)
+                if score >= min_relevance_threshold and asset.quality_score >= 0.5:
+                    pairs.append((score, slide_idx, asset_idx))
+
+        for _idx, slide in eligible:
+            slide.image_artifact_id = None
+            slide.image_caption = ""
+
+        used_slides: set[int] = set()
+        used_assets: set[int] = set()
+        for _score, slide_idx, asset_idx in sorted(pairs, reverse=True):
+            if slide_idx in used_slides or asset_idx in used_assets:
+                continue
+            slide = slides[slide_idx]
+            asset = available_assets[asset_idx]
+            slide.image_artifact_id = asset.asset_id
+            slide.image_caption = asset.caption or asset.semantic_summary
+            used_slides.add(slide_idx)
+            used_assets.add(asset_idx)

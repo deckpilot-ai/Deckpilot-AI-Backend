@@ -373,12 +373,15 @@ class ValidationCategory(str, Enum):
 
 
 class ValidationIssue(BaseModel):
+    checkpoint_id: str = ""
     severity: ValidationSeverity = ValidationSeverity.MEDIUM
     category: ValidationCategory = ValidationCategory.GEOMETRY
     slide_id: str = ""
     slide_number: int = 1
     message: str = ""
     suggested_fix: str = ""
+    auto_fixable: bool = True
+    repair_action: str = ""
 
 
 class QAReport(BaseModel):
@@ -389,6 +392,9 @@ class QAReport(BaseModel):
     slide_count: int = 0
     repair_triggered: bool = False
     repair_iterations: int = 0
+    checkpoints_total: int = 0
+    checkpoints_passed: int = 0
+    checkpoints_failed: int = 0
 
 
 class GenerationState(BaseModel):

@@ -125,9 +125,9 @@ class DocumentExtractor:
                         # Clean control characters
                         caption = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw_caption).strip()
 
-                fig_match = re.search(r'\b(?:fig(?:ure)?\.?|map|photo|chart|diagram|plate)\s*([\d\.]+)', caption, re.I)
+                fig_match = re.search(r'\b(?:fig(?:ure)?\.?|map|photo|chart|diagram|plate)\s*([\d\.]+)', caption, re.IGNORECASE)
                 fig_label = fig_match.group(0).lower() if fig_match else ""
-                has_explicit_caption = 1 if fig_label or bool(re.search(r'\b(?:fig(?:ure)?\.?|map|photo|chart|diagram|plate)\b', caption, re.I)) else 0
+                has_explicit_caption = 1 if fig_label or bool(re.search(r'\b(?:fig(?:ure)?\.?|map|photo|chart|diagram|plate)\b', caption, re.IGNORECASE)) else 0
                 area = rect.width * rect.height
 
                 candidate = {
@@ -177,6 +177,7 @@ class DocumentExtractor:
             on_progress(f"Finalizing high-res documentary figures from {filename}...")
 
         max_figures = 16
+        seen_image_hashes: set[str] = set()
         for cand in extracted_candidates:
             if len(result.extracted_images) >= max_figures:
                 break
@@ -201,6 +202,10 @@ class DocumentExtractor:
 
                 ext = "png" if pix.alpha else "jpg"
                 image_bytes = pix.tobytes("png") if pix.alpha else pix.tobytes("jpg", jpg_quality=90)
+                image_sha = hashlib.sha256(image_bytes).hexdigest()
+                if image_sha in seen_image_hashes:
+                    continue
+                seen_image_hashes.add(image_sha)
                 storage_key = f"extracted/{Path(filename).stem}_p{cand['page']}_img{cand['img_idx']}.{ext}"
 
                 result.image_payloads.append((storage_key, image_bytes, f"image/{ext}"))
@@ -211,6 +216,7 @@ class DocumentExtractor:
                     "format": ext,
                     "page": cand["page"],
                     "byte_size": len(image_bytes),
+                    "sha256": image_sha,
                     "caption": cand["caption"],
                 })
             except Exception:

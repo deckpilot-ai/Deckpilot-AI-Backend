@@ -83,13 +83,18 @@ class PPTXRenderer:
         center=False,
         italic=False,
         bullet_list=False,
+        name="content-text",
     ):
         text = clean_text(text)
+        # QA can request a per-slide legibility boost without changing the
+        # authoring model or hard-coding a different layout implementation.
+        scale = float(getattr(cls, "_active_font_scale", 1.0))
+        size = max(11.0, size * scale) if not title else size * scale
         if bullet_list:
             text = "\n".join(re.sub(r"^\s*[•●▪-]\s*", "", line) for line in text.split("\n"))
 
         shape = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
-        shape.name = "content-text"
+        shape.name = name
         frame = shape.text_frame
         frame.word_wrap = True
         frame.margin_left = frame.margin_right = Inches(0.02)
@@ -98,7 +103,7 @@ class PPTXRenderer:
         if title and len(text) > 400:
             raise ValueError("Slide text exceeds its layout budget; shorten the source copy and regenerate")
 
-        floor = 18 if title and size >= 24 else min(int(round(size)), 9)
+        floor = 18 if title and size >= 24 else min(int(round(size)), 11)
         curr_size = int(round(size))
         while True:
             if cls._fits(text, w, h, curr_size, bullet_list):
@@ -163,6 +168,22 @@ class PPTXRenderer:
 
         return shape
 
+    @staticmethod
+    def _balanced_card_metrics(text: str, width: float, height: float) -> tuple[int, float, float]:
+        """Return readable font size, text height, and vertically balanced top padding."""
+        value = clean_text(text)
+        word_count = len(value.split())
+        preferred = 20 if word_count <= 14 else 19 if word_count <= 22 else 18
+        size = preferred
+        usable_h = max(0.7, height - 0.55)
+        while size > 17 and not PPTXRenderer._fits(value, width, usable_h, size):
+            size -= 1
+        capacity = max(1, int((width - 0.04) * 72 / (size * 0.56)))
+        lines = max(1, math.ceil(len(value) / capacity))
+        text_h = min(usable_h, max(0.58, (lines * size * 1.24) / 72 + 0.12))
+        top_padding = max(0.28, (height - text_h) / 2)
+        return size, text_h, top_padding
+
     @classmethod
     def _card(
         cls,
@@ -178,6 +199,7 @@ class PPTXRenderer:
         font_name="Segoe UI",
         number=None,
         badge_label=None,
+        fixed_height=False,
     ):
         bullet_list = "\n" in text
         text_x, text_w = x + 0.25, w - 0.5
@@ -193,7 +215,7 @@ class PPTXRenderer:
         lines = sum(max(1, math.ceil(len(line) / capacity)) for line in paragraphs)
         spacing = max(0, len(paragraphs) - 1) * 5 if bullet_list else 0
         actual_h = (lines * size * 1.25 + spacing) / 72 + 0.46
-        card_h = min(h, max(0.85, actual_h))
+        card_h = h if fixed_height else min(h, max(0.85, actual_h))
 
         cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, card_h, fill)
         if number is not None:
@@ -201,6 +223,17 @@ class PPTXRenderer:
             cls._text(slide, str(number), x + 0.2, y + 0.25, 0.4, 0.4, RGBColor(255, 255, 255), font_name, 11, bold=True, center=True)
             text_x, text_w = x + 0.8, w - 1.05
         cls._text(slide, text, text_x, y + 0.2, text_w, card_h - 0.4, foreground, font_name, size, bullet_list=bullet_list)
+
+    @staticmethod
+    def _short_caption(value: str, max_words: int = 20) -> str:
+        """Keep captions readable without cutting a word or clause in half."""
+        caption = clean_text(value or "")
+        if not caption:
+            return ""
+        words = caption.split()
+        if len(words) <= max_words:
+            return caption
+        return " ".join(words[:max_words]).rstrip(" ,;:-") + "."
 
     @classmethod
     def render_presentation(
@@ -233,6 +266,7 @@ class PPTXRenderer:
         body_font = design_system.typography.body_font.name
 
         for index, slide_data in enumerate(slide_specs):
+            cls._active_font_scale = max(1.0, min(1.3, float(slide_data.archetype_fields.get("qa_font_scale", 1.0))))
             slide = prs.slides.add_slide(prs.slide_layouts[6])
             layout = slide_data.layout_family
             arch_id = getattr(slide_data, "archetype_id", None)
@@ -268,7 +302,9 @@ class PPTXRenderer:
 
             # Footer
             if not is_standalone_cover:
-                footer_text = f"{deck_title.upper()} · {eyebrow.upper()}"
+                norm_deck = re.sub(r"\W+", "", deck_title).lower()
+                norm_eyebrow = re.sub(r"\W+", "", eyebrow).lower()
+                footer_text = deck_title.upper() if norm_deck == norm_eyebrow else f"{deck_title.upper()} / {eyebrow.upper()}"
                 cls._text(slide, footer_text[:140], 0.6, 7.05, 11.4, 0.28, body_col, body_font, 9.5)
 
             # Persistent Page Number Pill
@@ -325,7 +361,7 @@ class PPTXRenderer:
                     cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.7, 1.40, 4.8, 4.15, card_fill, "photo-mat", corner_radius=0.02)
                     cls._render_picture(slide, image_bytes, 7.8, 1.50, 4.6, 3.95)
                     caption = slide_data.image_caption or "Documentary reference figure"
-                    cls._text(slide, caption[:85], 7.5, 5.85, 5.2, 0.45, tint(white, 0.15), body_font, 10, italic=True, center=True)
+                    cls._text(slide, cls._short_caption(caption), 7.5, 5.85, 5.2, 0.45, tint(white, 0.15), body_font, 10, italic=True, center=True)
                 else:
                     cls._text(slide, main_t, 0.6, 1.1, 12.1, 1.65, fg, title_font, 46, title=True)
                     cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.6, 2.95, 1.8, 0.07, accent, "accent-rule")
@@ -378,7 +414,7 @@ class PPTXRenderer:
                 caption = slide_data.image_caption or "Source document image"
                 if not re.match(r"^(?:Fig|Figure|Map)\b", caption, re.I):
                     caption = f"Fig. {index + 1} - {caption}"
-                cls._text(slide, caption[:95], 6.85, 6.20, 5.75, 0.45, primary, body_font, 10.5, italic=True, center=True)
+                cls._text(slide, cls._short_caption(caption), 6.85, 6.20, 5.75, 0.45, primary, body_font, 10.5, italic=True, center=True)
 
             elif slide_data.metrics and slide_data.layout_hint == "bar_chart":
                 # Render direct data-bars with provenance
@@ -485,7 +521,7 @@ class PPTXRenderer:
                 cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.3, 1.75, 5.4, 4.95, white, "artifact-frame", corner_radius=0.03)
                 cls._render_picture(slide, image_bytes, 7.45, 1.9, 5.1, 4.1)
                 caption = slide_data.image_caption or "Source document illustration"
-                cls._text(slide, caption[:95], 7.45, 6.2, 5.1, 0.4, primary, body_font, 10.5, italic=True, center=True)
+                cls._text(slide, cls._short_caption(caption), 7.45, 6.2, 5.1, 0.4, primary, body_font, 10.5, italic=True, center=True)
 
             elif slide_data.layout_hint in ("stacked_comparison", "legacy", "two_highways") and image_bytes:
                 mid = max(1, math.ceil(len(bullets) / 2))
@@ -498,7 +534,7 @@ class PPTXRenderer:
                 cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.3, 1.75, 5.4, 4.95, white, "map-frame", corner_radius=0.03)
                 cls._render_picture(slide, image_bytes, 7.45, 1.9, 5.1, 4.15)
                 caption = slide_data.image_caption or "Source document map"
-                cls._text(slide, caption[:95], 7.45, 6.2, 5.1, 0.4, primary, body_font, 10.5, italic=True, center=True)
+                cls._text(slide, cls._short_caption(caption), 7.45, 6.2, 5.1, 0.4, primary, body_font, 10.5, italic=True, center=True)
 
             elif layout in (LayoutFamily.CARD_GRID, LayoutFamily.THREE_COLUMN):
                 items = bullets or ([slide_data.takeaway] if slide_data.takeaway else [])
@@ -510,7 +546,7 @@ class PPTXRenderer:
                 for j, item in enumerate(items):
                     x_c = 0.6 + (j % cols) * (w_card + 0.35)
                     y_c = 2.4 + (j // cols) * (h_card + 0.35)
-                    cls._card(slide, item, x_c, y_c, w_card, h_card, fill, body_col, primary, body_font, j + 1)
+                    cls._card(slide, item, x_c, y_c, w_card, h_card, fill, body_col, primary, body_font, j + 1, fixed_height=True)
 
             else:
                 # If image_bytes is present, prioritize visual framed layout with rich typographic hierarchy
@@ -547,13 +583,50 @@ class PPTXRenderer:
                     caption = slide_data.image_caption or "Source document illustration"
                     if not re.match(r"^(?:Fig|Figure|Map)\b", caption, re.I):
                         caption = f"Fig. {index + 1} - {caption}"
-                    cls._text(slide, caption[:95], 6.85, 6.20, 5.75, 0.45, primary, body_font, 10.5, italic=True, center=True)
+                    cls._text(slide, cls._short_caption(caption), 6.85, 6.20, 5.75, 0.45, primary, body_font, 10.5, italic=True, center=True)
+                elif slide_data.archetype_fields.get("qa_balanced_cards"):
+                    # A lead band plus balanced evidence cards uses the full
+                    # canvas even when the source supplies concise copy.
+                    content_y = 2.15
+                    if slide_data.takeaway:
+                        cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, content_y, 12.1, 1.05, tint(accent, 0.91), "lead-band", corner_radius=0.04)
+                        cls._text(slide, "KEY IDEA", 0.85, content_y + 0.12, 1.25, 0.28, accent, body_font, 11, bold=True, name="lead-card-label")
+                        lead_color = ink if dark else fg
+                        cls._text(slide, slide_data.takeaway, 2.0, content_y + 0.10, 10.35, 0.76, lead_color, title_font, 18, bold=True)
+                        content_y = 3.45
+                    items = bullets[:3] or ([slide_data.takeaway] if slide_data.takeaway else [])
+                    cols = min(3, max(1, len(items)))
+                    card_w = (12.1 - 0.3 * (cols - 1)) / cols
+                    for j, item in enumerate(items):
+                        x = 0.6 + j * (card_w + 0.3)
+                        card_h = 2.65
+                        cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, content_y, card_w, card_h, fill, f"evidence-card-{j+1}", corner_radius=0.04)
+                        text_w = card_w - 1.03
+                        card_font, text_h, top_pad = cls._balanced_card_metrics(item, text_w, card_h)
+                        marker_y = content_y + top_pad + 0.03
+                        cls._shape(slide, MSO_SHAPE.OVAL, x + 0.22, marker_y, 0.46, 0.46, accent, f"evidence-disc-{j+1}")
+                        cls._text(slide, str(j + 1), x + 0.22, marker_y + 0.03, 0.46, 0.35, white, body_font, 11, bold=True, center=True, name=f"evidence-disc-number-{j+1}")
+                        cls._text(
+                            slide,
+                            item,
+                            x + 0.78,
+                            content_y + top_pad,
+                            text_w,
+                            text_h,
+                            body_col,
+                            body_font,
+                            card_font,
+                            name=f"evidence-text-{j+1}",
+                        )
                 else:
-                    # Two Column / Comparison default
+                    # General-purpose layouts must preserve every source item
+                    # as native bullet paragraphs. This also keeps the older
+                    # compact cards used by API clients and regression tests.
                     midpoint = max(1, math.ceil(len(bullets) / 2))
                     groups = [bullets[:midpoint], bullets[midpoint:]]
                     for j, group in enumerate(groups):
-                        cls._card(slide, "\n".join(group), 0.6 + j * 6.225, 2.25, 5.875, 4.0, fill, body_col, accent, body_font)
+                        if group:
+                            cls._card(slide, "\n".join(group), 0.6 + j * 6.225, 2.25, 5.875, 4.0, fill, body_col, accent, body_font)
 
             # Speaker Notes
             notes = slide_data.speaker_notes or f"Presenter guidance for Slide {index + 1}: {title}"
