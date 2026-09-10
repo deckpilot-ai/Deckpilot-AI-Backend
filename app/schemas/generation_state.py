@@ -2,7 +2,51 @@
 
 from enum import Enum
 from typing import Any, Literal
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel, Field, field_validator
+
+
+def normalize_bullet_items(value: Any) -> list[str]:
+    """Convert common LLM bullet shapes into renderer-safe display strings.
+
+    Planning providers occasionally return semantic objects (for example,
+    ``{"label": "Nalanda", "value": "427 CE"}``) even though the rendering
+    contract uses strings.  Preserve that useful content instead of allowing a
+    provider formatting variation to fail the whole generation job.
+    """
+    if value is None:
+        return []
+    items = value if isinstance(value, (list, tuple)) else [value]
+    normalized: list[str] = []
+
+    for item in items:
+        text = ""
+        if isinstance(item, str):
+            text = item
+        elif isinstance(item, dict):
+            label = item.get("label") or item.get("title") or item.get("name") or item.get("heading")
+            detail = (
+                item.get("value")
+                or item.get("text")
+                or item.get("description")
+                or item.get("detail")
+                or item.get("content")
+            )
+            if label and detail and str(label).strip() != str(detail).strip():
+                text = f"{label}: {detail}"
+            elif detail or label:
+                text = str(detail or label)
+            else:
+                scalar_values = [str(v).strip() for v in item.values() if isinstance(v, (str, int, float)) and str(v).strip()]
+                text = ": ".join(scalar_values)
+        elif isinstance(item, (int, float)):
+            text = str(item)
+
+        text = " ".join(text.split())
+        if text:
+            normalized.append(text)
+
+    return normalized
 
 
 class PresentationType(str, Enum):
@@ -219,6 +263,11 @@ class SlideSpec(BaseModel):
     # Rendering metadata
     dark_background: bool = False
     layout_hint: str = ""
+
+    @field_validator("bullets", mode="before")
+    @classmethod
+    def normalize_bullets(cls, value: Any) -> list[str]:
+        return normalize_bullet_items(value)
 
     @classmethod
     def model_validate(cls, obj: Any, **kwargs):
