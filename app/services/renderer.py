@@ -206,8 +206,9 @@ class PPTXRenderer:
         if number is not None:
             text_x, text_w = x + 0.8, w - 1.05
 
-        size = 16
-        while size > 13 and not cls._fits(text, text_w, h - 0.4, size, bullet_list):
+        size = 18 if fixed_height else 16
+        floor = 17 if fixed_height else 13
+        while size > floor and not cls._fits(text, text_w, h - 0.4, size, bullet_list):
             size -= 1
 
         capacity = max(1, int((text_w - 0.04 - (0.23 if bullet_list else 0)) * 72 / (size * 0.56)))
@@ -222,7 +223,9 @@ class PPTXRenderer:
             cls._shape(slide, MSO_SHAPE.OVAL, x + 0.2, y + 0.25, 0.4, 0.4, accent)
             cls._text(slide, str(number), x + 0.2, y + 0.25, 0.4, 0.4, RGBColor(255, 255, 255), font_name, 11, bold=True, center=True)
             text_x, text_w = x + 0.8, w - 1.05
-        cls._text(slide, text, text_x, y + 0.2, text_w, card_h - 0.4, foreground, font_name, size, bullet_list=bullet_list)
+        text_shape = cls._text(slide, text, text_x, y + 0.2, text_w, card_h - 0.4, foreground, font_name, size, bullet_list=bullet_list)
+        if fixed_height:
+            text_shape.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
 
     @staticmethod
     def _short_caption(value: str, max_words: int = 20) -> str:
@@ -626,7 +629,19 @@ class PPTXRenderer:
                     groups = [bullets[:midpoint], bullets[midpoint:]]
                     for j, group in enumerate(groups):
                         if group:
-                            cls._card(slide, "\n".join(group), 0.6 + j * 6.225, 2.25, 5.875, 4.0, fill, body_col, accent, body_font)
+                            cls._card(
+                                slide,
+                                "\n".join(group),
+                                0.6 + j * 6.225,
+                                2.25,
+                                5.875,
+                                4.0,
+                                fill,
+                                body_col,
+                                accent,
+                                body_font,
+                                fixed_height=True,
+                            )
 
             # Speaker Notes
             notes = slide_data.speaker_notes or f"Presenter guidance for Slide {index + 1}: {title}"

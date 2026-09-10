@@ -915,7 +915,7 @@ class JobOrchestrator:
                             storage_key=art.storage_key or "",
                         ) for art in existing_artifacts if art.type == "image" and art.id in source_images
                     ]
-                    ImageMatcher.assign_images_semantically(raw_slides, available_assets_meta, min_relevance_threshold=1.5)
+                    ImageMatcher.assign_images_semantically(raw_slides, available_assets_meta)
 
                 for slide in context.get("deck_spec", {}).get("slides", []):
                     if slide.get("imageArtifactId") and slide.get("imageArtifactId") not in source_images:

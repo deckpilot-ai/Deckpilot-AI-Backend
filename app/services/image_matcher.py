@@ -16,6 +16,8 @@ from app.schemas.generation_state import (
 
 logger = logging.getLogger(__name__)
 
+MIN_SEMANTIC_RELEVANCE = 4.5
+
 STOPWORDS = {
     "the", "a", "an", "and", "or", "in", "of", "to", "for", "with", "on", "at",
     "by", "from", "up", "about", "into", "over", "after", "is", "are", "was",
@@ -77,7 +79,7 @@ class ImageMatcher:
         cls,
         slides: list[SlideSpec] | list[dict[str, Any]],
         available_assets: list[AssetMetadata] | list[dict[str, Any]],
-        min_relevance_threshold: float = 1.5,
+        min_relevance_threshold: float = MIN_SEMANTIC_RELEVANCE,
     ) -> None:
         """Assign assets to slides semantically. Mutates slides in place."""
         if not slides or not available_assets:
@@ -170,7 +172,7 @@ class ImageMatcher:
         cls,
         slides: list[SlideSpec],
         available_assets: list[AssetMetadata],
-        min_relevance_threshold: float = 1.5,
+        min_relevance_threshold: float = MIN_SEMANTIC_RELEVANCE,
     ) -> None:
         """Recompute one-to-one assignments for existing image-capable slides.
 

@@ -120,7 +120,7 @@ def test_turso_sessions_do_not_share_singleton_thread_connections(monkeypatch):
     engine.dispose()
 
 
-def test_content_boxes_fit_copy_and_subjects_have_distinct_covers():
+def test_content_boxes_use_available_canvas_and_subjects_have_distinct_covers():
     outputs = []
     for title in ['The Rise of Empires', 'The Parliamentary System', 'Factors of Production']:
         spec = prepare_deck({'deckTitle': title, 'slides': [
@@ -135,7 +135,7 @@ def test_content_boxes_fit_copy_and_subjects_have_distinct_covers():
     assert len({str(p.slides[0].background.fill.fore_color.rgb) for p in decks}) == 3
     for p in decks:
         cards = [s for s in p.slides[1].shapes if s.name == 'card']
-        assert cards and all(s.height / 914400 < 1.5 for s in cards)
+        assert cards and all(s.height / 914400 >= 3.8 for s in cards)
 
 
 def test_qr_assets_are_rejected_and_real_images_are_accepted():

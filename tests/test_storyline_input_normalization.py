@@ -1,6 +1,12 @@
+import io
+
+from pptx import Presentation
+
+from app.agents.design_intelligence import DesignIntelligenceAgent
 from app.agents.storyline_agent import StorylineAgent
 from app.schemas.generation_state import AssetMetadata, PresentationGoal, SlideSpec
 from app.services.image_matcher import ImageMatcher
+from app.services.renderer import PPTXRenderer
 
 
 def test_slide_spec_normalizes_structured_bullets() -> None:
@@ -68,3 +74,57 @@ def test_image_matcher_normalizes_provider_bullets_before_joining() -> None:
 
     assert slides[0]["bullets"] == ["Nalanda: 427 CE"]
     assert slides[0]["imageArtifactId"] == "nalanda-image"
+
+
+def test_image_matcher_rejects_single_weak_keyword_overlap() -> None:
+    slides = [
+        {
+            "headline": "Buddhist relics and religious patronage",
+            "purpose": "Explain monuments built for monks",
+            "layoutHint": "image_focus",
+            "bullets": ["Rulers supported religious communities."],
+        }
+    ]
+    assets = [
+        AssetMetadata(
+            asset_id="trade-image",
+            caption="Rulers controlled rivers and trade networks to secure resources",
+        )
+    ]
+
+    ImageMatcher.assign_images_semantically(slides, assets)
+
+    assert "imageArtifactId" not in slides[0]
+
+
+def test_default_section_label_does_not_repeat_the_user_prompt() -> None:
+    goal = PresentationGoal(
+        topic="Create a professional high-quality 24-slide presentation based only on the attached PDF",
+        target_slide_count=1,
+    )
+
+    slides = StorylineAgent.create_storyline_plan(goal)
+
+    assert slides[0].section == "Section 1"
+
+
+def test_numbered_process_preserves_complete_unsplit_sentences() -> None:
+    goal = PresentationGoal(topic="Empire growth", target_slide_count=1)
+    design = DesignIntelligenceAgent.generate_design_system(goal)
+    bullets = [
+        "Soldiers marched to battle against neighbouring kingdoms.",
+        "Military action addressed external threats.",
+        "Defense remained a primary responsibility of rulers.",
+    ]
+    slide = SlideSpec(
+        headline="Military organization",
+        bullets=bullets,
+        archetype_id="A10",
+    )
+
+    payload = PPTXRenderer.render_presentation([slide], design)
+    rendered = Presentation(io.BytesIO(payload))
+    text = "\n".join(shape.text for shape in rendered.slides[0].shapes if getattr(shape, "has_text_frame", False))
+
+    for bullet in bullets:
+        assert bullet in text

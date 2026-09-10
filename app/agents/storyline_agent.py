@@ -43,7 +43,7 @@ class StorylineAgent:
         # Semantically match available assets to slides first, preventing wrong image assignment
         if assets and slides_input:
             from app.services.image_matcher import ImageMatcher
-            ImageMatcher.assign_images_semantically(slides_input, assets, min_relevance_threshold=1.5)
+            ImageMatcher.assign_images_semantically(slides_input, assets)
 
         # Layout rhythm tracker
         recent_layouts: list[LayoutFamily] = []
@@ -158,9 +158,9 @@ class StorylineAgent:
             elif raw_slide.get("chapter"):
                 eyebrow = raw_slide.get("chapter")
             elif getattr(goal, "presentation_type", None) == PresentationType.RESEARCH_EDUCATION:
-                eyebrow = f"Chapter {(i // 4) + 1} · {goal.topic}"
+                eyebrow = f"Chapter {(i // 4) + 1}"
             else:
-                eyebrow = f"Section {(i // 4) + 1} · {goal.topic}"
+                eyebrow = f"Section {(i // 4) + 1}"
 
             if raw_slide.get("takeaway"):
                 takeaway = raw_slide.get("takeaway")

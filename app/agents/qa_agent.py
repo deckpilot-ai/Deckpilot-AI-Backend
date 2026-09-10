@@ -27,7 +27,7 @@ from app.schemas.generation_state import (
     ValidationIssue,
     ValidationSeverity,
 )
-from app.services.image_matcher import ImageMatcher
+from app.services.image_matcher import MIN_SEMANTIC_RELEVANCE, ImageMatcher
 from app.tools.pptx_validator import PPTXValidator
 
 logger = logging.getLogger(__name__)
@@ -326,7 +326,7 @@ class PresentationQAAgent:
             semantic = " ".join(filter(None, [caption, getattr(asset, "nearby_text", ""), getattr(asset, "semantic_summary", "")]))
             slide_text = " ".join([slide.headline, slide.objective, slide.takeaway, *slide.bullets])
             relevance = ImageMatcher.calculate_relevance(slide_text, semantic)
-            if relevance < 1.5:
+            if relevance < MIN_SEMANTIC_RELEVANCE:
                 issues.append(cls._issue("image_semantic_mismatch", ValidationSeverity.HIGH, ValidationCategory.DESIGN, idx, f"Image '{asset_id}' has low relevance ({relevance:.1f}) to '{slide.headline[:55]}'", slide.slide_id))
             if not caption:
                 issues.append(cls._issue("missing_image_caption", ValidationSeverity.MEDIUM, ValidationCategory.DESIGN, idx, f"Image '{asset_id}' has no caption", slide.slide_id))

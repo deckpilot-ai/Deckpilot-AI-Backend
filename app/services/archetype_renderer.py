@@ -451,11 +451,26 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.OVAL, cx + 0.35, card_y + 0.35, 0.6, 0.6, ink, f"step-badge-{k+1}")
             r_cls._text(slide, f"0{k+1}", cx + 0.35, card_y + 0.4, 0.6, 0.5, white, title_font, 16, bold=True, center=True)
 
-            parts = step.split(":", 1) if ":" in step else [step[:30], step[30:]]
-            r_cls._text(slide, parts[0].strip(), cx + 0.35, card_y + 1.15, cw - 0.7, 0.5, primary, title_font, 15, bold=True)
+            parts = step.split(":", 1) if ":" in step else [step]
+            heading_h = 0.75 if len(parts) > 1 else 1.8
+            heading_size = 15 if len(parts) > 1 else 16
+            r_cls._text(
+                slide,
+                parts[0].strip(),
+                cx + 0.35,
+                card_y + 1.15,
+                cw - 0.7,
+                heading_h,
+                primary,
+                title_font,
+                heading_size,
+                bold=len(parts) > 1,
+                center=True,
+            )
             r_cls._shape(slide, MSO_SHAPE.RECTANGLE, cx + 0.35, card_y + 1.75, 1.2, 0.04, primary, f"rule-{k+1}")
-            desc = parts[1].strip() if len(parts) > 1 else ""
-            r_cls._text(slide, desc[:160], cx + 0.35, card_y + 1.9, cw - 0.7, card_h - 2.1, hex_to_rgb(ds.colors.text_secondary), body_font, 12)
+            if len(parts) > 1:
+                desc = parts[1].strip()
+                r_cls._text(slide, desc[:160], cx + 0.35, card_y + 1.9, cw - 0.7, card_h - 2.1, hex_to_rgb(ds.colors.text_secondary), body_font, 15, center=True)
 
             # Connecting Arrow Chip
             if k < 2:

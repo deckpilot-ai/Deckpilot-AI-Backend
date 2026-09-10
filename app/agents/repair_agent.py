@@ -13,7 +13,7 @@ from app.schemas.generation_state import (
     SlideSpec,
     ValidationSeverity,
 )
-from app.services.image_matcher import ImageMatcher
+from app.services.image_matcher import MIN_SEMANTIC_RELEVANCE, ImageMatcher
 
 
 def _clean_text(text: Any) -> str:
@@ -100,7 +100,10 @@ class RepairAgent:
                 slide.headline = f"{base}: {qualifier}"[:82] if qualifier and _norm(qualifier) not in _norm(base) else f"{base} ({slide.slide_number})"
             elif action == "shorten_title" and slide:
                 raw = _clean_text(slide.headline or slide.key_message)
-                slide.headline = " ".join(raw.split()[:10]).rstrip(" ,:;-")
+                words = raw.split()[:10]
+                while len(" ".join(words)) > 82 and len(words) > 3:
+                    words.pop()
+                slide.headline = " ".join(words).rstrip(" ,:;-")
             elif action in {"trim_bullets", "shorten_bullets", "shorten_and_reflow"} and slide:
                 slide.bullets = [cls._shorten(b, 22) for b in slide.bullets[:5]]
                 slide.archetype_fields["qa_font_scale"] = max(1.08, float(slide.archetype_fields.get("qa_font_scale", 1.0)))
@@ -130,12 +133,12 @@ class RepairAgent:
                 cls._choose_content_layout(slide, force_different=True)
             elif action in {"rematch_image", "replace_duplicate_image", "replace_image", "replace_or_shrink_image"} and slide:
                 if not images_rematched:
-                    ImageMatcher.rematch_images_semantically(slides, assets, min_relevance_threshold=1.5)
+                    ImageMatcher.rematch_images_semantically(slides, assets)
                     images_rematched = True
             elif action in {"change_layout", "vary_layout", "simplify_layout", "route_to_process"} and slide:
                 cls._choose_content_layout(slide, force_different=True)
             elif action == "assign_visuals":
-                ImageMatcher.assign_images_semantically(slides, assets, min_relevance_threshold=1.5)
+                ImageMatcher.assign_images_semantically(slides, assets)
                 cls._remove_duplicate_images(slides, assets)
             elif action in {"add_caption", "improve_caption"} and slide and slide.image_artifact_id:
                 asset = asset_by_id.get(slide.image_artifact_id)
@@ -259,7 +262,7 @@ class RepairAgent:
             evidence = f"{asset.caption} {asset.nearby_text} {asset.semantic_summary}"
             candidates.append((ImageMatcher.calculate_relevance(slide_text, evidence), asset))
         candidates.sort(key=lambda pair: pair[0], reverse=True)
-        if candidates and candidates[0][0] >= 1.5:
+        if candidates and candidates[0][0] >= MIN_SEMANTIC_RELEVANCE:
             best = candidates[0][1]
             slide.image_artifact_id = best.asset_id
             slide.image_caption = best.caption or best.semantic_summary
