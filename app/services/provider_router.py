@@ -69,8 +69,8 @@ class ProviderRouter:
     def sync_environment_providers(db: Session) -> None:
         """Auto-synchronize system AI providers and API keys from settings / environment into database."""
         provider_configs = [
+            ("nvidia", settings.nvidia_base_url or "https://integrate.api.nvidia.com/v1", settings.nvidia_api_key, 25),
             ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 18),
-            ("nvidia", settings.nvidia_base_url or "https://integrate.api.nvidia.com/v1", settings.nvidia_api_key, 17),
             ("codecraft", settings.codecraft_base_url or "https://codecraftapi.com/v1", settings.codecraft_api_key, 15),
             ("experientiallabs", settings.experientiallabs_base_url or "https://api.experientiallabs.ai/v1", settings.effective_experientiallabs_api_key, 11),
             ("openrouter", "https://openrouter.ai/api/v1", settings.openrouter_api_key, 10),
