@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     ai_provider_allowed_hosts: str = (
         "openrouter.ai,api.openai.com,generativelanguage.googleapis.com,"
         "api.groq.com,api.mistral.ai,api.anthropic.com,api.experientiallabs.ai,"
-        "codecraftapi.com,api.codecraftapi.com,integrate.api.nvidia.com"
+        "codecraftapi.com,api.codecraftapi.com,integrate.api.nvidia.com,api.bazaarlink.ai"
     )
 
     # Request limits
@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     codecraft_base_url: str = "https://codecraftapi.com/v1"
     nvidia_api_key: str = "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"
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
+    bazaarlink_api_key: str = "sk-bl-CnaXx41rPQYL4Wqiw_ovTLX7V2ncRqafdgg0bVLomg4GzLtM"
+    bazaarlink_base_url: str = "https://api.bazaarlink.ai/v1"
 
     @property
     def effective_experientiallabs_api_key(self) -> str:

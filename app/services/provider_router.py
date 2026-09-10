@@ -69,6 +69,7 @@ class ProviderRouter:
     def sync_environment_providers(db: Session) -> None:
         """Auto-synchronize system AI providers and API keys from settings / environment into database."""
         provider_configs = [
+            ("bazaarlink", settings.bazaarlink_base_url or "https://api.bazaarlink.ai/v1", settings.bazaarlink_api_key, 28),
             ("nvidia", settings.nvidia_base_url or "https://integrate.api.nvidia.com/v1", settings.nvidia_api_key, 25),
             ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 18),
             ("codecraft", settings.codecraft_base_url or "https://codecraftapi.com/v1", settings.codecraft_api_key, 15),
@@ -103,7 +104,17 @@ class ProviderRouter:
                 existing_models = db.scalars(select(AIProviderModel).where(AIProviderModel.provider_id == provider.id)).all()
                 if not existing_models:
                     default_models = []
-                    if name == "gemini":
+                    if name == "bazaarlink":
+                        default_models = [
+                            {"model_id": "auto:free", "display_name": "Auto Router (Free)", "priority": 100, "enabled": 1, "context_length": 128000},
+                            {"model_id": "qwen/qwen3.7-flash:free", "display_name": "Qwen 3.7 Flash (Free)", "priority": 98, "enabled": 1, "context_length": 128000},
+                            {"model_id": "auto", "display_name": "Auto Router", "priority": 96, "enabled": 1, "context_length": 128000},
+                            {"model_id": "deepseek-v4-flash", "display_name": "DeepSeek V4 Flash", "priority": 94, "enabled": 1, "context_length": 128000},
+                            {"model_id": "qwen3.8-max", "display_name": "Qwen 3.8 Max", "priority": 92, "enabled": 1, "context_length": 1000000},
+                            {"model_id": "claude-sonnet-4.6", "display_name": "Claude Sonnet 4.6", "priority": 90, "enabled": 1, "context_length": 200000},
+                            {"model_id": "glm-5", "display_name": "GLM 5", "priority": 88, "enabled": 1, "context_length": 128000},
+                        ]
+                    elif name == "gemini":
                         default_models = [
                             {"model_id": "gemini-3.8-flash", "display_name": "Gemini 3.8 Flash", "priority": 100, "enabled": 1, "context_length": 1000000},
                             {"model_id": "gemini-3.7-flash", "display_name": "Gemini 3.7 Flash", "priority": 98, "enabled": 1, "context_length": 1000000},
@@ -350,6 +361,7 @@ class ProviderRouter:
 
         headers: dict[str, str] = {
             "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "HTTP-Referer": "https://deckpilot.ai",
             "X-Title": "deckpilotAI",
         }
@@ -649,6 +661,16 @@ class ProviderRouter:
                         ("nvidia/ising-calibration-1.5-31b", 90),
                         ("meta/llama-3.2-11b-vision-instruct", 88),
                     ]
+                elif "bazaarlink" in p_name:
+                    model_candidates = [
+                        ("auto:free", 100),
+                        ("qwen/qwen3.7-flash:free", 98),
+                        ("auto", 96),
+                        ("deepseek-v4-flash", 94),
+                        ("qwen3.8-max", 92),
+                        ("claude-sonnet-4.6", 90),
+                        ("glm-5", 88),
+                    ]
                 elif "openai" in p_name:
                     model_candidates = [("gpt-4o-mini", 90), ("gpt-4o", 95)]
                 elif "mistral" in p_name:
@@ -738,6 +760,7 @@ class ProviderRouter:
                 headers = {
                     "Authorization": f"Bearer {secret_key}",
                     "Content-Type": "application/json",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                     "HTTP-Referer": "https://deckpilot.ai",
                     "X-Title": "deckpilotAI",
                 }
@@ -910,7 +933,7 @@ class ProviderRouter:
                         additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
                     )
                     is_provider_outage = (
-                        provider.name not in ("gemini", "nvidia")
+                        provider.name not in ("gemini", "nvidia", "bazaarlink")
                         and (
                             resp.status_code in (502, 503, 504, 403)
                             or (resp.status_code == 429 and any(
