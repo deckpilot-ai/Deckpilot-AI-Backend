@@ -300,8 +300,8 @@ class PPTXRenderer:
             # Eyebrow & Title & Accent Tick (Skip for custom cover/divider archetypes)
             if not is_standalone_cover:
                 cls._text(slide, eyebrow.upper(), 0.6, 0.45, 12.1, 0.32, primary if not dark else accent, body_font, 12, bold=True)
-                cls._text(slide, title, 0.6, 0.82, 12.1, 0.85, fg, title_font, 28, title=True)
-                cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.6, 1.72, 0.6, 0.06, accent if not dark else tint(primary, 0.6), "accent-tick")
+                cls._text(slide, title, 0.6, 0.78, 12.1, 1.05, fg, title_font, 28, title=True)
+                cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.6, 1.88, 0.6, 0.06, accent if not dark else tint(primary, 0.6), "accent-tick")
 
             # Footer
             if not is_standalone_cover:
@@ -439,6 +439,13 @@ class PPTXRenderer:
                     cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, 2.4, width, 3.0, fill)
                     cls._text(slide, str(metric.get("value", "")), x + 0.2, 2.85, width - 0.4, 1.15, fg, title_font, 40, bold=True, center=True)
                     cls._text(slide, str(metric.get("label", "")), x + 0.2, 4.3, width - 0.4, 0.75, body_col, body_font, 13, center=True)
+
+            elif layout in (LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE) and len(bullets) <= 1:
+                cls._text(slide, title, 0.6, 1.05, 12.1, 1.1, fg, title_font, 32, title=True)
+                if slide_data.takeaway:
+                    cls._text(slide, slide_data.takeaway, 0.6, 1.95, 12.1, 0.65, body_col, body_font, 14)
+                cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 2.55, 12.1, 3.75, tint(primary, 0.22), "card")
+                cls._text(slide, "\n".join(bullets), 1.0, 2.85, 11.3, 3.1, body_col, body_font, 22, center=True)
 
             elif layout in (LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE):
                 cls._text(slide, title, 0.6, 1.05, 12.1, 1.1, fg, title_font, 32, title=True)
@@ -628,15 +635,16 @@ class PPTXRenderer:
                     # as native bullet paragraphs. This also keeps the older
                     # compact cards used by API clients and regression tests.
                     midpoint = max(1, math.ceil(len(bullets) / 2))
-                    groups = [bullets[:midpoint], bullets[midpoint:]]
+                    groups = [bullets] if len(bullets) <= 1 else [bullets[:midpoint], bullets[midpoint:]]
                     for j, group in enumerate(groups):
                         if group:
+                            card_width = 12.1 if len(groups) == 1 else 5.875
                             cls._card(
                                 slide,
                                 "\n".join(group),
                                 0.6 + j * 6.225,
                                 2.25,
-                                5.875,
+                                card_width,
                                 4.0,
                                 fill,
                                 body_col,

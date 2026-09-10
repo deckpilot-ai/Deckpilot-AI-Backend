@@ -150,3 +150,31 @@ def test_numbered_columns_preserve_complete_unsplit_sentences() -> None:
 
     for bullet in bullets:
         assert bullet in text
+
+
+def test_process_diagram_uses_the_slide_topic_instead_of_product_workflow_copy() -> None:
+    goal = PresentationGoal(topic="The rise of empires", target_slide_count=1)
+    plan = {
+        "slides": [
+            {
+                "slideId": "s01",
+                "headline": "Conquest → Integration → Administration → Legacy",
+                "purpose": "Explain the historical sequence",
+                "layoutHint": "process_steps",
+                "bullets": [
+                    "Military conquest established control.",
+                    "Institutions integrated diverse territories.",
+                    "Administrators governed provinces.",
+                    "Successor states inherited imperial practices.",
+                ],
+            }
+        ]
+    }
+
+    slide = StorylineAgent.create_storyline_plan(goal, llm_plan_spec=plan)[0]
+    labels = [node.label for node in slide.diagram_spec.nodes]
+    subtext = [node.subtext for node in slide.diagram_spec.nodes]
+
+    assert labels == ["1. Conquest", "2. Integration", "3. Administration", "4. Legacy"]
+    assert subtext == plan["slides"][0]["bullets"]
+    assert all("Ingestion" not in label and "Architecture" not in label for label in labels)

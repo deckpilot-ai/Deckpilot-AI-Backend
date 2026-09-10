@@ -401,7 +401,16 @@ class PresentationQAAgent:
                 issues.append(cls._issue("layout_content_mismatch", ValidationSeverity.MEDIUM, ValidationCategory.DESIGN, idx, "Chart content is not using a chart layout", slide.slide_id))
             if slide.diagram_spec and slide.layout_family not in {LayoutFamily.PROCESS_STEPS, LayoutFamily.ARCHITECTURE_DIAGRAM, LayoutFamily.MATRIX_QUADRANT}:
                 issues.append(cls._issue("diagram_missing_for_process", ValidationSeverity.MEDIUM, ValidationCategory.DESIGN, idx, "Diagram content is not using a diagram layout", slide.slide_id))
-            if not slide.chart_spec and len(re.findall(r"\b\d+(?:\.\d+)?%?\b", lower)) >= 4:
+            numeric_story = re.sub(
+                r"(?:source\s+[^\s)]*#page=\d+|\b(?:p|page|fig|figure)\.?\s*\d+(?:\.\d+)*|\b\d{3,4}\s*(?:bce|ce)\b)",
+                "",
+                lower,
+            )
+            if (
+                not slide.chart_spec
+                and slide.layout_family not in {LayoutFamily.TIMELINE, LayoutFamily.ROADMAP}
+                and len(re.findall(r"\b\d+(?:\.\d+)?%?\b", numeric_story)) >= 4
+            ):
                 issues.append(cls._issue("chart_missing_for_numeric_story", ValidationSeverity.LOW, ValidationCategory.DESIGN, idx, "Slide contains four or more numeric values without a chart", slide.slide_id, auto_fixable=False))
             if not slide.diagram_spec and re.search(r"\b(step|phase|stage)\s*[1-5]\b", lower):
                 issues.append(cls._issue("diagram_missing_for_process", ValidationSeverity.LOW, ValidationCategory.DESIGN, idx, "Numbered process content has no process diagram", slide.slide_id, auto_fixable=False))

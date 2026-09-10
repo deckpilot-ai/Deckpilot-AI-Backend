@@ -162,3 +162,20 @@ def test_image_matcher_preserves_explicit_choices_and_skips_non_image_layouts():
     assert slides[0]["imageArtifactId"] == "solar"
     assert "imageArtifactId" not in slides[1]
     assert slides[2]["imageArtifactId"] == "wind"
+
+
+def test_page_and_figure_citations_do_not_trigger_numeric_chart_check():
+    slide = SlideSpec(
+        slide_id="s01",
+        slide_number=1,
+        headline="Evidence across the empire",
+        bullets=[
+            "Pataliputra appears in Fig. 5.2 (p. 6).",
+            "Trade routes are documented in source data.pdf#page=8.",
+            "A later monument appears in Figure 5.27 on page 29.",
+        ],
+        layout_family=LayoutFamily.TWO_COLUMN,
+    )
+
+    report = PresentationQAAgent.evaluate_presentation([slide], DesignSystem())
+    assert "QA-079" not in {issue.checkpoint_id for issue in report.issues}

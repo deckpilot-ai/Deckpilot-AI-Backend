@@ -4,6 +4,7 @@ import io
 
 from pptx import Presentation
 
+from app.schemas.generation_state import DesignSystem, LayoutFamily, SlideSpec
 from app.services.renderer import PPTXRenderer
 
 
@@ -60,3 +61,22 @@ def test_render_all_slide_layouts():
     # Verify widescreen 16:9 dimensions
     assert int(prs.slide_width.inches) == 13
     assert int(prs.slide_height.inches) == 7
+
+
+def test_long_title_and_single_point_use_the_available_canvas() -> None:
+    headline = "An empire is a political unit where a central ruler commands diverse peoples and territories"
+    spec = SlideSpec(
+        slide_id="s01",
+        slide_number=1,
+        headline=headline,
+        bullets=["This is one substantive source-grounded conclusion."],
+        layout_family=LayoutFamily.DARK_QUOTE,
+        dark_background=True,
+    )
+
+    payload = PPTXRenderer.render_presentation([spec], DesignSystem(), deck_title="Empires")
+    slide = Presentation(io.BytesIO(payload)).slides[0]
+    text_shapes = [shape for shape in slide.shapes if getattr(shape, "has_text_frame", False)]
+    assert any(shape.text == headline for shape in text_shapes)
+    content_cards = [shape for shape in slide.shapes if shape.name == "card"]
+    assert content_cards and max(shape.width.inches for shape in content_cards) >= 11.9

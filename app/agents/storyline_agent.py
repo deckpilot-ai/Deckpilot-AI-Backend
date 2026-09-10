@@ -133,22 +133,49 @@ class StorylineAgent:
             # 6. Associate Diagrams if process or matrix layout
             diagram_spec = None
             if chosen_layout == LayoutFamily.PROCESS_STEPS:
+                arrow_steps = [
+                    part.strip()
+                    for part in re.split(r"\s*(?:→|->|⟶)​?\s*", headline)
+                    if part.strip()
+                ]
+                if len(arrow_steps) >= 2:
+                    nodes = [
+                        DiagramNode(
+                            label=f"{node_index + 1}. {label}",
+                            subtext=bullets[node_index] if node_index < len(bullets) else purpose,
+                        )
+                        for node_index, label in enumerate(arrow_steps[:5])
+                    ]
+                else:
+                    source_items = bullets[:5] or [purpose or headline]
+                    nodes = []
+                    for node_index, item in enumerate(source_items):
+                        if ":" in item:
+                            label, subtext = item.split(":", 1)
+                        else:
+                            words = item.split()
+                            label = " ".join(words[:5])
+                            subtext = " ".join(words[5:]) or item
+                        nodes.append(
+                            DiagramNode(
+                                label=f"{node_index + 1}. {label.strip()}",
+                                subtext=subtext.strip(),
+                            )
+                        )
                 diagram_spec = DiagramSpec(
                     diagram_type="process",
-                    nodes=[
-                        DiagramNode(label="1. Ingestion & Analysis", subtext="Multi-source document and data extraction"),
-                        DiagramNode(label="2. Synthesis & Architecture", subtext="Domain-aware storyline and hierarchy generation"),
-                        DiagramNode(label="3. Execution & Verification", subtext="Automated slide geometry, chart and visual QA"),
-                    ]
+                    nodes=nodes,
                 )
             elif chosen_layout == LayoutFamily.MATRIX_QUADRANT:
+                matrix_items = bullets[:4] or [purpose or headline]
                 diagram_spec = DiagramSpec(
                     diagram_type="matrix",
                     nodes=[
-                        DiagramNode(label="Immediate High-ROI Wins", subtext="Core automation workflows"),
-                        DiagramNode(label="Strategic Capabilities", subtext="Proprietary AI and platform tooling"),
-                        DiagramNode(label="Foundational Hygiene", subtext="Data compliance and infrastructure security"),
-                        DiagramNode(label="Long-Term Explorations", subtext="Emerging channel experiments"),
+                        DiagramNode(
+                            label=(item.split(":", 1)[0] if ":" in item else " ".join(item.split()[:5])),
+                            subtext=(item.split(":", 1)[1].strip() if ":" in item else item),
+                        )
+                        for item in matrix_items
                     ]
                 )
 
