@@ -46,6 +46,30 @@ class LayoutFamily(str, Enum):
     TEXT_IMAGE = "text_image"
     SECTION_DIVIDER = "section_divider"
     CLOSING = "closing"
+    # Consulting Archetype Identifiers (A1-A23)
+    A1_TITLE_BLOB = "A1"
+    A2_TITLE_SPLIT = "A2"
+    A3_DIVIDER_HERO = "A3"
+    A4_ROADMAP_AGENDA = "A4"
+    A5_DEFINITION = "A5"
+    A6_TWO_ENTITY_COMPARISON = "A6"
+    A7_TWO_COLUMN_CONTRAST = "A7"
+    A8_STAT_IMAGE_HIGHLIGHT = "A8"
+    A9_PROCESS_CHAIN = "A9"
+    A10_NUMBERED_PROCESS = "A10"
+    A11_STAGE_COLUMNS = "A11"
+    A12_BEFORE_AFTER = "A12"
+    A13_ICON_GRID = "A13"
+    A14_CHART_INSIGHT = "A14"
+    A15_DUAL_STAT_COMPARISON = "A15"
+    A16_NATIVE_TABLE = "A16"
+    A17_CLOSING_TAKEAWAYS = "A17"
+    A18_RECAP_CHECKLIST = "A18"
+    A19_GLOSSARY_GRID = "A19"
+    A20_ORG_HIERARCHY = "A20"
+    A21_KPI_CLUSTER = "A21"
+    A22_HUB_SPOKE = "A22"
+    A23_VERTICAL_PIPELINE = "A23"
 
 
 class ChartType(str, Enum):
@@ -113,9 +137,13 @@ class FontConfig(BaseModel):
 
 
 class ColorPalette(BaseModel):
-    primary: str = "#132A52"
-    secondary: str = "#0F172A"
-    accent: str = "#2563EB"
+    ink: str = "#0C3B39"
+    primary: str = "#0E7C7B"
+    secondary: str = "#16A085"
+    accent: str = "#0E7C7B"
+    tint_a: str = "#E9F3F1"
+    tint_b: str = "#F6EFE2"
+    alert: str = "#C63A28"
     neutral: str = "#EEF2F8"
     background: str = "#FFFFFF"
     paper: str = "#FAFAF9"
@@ -129,11 +157,11 @@ class ColorPalette(BaseModel):
 
 
 class TypographyHierarchy(BaseModel):
-    title_font: FontConfig = Field(default_factory=lambda: FontConfig(name="Segoe UI"))
-    body_font: FontConfig = Field(default_factory=lambda: FontConfig(name="Segoe UI"))
-    numeric_font: FontConfig = Field(default_factory=lambda: FontConfig(name="Segoe UI"))
+    title_font: FontConfig = Field(default_factory=lambda: FontConfig(name="Cambria"))
+    body_font: FontConfig = Field(default_factory=lambda: FontConfig(name="Calibri"))
+    numeric_font: FontConfig = Field(default_factory=lambda: FontConfig(name="Cambria"))
     hero_title_size: int = 36
-    slide_title_size: int = 24
+    slide_title_size: int = 28
     subtitle_size: int = 14
     body_size: int = 13
     caption_size: int = 10
@@ -173,6 +201,10 @@ class SlideSpec(BaseModel):
     takeaway: str = ""
     speaker_notes: str = ""
     
+    # Archetype fields (A1-A23)
+    archetype_id: str | None = None
+    archetype_fields: dict[str, Any] = Field(default_factory=dict)
+    
     # Visual elements
     image_artifact_id: str | None = None
     image_caption: str = ""
@@ -204,24 +236,31 @@ class SlideSpec(BaseModel):
                 obj["table_spec"] = obj["table"]
             if "diagram" in obj and "diagram_spec" not in obj:
                 obj["diagram_spec"] = obj["diagram"]
+            if "archetype" in obj and "archetype_id" not in obj:
+                obj["archetype_id"] = obj["archetype"]
             
             # Layout mapping
-            lf = obj.get("layout_family")
+            lf = obj.get("layout_family") or obj.get("archetype_id") or obj.get("layoutHint") or obj.get("layout_hint")
             if isinstance(lf, str):
+                lf_norm = lf.upper().replace("-", "_").strip()
                 layout_map = {
-                    "hero_title": LayoutFamily.HERO,
-                    "kpi_grid": LayoutFamily.METRICS_GRID,
-                    "metrics_focus": LayoutFamily.METRICS_GRID,
-                    "process_flow": LayoutFamily.PROCESS_STEPS,
-                    "matrix": LayoutFamily.MATRIX_QUADRANT,
-                    "quadrant_matrix": LayoutFamily.MATRIX_QUADRANT,
-                    "text_and_image": LayoutFamily.TEXT_IMAGE,
-                    "image_and_text": LayoutFamily.TEXT_IMAGE,
-                    "table": LayoutFamily.TABLE_FOCUS,
-                    "chart": LayoutFamily.CHART_FOCUS,
+                    "HERO_TITLE": LayoutFamily.HERO,
+                    "KPI_GRID": LayoutFamily.METRICS_GRID,
+                    "METRICS_FOCUS": LayoutFamily.METRICS_GRID,
+                    "PROCESS_FLOW": LayoutFamily.PROCESS_STEPS,
+                    "MATRIX": LayoutFamily.MATRIX_QUADRANT,
+                    "QUADRANT_MATRIX": LayoutFamily.MATRIX_QUADRANT,
+                    "TEXT_AND_IMAGE": LayoutFamily.TEXT_IMAGE,
+                    "IMAGE_AND_TEXT": LayoutFamily.TEXT_IMAGE,
+                    "TABLE": LayoutFamily.TABLE_FOCUS,
+                    "CHART": LayoutFamily.CHART_FOCUS,
                 }
+                for i in range(1, 24):
+                    layout_map[f"A{i}"] = getattr(LayoutFamily, f"A{i}_{'TITLE_BLOB' if i==1 else 'TITLE_SPLIT' if i==2 else 'DIVIDER_HERO' if i==3 else 'ROADMAP_AGENDA' if i==4 else 'DEFINITION' if i==5 else 'TWO_ENTITY_COMPARISON' if i==6 else 'TWO_COLUMN_CONTRAST' if i==7 else 'STAT_IMAGE_HIGHLIGHT' if i==8 else 'PROCESS_CHAIN' if i==9 else 'NUMBERED_PROCESS' if i==10 else 'STAGE_COLUMNS' if i==11 else 'BEFORE_AFTER' if i==12 else 'ICON_GRID' if i==13 else 'CHART_INSIGHT' if i==14 else 'DUAL_STAT_COMPARISON' if i==15 else 'NATIVE_TABLE' if i==16 else 'CLOSING_TAKEAWAYS' if i==17 else 'RECAP_CHECKLIST' if i==18 else 'GLOSSARY_GRID' if i==19 else 'ORG_HIERARCHY' if i==20 else 'KPI_CLUSTER' if i==21 else 'HUB_SPOKE' if i==22 else 'VERTICAL_PIPELINE'}")
                 if lf in layout_map:
                     obj["layout_family"] = layout_map[lf]
+                elif lf_norm in layout_map:
+                    obj["layout_family"] = layout_map[lf_norm]
                 elif lf in [e.value for e in LayoutFamily]:
                     obj["layout_family"] = LayoutFamily(lf)
         return super().model_validate(obj, **kwargs)

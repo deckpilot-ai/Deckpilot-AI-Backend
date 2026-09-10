@@ -98,36 +98,57 @@ class DesignIntelligenceAgent:
         p_type = goal.presentation_type.value.lower() if hasattr(goal.presentation_type, "value") else str(goal.presentation_type).lower()
         skill = get_skill_for_request(goal.topic, p_type)
 
-        # 1. Determine base palette
+        # Determine subject domain
         if "tech" in p_type or "architecture" in p_type or "ai" in topic_lower or "cloud" in topic_lower:
             domain_key = "tech"
-        elif "finance" in p_type or "revenue" in topic_lower or "budget" in topic_lower:
+        elif "finance" in p_type or "revenue" in topic_lower or "budget" in topic_lower or "economy" in topic_lower:
             domain_key = "finance"
-        elif "history" in topic_lower or "research" in p_type or "ncert" in topic_lower or "education" in topic_lower:
-            domain_key = "research"
+        elif "history" in topic_lower or "research" in p_type or "maratha" in topic_lower:
+            domain_key = "history"
         elif "health" in topic_lower or "medical" in topic_lower:
             domain_key = "healthcare"
+        elif "federal" in topic_lower or "governance" in topic_lower or "civic" in topic_lower:
+            domain_key = "governance"
         else:
             domain_key = "executive"
 
-        colors = cls.PALETTES_BY_DOMAIN[domain_key].model_copy()
+        # 1. Determine base palette from PaletteGenerator
+        from app.services.deck_archetypes import PaletteGenerator
+        tokens = PaletteGenerator.generate_palette(goal.topic)
+        
+        colors = ColorPalette(
+            ink=tokens.ink,
+            primary=tokens.primary,
+            secondary=tokens.secondary,
+            accent=tokens.primary,
+            tint_a=tokens.tint_a,
+            tint_b=tokens.tint_b,
+            alert=tokens.alert,
+            neutral=tokens.tint_a,
+            background="#FFFFFF",
+            paper="#FAFAF9",
+            card_fill=tokens.tint_a,
+            text_primary=tokens.ink,
+            text_secondary="#475569",
+        )
 
         # 2. Learn from reference PPT profile if present
         ref_fonts = (reference_profile or {}).get("fonts", {})
-        dominant_title = ref_fonts.get("dominant_title_font") or skill.title_font_hint
-        dominant_body = ref_fonts.get("dominant_body_font") or skill.body_font_hint
+        dominant_title = ref_fonts.get("dominant_title_font") or "Cambria"
+        dominant_body = ref_fonts.get("dominant_body_font") or "Calibri"
 
         # Override colors if valid reference colors or LLM hints are provided
         ref_colors = (reference_profile or {}).get("colors", {})
         if ref_colors.get("primary_hint") and re.match(r"^#[0-9A-Fa-f]{6}$", ref_colors["primary_hint"]):
             colors.primary = ref_colors["primary_hint"]
+            colors.accent = ref_colors["primary_hint"]
         if ref_colors.get("accent_hint") and re.match(r"^#[0-9A-Fa-f]{6}$", ref_colors["accent_hint"]):
-            colors.accent = ref_colors["accent_hint"]
+            colors.secondary = ref_colors["accent_hint"]
 
         if llm_brand_hints and isinstance(llm_brand_hints, dict):
             hint_cols = llm_brand_hints.get("colors", {})
             if isinstance(hint_cols, dict):
-                for k in ("primary", "accent", "neutral"):
+                for k in ("ink", "primary", "secondary", "accent", "tint_a", "tint_b", "alert", "neutral"):
                     val = hint_cols.get(k)
                     if isinstance(val, str) and re.match(r"^#[0-9A-Fa-f]{6}$", val):
                         setattr(colors, k, val)
@@ -135,9 +156,9 @@ class DesignIntelligenceAgent:
         typography = TypographyHierarchy(
             title_font=FontConfig(name=dominant_title),
             body_font=FontConfig(name=dominant_body),
-            numeric_font=FontConfig(name=dominant_body),
+            numeric_font=FontConfig(name=dominant_title),
             hero_title_size=36,
-            slide_title_size=24,
+            slide_title_size=28,
             subtitle_size=14,
             body_size=13,
             caption_size=10,

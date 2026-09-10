@@ -42,6 +42,7 @@ class StorylineAgent:
 
         # Layout rhythm tracker
         recent_layouts: list[LayoutFamily] = []
+        recent_archetypes: list[str] = []
 
         for i in range(count):
             slide_id = f"s{i+1:02d}"
@@ -160,6 +161,43 @@ class StorylineAgent:
 
             speaker_notes = raw_slide.get("speakerNotes") or raw_slide.get("speaker_notes") or f"In this slide, walk the audience through {purpose.lower()}. Emphasize key findings and historical context."
 
+            # Select consulting layout archetype
+            from app.services.deck_archetypes import ArchetypeSelector
+            arch_id = raw_slide.get("archetype_id") or raw_slide.get("archetype")
+            raw_hint = raw_slide.get("layoutHint") or raw_slide.get("layout_hint") or ""
+            if not arch_id and (not raw_hint or raw_hint in ("default", "standard")):
+                # Map chosen_layout or purpose to content type
+                if is_first:
+                    c_type = "title"
+                elif is_last:
+                    c_type = "closing"
+                elif chart_spec:
+                    c_type = "chart"
+                elif table_spec:
+                    c_type = "table"
+                elif raw_slide.get("metrics") or chosen_layout == LayoutFamily.METRICS_GRID:
+                    c_type = "stat_highlight"
+                elif chosen_layout == LayoutFamily.COMPARISON:
+                    c_type = "comparison"
+                elif chosen_layout == LayoutFamily.PROCESS_STEPS:
+                    c_type = "process"
+                elif "definition" in purpose.lower():
+                    c_type = "definition"
+                else:
+                    c_type = "grid"
+
+                prev_arch = recent_archetypes[-1] if recent_archetypes else None
+                arch_id = ArchetypeSelector.select_archetype(
+                    content_type=c_type,
+                    content_summary=purpose,
+                    previous_archetype=prev_arch,
+                    has_image=bool(img_id),
+                    has_chart=bool(chart_spec),
+                    has_table=bool(table_spec),
+                )
+            if arch_id:
+                recent_archetypes.append(arch_id)
+
             spec = SlideSpec(
                 slide_id=slide_id,
                 slide_number=i + 1,
@@ -174,6 +212,7 @@ class StorylineAgent:
                 metrics=raw_slide.get("metrics", []),
                 takeaway=takeaway,
                 speaker_notes=speaker_notes,
+                archetype_id=arch_id,
                 image_artifact_id=img_id,
                 image_caption=caption,
                 chart_spec=chart_spec,

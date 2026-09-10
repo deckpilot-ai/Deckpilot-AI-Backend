@@ -55,6 +55,9 @@ def clean_text(value: Any) -> str:
 
 
 def default_brand(topic: str) -> dict[str, Any]:
+    from app.services.deck_archetypes import PaletteGenerator
+    tokens = PaletteGenerator.generate_palette(topic)
+    
     domain = "markets"
     for key, words in (
         ("history", r"history|heritage|empire|medieval|maratha|harapp|civilisation|civilization"),
@@ -66,22 +69,42 @@ def default_brand(topic: str) -> dict[str, Any]:
         if re.search(words, topic, re.IGNORECASE):
             domain = key
             break
-    primary, accent, neutral = PALETTES[domain]
+            
     return {
-        "titleFont": {"name": "Cambria"}, "bodyFont": {"name": "Calibri"},
-        "colors": {"primary": primary, "accent": accent, "background": "#FFFFFF",
-                   "neutral": neutral, "secondary": primary},
-        "designSystem": DESIGN_SYSTEM_VERSION, "subject": domain,
+        "titleFont": {"name": "Cambria"},
+        "bodyFont": {"name": "Calibri"},
+        "colors": {
+            "ink": tokens.ink,
+            "primary": tokens.primary,
+            "secondary": tokens.secondary,
+            "accent": tokens.primary,
+            "tint_a": tokens.tint_a,
+            "tint_b": tokens.tint_b,
+            "alert": tokens.alert,
+            "background": "#FFFFFF",
+            "paper": "#FAFAF9",
+            "neutral": tokens.tint_a,
+            "card_fill": tokens.tint_a,
+        },
+        "designSystem": DESIGN_SYSTEM_VERSION,
+        "subject": domain,
     }
 
 
 def normalize_brand(brand: Any, topic: str) -> dict[str, Any]:
     result = default_brand(topic)
     colors = brand.get("colors", {}) if isinstance(brand, dict) else {}
-    for key in ("primary", "accent", "neutral"):
+    for key in ("ink", "primary", "secondary", "accent", "tint_a", "tint_b", "alert", "neutral", "card_fill", "paper"):
         value = colors.get(key) if isinstance(colors, dict) else None
         if isinstance(value, str) and re.fullmatch(r"#?[0-9a-fA-F]{6}", value):
             result["colors"][key] = "#" + value.lstrip("#")
+    
+    # Maintain backwards compatibility aliases
+    if "primary" in result["colors"] and "accent" not in colors:
+        result["colors"]["accent"] = result["colors"]["primary"]
+    if "tint_a" in result["colors"] and "neutral" not in colors:
+        result["colors"]["neutral"] = result["colors"]["tint_a"]
+
     # A light primary breaks the dark-slide treatment. Reject it deterministically.
     primary = result["colors"]["primary"].lstrip("#")
     if sum(int(primary[i:i + 2], 16) for i in (0, 2, 4)) > 330:

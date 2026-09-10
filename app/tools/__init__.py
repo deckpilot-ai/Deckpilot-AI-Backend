@@ -8,6 +8,7 @@ from app.tools.table_engine import TableEngine
 from app.tools.diagram_engine import DiagramEngine
 from app.tools.text_geometry import TextGeometry
 from app.tools.pptx_validator import PPTXValidator
+from app.tools.design_auto_configurator import DesignAutoConfigurator
 
 __all__ = [
     "DocumentAssetExtractor",
@@ -18,4 +19,5 @@ __all__ = [
     "DiagramEngine",
     "TextGeometry",
     "PPTXValidator",
+    "DesignAutoConfigurator",
 ]

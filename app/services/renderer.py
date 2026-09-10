@@ -237,16 +237,38 @@ class PPTXRenderer:
             bullets = [b for b in slide_data.bullets if isinstance(b, str) and b.strip()]
             image_bytes = images.get(slide_data.image_artifact_id or "")
 
-            # Eyebrow & Title
-            if layout not in (LayoutFamily.HERO, LayoutFamily.CLOSING):
-                cls._text(slide, eyebrow.upper(), 0.6, 0.5, 12.1, 0.32, body_col, body_font, 12.5)
-                cls._text(slide, title, 0.6, 0.95, 12.1, 1.1, fg, title_font, 28, title=True)
+            from app.services.archetype_renderer import ArchetypeRenderer
+
+            # Check archetype ID
+            arch_id = getattr(slide_data, "archetype_id", None)
+            if not arch_id and hasattr(layout, "value") and str(layout.value).startswith("A") and str(layout.value)[1:].isdigit():
+                arch_id = str(layout.value)
+            if not arch_id and isinstance(slide_data.layout_hint, str) and slide_data.layout_hint.upper().startswith("A"):
+                cand = slide_data.layout_hint.upper()
+                if cand[1:].isdigit():
+                    arch_id = cand
+
+            # Eyebrow & Title & Accent Tick (Skip for custom cover/divider archetypes)
+            is_standalone_cover = layout in (LayoutFamily.HERO, LayoutFamily.CLOSING) or arch_id in ("A1", "A2", "A3")
+            if not is_standalone_cover:
+                cls._text(slide, eyebrow.upper(), 0.6, 0.45, 12.1, 0.32, primary if not dark else accent, body_font, 12, bold=True)
+                cls._text(slide, title, 0.6, 0.82, 12.1, 0.85, fg, title_font, 28, title=True)
+                cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.6, 1.72, 0.6, 0.06, accent if not dark else tint(primary, 0.6), "accent-tick")
 
             # Footer
-            footer_text = f"{deck_title.upper()} - {eyebrow.upper()}"
-            cls._text(slide, footer_text[:140], 0.6, 6.62, 11.15, 0.28, body_col, body_font, 9)
-            cls._shape(slide, MSO_SHAPE.OVAL, 12.3, 6.52, 0.4, 0.4, white if dark else primary, "page-badge")
-            cls._text(slide, str(index + 1), 12.3, 6.52, 0.4, 0.4, primary if dark else white, body_font, 10, bold=True, center=True)
+            footer_text = f"{deck_title.upper()} · {eyebrow.upper()}"
+            cls._text(slide, footer_text[:140], 0.6, 7.05, 11.4, 0.28, body_col, body_font, 9.5)
+            cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.2, 6.95, 0.5, 0.35, tint(primary, 0.12) if not dark else tint(primary, 0.3), "page-pill", corner_radius=0.2)
+            cls._text(slide, str(index + 1), 12.2, 6.95, 0.5, 0.35, primary if not dark else white, body_font, 10, bold=True, center=True)
+
+            # Speaker Notes
+            notes = slide_data.speaker_notes or f"Presenter guidance for Slide {index + 1}: {title}"
+            slide.notes_slide.notes_text_frame.text = notes
+
+            # --- Consulting Archetype Dispatch ---
+            if arch_id and ArchetypeRenderer.can_render(arch_id):
+                if ArchetypeRenderer.render(slide, arch_id, slide_data, design_system, image_bytes, cls):
+                    continue
 
             # --- Layout Routing ---
             if layout == LayoutFamily.HERO:
