@@ -341,15 +341,28 @@ class ChatService:
                 },
             }
 
+        from app.services.compaction import ContextCompactionService
+        eff_ctx = ContextCompactionService.get_effective_context(db, project_id)
+
         # -------------------------------------------------------------
         # MODE 3: AUTOPILOT MODE (Default: End-to-end execution)
         # -------------------------------------------------------------
-        should_generate = input_guardrail.intent == IntentCategory.DECK_GENERATION
+        existing_deck = db.scalar(
+            select(DeckVersion)
+            .where(DeckVersion.project_id == project_id, DeckVersion.status == "ready")
+            .order_by(DeckVersion.version.desc())
+        )
+
+        is_revision = input_guardrail.intent == IntentCategory.REVISION or (
+            existing_deck is not None and any(w in input_guardrail.sanitized_content.lower() for w in ("change slide", "update slide", "edit slide", "modify slide", "rewrite slide", "replace slide", "in slide", "make slide"))
+        )
+        should_generate = (input_guardrail.intent == IntentCategory.DECK_GENERATION) or is_revision
 
         if should_generate:
-            # Check for decisions if prompt is concise
+            intent_type = "revise" if (is_revision and existing_deck is not None) else "generate"
+            # Check for decisions if prompt is concise and it's a new deck
             decision_questions = None
-            if len(input_guardrail.sanitized_content.split()) <= 7:
+            if intent_type == "generate" and len(input_guardrail.sanitized_content.split()) <= 7:
                 decision_questions = [
                     {
                         "id": "deck_depth",
@@ -359,7 +372,7 @@ class ChatService:
                 ]
 
             return {
-                "intent": "generate",
+                "intent": intent_type,
                 "mode": "autopilot",
                 "should_generate": True,
                 "user_message": user_msg_dict,
@@ -373,15 +386,18 @@ class ChatService:
             }
 
         # Conversational query in Autopilot mode (not a direct greeting/thanks, e.g. custom question)
-        existing_deck = db.scalar(select(DeckVersion).where(DeckVersion.project_id == project_id))
-
         deck_context_note = ""
         if existing_deck:
             deck_context_note = f"\nNote: The user already has Deck v{existing_deck.version} in this workspace session."
 
+        context_prompt_fragment = ""
+        if eff_ctx.get("context_prompt"):
+            context_prompt_fragment = f"\nConversation History & Context:\n{eff_ctx['context_prompt']}\n"
+
         user_prompt_conversational = (
             f"User Inquiry: \"{input_guardrail.sanitized_content}\"\n"
             f"{deck_context_note}\n"
+            f"{context_prompt_fragment}"
             f"Instructions:\n"
             f"- Understand what the user is asking and answer their specific question directly.\n"
             f"- Guardrail constraint: Keep response concise (under {input_guardrail.max_words} words). Do NOT generate unnecessary big responses, unsolicited feature lists, or multi-paragraph text.\n"

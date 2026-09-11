@@ -17,6 +17,7 @@ from app.agents.design_intelligence import DesignIntelligenceAgent
 from app.agents.qa_agent import PresentationQAAgent
 from app.agents.repair_agent import RepairAgent
 from app.agents.requirements_agent import RequirementsAgent
+from app.agents.revision_agent import RevisionAgent
 from app.agents.storyline_agent import StorylineAgent
 from app.agents.title_intelligence import TitleIntelligence
 from app.models.attachment import Attachment
@@ -444,12 +445,39 @@ class JobOrchestrator:
                 _update_task("source_grounding", "completed", completed=True)
                 _emit("source_grounding", "completed", f"Grounded factual context from {len(existing_artifacts)} sources.")
 
-            # 3. Dynamic Design Intelligence
+            # 3. Dynamic Design Intelligence & Targeted Revision Handling
+            latest_deck = db.scalar(
+                select(DeckVersion)
+                .where(DeckVersion.project_id == project_id, DeckVersion.status == "ready")
+                .order_by(DeckVersion.version.desc())
+            )
+            saved_deck_artifact = (
+                db.get(Artifact, latest_deck.deck_json_artifact_id)
+                if latest_deck and latest_deck.deck_json_artifact_id
+                else None
+            )
+            prev_spec = None
+            if saved_deck_artifact and saved_deck_artifact.json_data:
+                try:
+                    prev_spec = json.loads(saved_deck_artifact.json_data)
+                except Exception:
+                    prev_spec = None
+
+            is_targeted_revision = False
+            if prev_spec and isinstance(prev_spec.get("slides"), list) and prev_spec["slides"]:
+                if job_mode == "revise":
+                    is_targeted_revision = True
+                elif job_mode != "export":
+                    target_indices = RevisionAgent.detect_target_slide_indices(user_prompt, prev_spec)
+                    is_theme = RevisionAgent.is_global_theme_change(user_prompt)
+                    has_revision_words = any(w in user_prompt.lower() for w in ("change slide", "update slide", "edit slide", "modify slide", "make slide", "in slide", "rewrite slide", "replace slide"))
+                    if target_indices or is_theme or has_revision_words:
+                        is_targeted_revision = True
+
             if job_mode == "export":
                 await wait_for_pending_attachments(db, project_id, emit=_emit)
-                latest = db.scalar(select(DeckVersion).where(DeckVersion.project_id == project_id,
-                                                             DeckVersion.status == "ready").order_by(DeckVersion.version.desc()))
-                saved = db.get(Artifact, latest.deck_json_artifact_id) if latest and latest.deck_json_artifact_id else None
+                latest = latest_deck
+                saved = saved_deck_artifact
                 if not saved or not saved.json_data:
                     raise ValueError("Generate a presentation before re-exporting it")
                 context["deck_spec"] = prepare_deck(json.loads(saved.json_data), enriched_prompt)
@@ -458,10 +486,48 @@ class JobOrchestrator:
                     _update_task(stage, "completed", completed=True)
                     _emit(stage, "completed", "Reusing the existing written presentation for export.")
 
+            elif is_targeted_revision and prev_spec:
+                await wait_for_pending_attachments(db, project_id, emit=_emit)
+                _update_task("font_brand_detection", "running", started=True)
+                _emit("font_brand_detection", "running", "Preserving presentation design system and analyzing revision directives...")
+
+                goal: PresentationGoal = context.get("presentation_goal") or RequirementsAgent.analyze_requirements(user_prompt)
+                design_system: DesignSystem = DesignIntelligenceAgent.generate_design_system(
+                    goal=goal,
+                    reference_profile=reference_ppt_profile,
+                )
+                context["design_system"] = design_system
+                context["brand_style"] = prev_spec.get("brandStyle") or {
+                    "colors": design_system.colors.model_dump(),
+                    "titleFont": design_system.typography.title_font.model_dump(),
+                    "bodyFont": design_system.typography.body_font.model_dump(),
+                    "subject": design_system.subject_domain,
+                }
+                _update_task("font_brand_detection", "completed", completed=True)
+                _emit("font_brand_detection", "completed", "Retained presentation design system and brand styling.")
+
+                _update_task("deck_planner", "completed", completed=True)
+                _emit("deck_planner", "completed", f"Retaining all {len(prev_spec.get('slides', []))} planned slides for targeted revision.")
+
+                _update_task("slide_writer", "running", started=True)
+                revised_spec, rev_summary = await RevisionAgent.apply_revision(
+                    db=db,
+                    deck_spec=prev_spec,
+                    user_prompt=user_prompt,
+                    brand_style=context["brand_style"],
+                    user_id=user_id,
+                    job_id=job_id,
+                    emit_fn=_emit,
+                )
+                context["deck_spec"] = prepare_deck(revised_spec, enriched_prompt)
+                db.add(Artifact(project_id=project_id, job_id=job_id, type="deck_draft", json_data=json.dumps(context["deck_spec"])))
+                _update_task("slide_writer", "completed", completed=True)
+                _emit("slide_writer", "completed", rev_summary)
+
             if check_cancelled():
                 return db.get(GenerationJob, job_id) or job
 
-            if job_mode != "export" and "font_brand_detection" in task_types:
+            if not is_targeted_revision and job_mode != "export" and "font_brand_detection" in task_types:
                 _update_task("font_brand_detection", "running", started=True)
                 _emit("font_brand_detection", "running", "Creating tailored design system, color palette, and typography hierarchy...")
 
@@ -513,7 +579,7 @@ class JobOrchestrator:
             # 4. Deck Planner & Storyline Intelligence
             if check_cancelled():
                 return db.get(GenerationJob, job_id) or job
-            if job_mode != "export" and "deck_planner" in task_types:
+            if not is_targeted_revision and job_mode != "export" and "deck_planner" in task_types:
                 _update_task("deck_planner", "running", started=True)
 
                 goal: PresentationGoal = context.get("presentation_goal") or RequirementsAgent.analyze_requirements(user_prompt)
@@ -646,7 +712,7 @@ class JobOrchestrator:
             # 5. Slide Writer
             if check_cancelled():
                 return db.get(GenerationJob, job_id) or job
-            if job_mode != "export" and "slide_writer" in task_types:
+            if not is_targeted_revision and job_mode != "export" and "slide_writer" in task_types:
                 _update_task("slide_writer", "running", started=True)
 
                 slides_to_write = context["deck_spec"].get("slides", [])
@@ -1205,13 +1271,17 @@ class JobOrchestrator:
             })
 
             # Conversational summary
+            is_revised = _new_version > 1
+            action_word = "updated" if is_revised else "created"
+            version_label = f" (Version {_new_version})" if is_revised else ""
             msg_content = (
-                f"I have created your presentation **\"{title}\"** with {slides_count} executive widescreen slides.\n\n"
+                f"I have {action_word} your presentation **\"{title}\"**{version_label} with {slides_count} executive widescreen slides.\n\n"
                 f"• **Slide Count**: {slides_count} custom slides rendered\n"
                 f"• **Format**: 16:9 native Microsoft PowerPoint OpenXML (.pptx)\n"
                 f"• **Design**: Dynamic {context.get('design_system', DesignSystem()).subject_domain.title()} Design System with native charts and structured visual layouts\n"
                 f"• **QA**: Verified layout geometry, message-driven titles, and data provenance\n\n"
-                f"You can download the PowerPoint file directly using the button above. Let me know if you would like me to adjust any slides, modify the color scheme, or add new data!"
+                f"[DECK_READY:version={_new_version}:title={title}:slides={slides_count}]\n\n"
+                f"You can download the PowerPoint file directly using the button above or below. Let me know if you would like me to adjust any specific slides, modify the color scheme, or add new data!"
             )
 
             assistant_msg = Message(

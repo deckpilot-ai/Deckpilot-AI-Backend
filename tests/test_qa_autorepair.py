@@ -1,4 +1,5 @@
 import io
+import pytest
 
 from pptx import Presentation
 from pptx.util import Inches, Pt
@@ -349,6 +350,57 @@ def test_explicit_user_prompt_details_and_outlines_preserved():
     assert len(fb["slides"]) == 5
     assert fb["generationMode"] == "user_explicit_outline"
     assert fb["slides"][0]["headline"] == "Executive Overview"
+
+
+@pytest.mark.asyncio
+async def test_targeted_slide_revision_preserves_other_slides():
+    from app.agents.revision_agent import RevisionAgent
+    from app.services.guardrails import InputGuardrailService, IntentCategory
+
+    # 1. Guardrail recognizes slide revision intent
+    gr = InputGuardrailService.evaluate("In slide 3, change the bullet points to focus on quantum error correction overhead.")
+    assert gr.intent == IntentCategory.REVISION
+
+    # 2. Existing 5-slide deck specification
+    initial_deck = {
+        "deckTitle": "Quantum Computing Architecture",
+        "brandStyle": {"subject": "technology"},
+        "slides": [
+            {"slideId": "s01", "headline": "Executive Overview", "purpose": "Overview", "message": "Overview", "bullets": ["Paradigm shift", "Enterprise adoption"], "layoutHint": "hero"},
+            {"slideId": "s02", "headline": "Physical Realizations", "purpose": "Hardware", "message": "Hardware", "bullets": ["Superconducting qubits", "Ion traps"], "layoutHint": "two_column"},
+            {"slideId": "s03", "headline": "Algorithmic Advantage", "purpose": "Algorithms", "message": "Algorithms", "bullets": ["Shor's algorithm", "Grover's algorithm"], "layoutHint": "metrics_grid"},
+            {"slideId": "s04", "headline": "Key Bottlenecks", "purpose": "Bottlenecks", "message": "Bottlenecks", "bullets": ["Decoherence", "Cryogenics"], "layoutHint": "two_column"},
+            {"slideId": "s05", "headline": "Commercial Horizon", "purpose": "Roadmap", "message": "Roadmap", "bullets": ["2025 NISQ", "2030 Fault tolerant"], "layoutHint": "timeline_band"},
+        ]
+    }
+
+    # 3. Detect target slide index -> should be 2 (Slide 3)
+    target_indices = RevisionAgent.detect_target_slide_indices(
+        "In slide 3, change the bullet points to focus on quantum error correction overhead.",
+        initial_deck
+    )
+    assert target_indices == [2]
+
+    # 4. Apply revision -> Slide 3 is updated, Slides 0, 1, 3, 4 remain strictly identical
+    revised_deck, summary = await RevisionAgent.apply_revision(
+        db=None,
+        deck_spec=initial_deck,
+        user_prompt="In slide 3, change headline to Quantum Error Correction Overhead and add bullet: Requires 1000 physical qubits per logical qubit",
+    )
+
+    assert "Slide 3" in summary
+    assert "Preserved remaining 4 slide(s) untouched" in summary
+
+    # Verify Slide 3 changed
+    assert revised_deck["slides"][2]["headline"] == "Quantum Error Correction Overhead"
+    assert any("1000 physical qubits" in b for b in revised_deck["slides"][2]["bullets"])
+
+    # Verify other slides were NOT touched at all
+    assert revised_deck["slides"][0] == initial_deck["slides"][0]
+    assert revised_deck["slides"][1] == initial_deck["slides"][1]
+    assert revised_deck["slides"][3] == initial_deck["slides"][3]
+    assert revised_deck["slides"][4] == initial_deck["slides"][4]
+
 
 
 

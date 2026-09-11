@@ -107,6 +107,14 @@ SPEED_PATTERNS = [
     r"^(how\s+long\s+does\s+it\s+take|how\s+fast\s+(is\s+it|are\s+you)|generation\s+time)(!|\.|\?|\s)*$",
 ]
 
+# Revision and targeted slide edit triggers
+REVISION_PATTERNS = [
+    r"\b(?:change|update|edit|modify|rewrite|replace|revise|fix|tweak|adjust|swap)\s+(?:slide|page|s|the\s*(?:\d+(?:st|nd|rd|th)?|[a-zA-Z]+)?\s*slide|title|headline|bullets?|theme|color|palette|layout)\b",
+    r"\bin\s+(?:slide\s*\d+|the\s*(?:\d+(?:st|nd|rd|th)?|[a-zA-Z]+)?\s*slide)[,\s]+(?:change|update|edit|modify|make|replace|add|remove|fix)\b",
+    r"\b(?:make|set)\s+(?:slide\s*\d+|the\s*(?:\d+(?:st|nd|rd|th)?|[a-zA-Z]+)?\s*slide|title|theme|palette)\s+(?:dark|light|blue|green|shorter|longer|two\s*column|timeline|cards?|metrics)\b",
+    r"\b(?:add|remove|delete)\s+(?:a\s+)?(?:bullet|slide|point|card)\s+(?:to|from|on|in)\s+slide\s*\d+\b",
+]
+
 # Presentation creation triggers
 PRESENTATION_KEYWORDS = [
     "create", "build", "generate", "make", "design", "draft", "produce",
@@ -300,7 +308,12 @@ class InputGuardrailService:
                     "Generating a complete presentation takes approximately 15–25 seconds. DeckPilot researches the topic, plans slide structure, writes content, and renders professional 16:9 PowerPoint slides.",
                 )
 
-        # 6. Mode overrides
+        # 6. Revision / Targeted Slide Edit detection
+        for pattern in REVISION_PATTERNS:
+            if re.search(pattern, lower):
+                return IntentCategory.REVISION, VerbosityLevel.STANDARD, None
+
+        # 7. Mode overrides
         if mode == "ask":
             return IntentCategory.ADVISORY, VerbosityLevel.STANDARD, None
         if mode == "plan":
@@ -310,7 +323,7 @@ class InputGuardrailService:
                 return IntentCategory.DECK_GENERATION, VerbosityLevel.STANDARD, None
             return IntentCategory.ADVISORY, VerbosityLevel.CONCISE, None
 
-        # 7. Deck generation detection
+        # 8. Deck generation detection
         has_presentation_kw = any(kw in lower for kw in PRESENTATION_KEYWORDS)
         has_slide_count = bool(re.search(r"\b\d+\s*(-|\s)?(slide|slides)\b", lower))
 
