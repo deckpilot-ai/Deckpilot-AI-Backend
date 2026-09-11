@@ -243,10 +243,27 @@ class RepairAgent:
             new = LayoutFamily.METRICS_GRID
         elif len(slide.bullets) >= 4:
             new = LayoutFamily.CARD_GRID
+        elif slide.takeaway and len(slide.bullets) <= 3:
+            new = LayoutFamily.A5_DEFINITION
         else:
             new = LayoutFamily.TWO_COLUMN
-        if force_different and new == old:
-            new = LayoutFamily.COMPARISON if new == LayoutFamily.TWO_COLUMN else LayoutFamily.TWO_COLUMN
+
+        if force_different:
+            options = [
+                LayoutFamily.A5_DEFINITION,
+                LayoutFamily.COMPARISON,
+                LayoutFamily.A10_NUMBERED_PROCESS,
+                LayoutFamily.A6_TWO_ENTITY_COMPARISON,
+                LayoutFamily.A13_ICON_GRID,
+                LayoutFamily.CARD_GRID,
+                LayoutFamily.METRICS_GRID,
+                LayoutFamily.TWO_COLUMN,
+            ]
+            for opt in options:
+                if opt != old:
+                    new = opt
+                    break
+
         slide.layout_family = new
         slide.layout_hint = new.value
         slide.archetype_id = None

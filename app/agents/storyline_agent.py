@@ -304,15 +304,20 @@ class StorylineAgent:
         if raw_slide.get("metrics") and len(raw_slide["metrics"]) >= 2:
             return LayoutFamily.METRICS_GRID
 
-        # Alternating visual rhythm defaults
+        # Multi-archetype visual rhythm alternator to prevent repetitive box patterns
         alternator = [
             LayoutFamily.TWO_COLUMN,
-            LayoutFamily.CARD_GRID,
+            LayoutFamily.A5_DEFINITION,
             LayoutFamily.COMPARISON,
+            LayoutFamily.CARD_GRID,
+            LayoutFamily.A10_NUMBERED_PROCESS,
             LayoutFamily.METRICS_GRID,
+            LayoutFamily.A13_ICON_GRID,
+            LayoutFamily.A6_TWO_ENTITY_COMPARISON,
             LayoutFamily.ROADMAP,
         ]
         chosen = alternator[index % len(alternator)]
         if recent and recent[-1] == chosen:
-            chosen = LayoutFamily.TWO_COLUMN if chosen != LayoutFamily.TWO_COLUMN else LayoutFamily.CARD_GRID
+            # Pick next non-matching archetype from alternator
+            chosen = alternator[(index + 1) % len(alternator)]
         return chosen

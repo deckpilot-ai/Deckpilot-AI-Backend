@@ -231,3 +231,44 @@ def test_number_badges_do_not_create_a_false_body_font_range_failure():
 
     report = PresentationQAAgent.evaluate_presentation([slide], DesignSystem(), pptx_bytes=payload)
     assert "QA-029" not in {issue.checkpoint_id for issue in report.issues}
+
+
+def test_dynamic_image_allocation_ratio():
+    assets = [
+        AssetMetadata(asset_id=f"doc-img-{i}", caption=f"Archaeological finding pillar inscription {i}")
+        for i in range(1, 6)
+    ]
+    slides = [
+        {"headline": "Ancient Civilizations Overview", "purpose": "Introduction"},
+        {"headline": "Archaeological finding pillar inscription 1", "bullets": ["Pillar details."]},
+        {"headline": "Administrative Governance", "bullets": ["State apparatus."]},
+        {"headline": "Archaeological finding pillar inscription 2", "bullets": ["Territorial borders."]},
+        {"headline": "Economic Trade Corridors", "bullets": ["Maritime routes."]},
+        {"headline": "Archaeological finding pillar inscription 3", "bullets": ["Coins and weights."]},
+        {"headline": "Strategic Inscriptions", "bullets": ["Rock edicts."]},
+        {"headline": "Archaeological finding pillar inscription 4", "bullets": ["Edict discovery."]},
+        {"headline": "Empire Legacy", "bullets": ["Lasting impact."]},
+        {"headline": "Summary & Conclusion", "purpose": "Wrap up"},
+    ]
+    ImageMatcher.assign_images_semantically(slides, assets)
+    assigned_images = [s.get("imageArtifactId") for s in slides if s.get("imageArtifactId")]
+    assert len(assigned_images) >= 3
+    assert len(assigned_images) == len(set(assigned_images))  # 100% unique
+
+
+def test_repetitive_box_patterns_detected_and_differentiated():
+    slides = [
+        SlideSpec(slide_id="s01", slide_number=1, headline="Title", layout_family=LayoutFamily.HERO),
+        SlideSpec(slide_id="s02", slide_number=2, headline="Section A", bullets=["Point 1", "Point 2"], layout_family=LayoutFamily.CARD_GRID),
+        SlideSpec(slide_id="s03", slide_number=3, headline="Section B", bullets=["Point 3", "Point 4"], layout_family=LayoutFamily.CARD_GRID),
+        SlideSpec(slide_id="s04", slide_number=4, headline="Section C", bullets=["Point 5", "Point 6"], layout_family=LayoutFamily.CARD_GRID),
+    ]
+    report = PresentationQAAgent.evaluate_presentation(slides, DesignSystem())
+    failed = {issue.checkpoint_id for issue in report.issues}
+    assert "QA-077" in failed  # consecutive_same_layout
+
+    repaired = RepairAgent.apply_corrections(slides, report)
+    layouts = [s.layout_family for s in repaired]
+    # Check that consecutive identical layouts are broken
+    assert layouts[1] != layouts[2] or layouts[2] != layouts[3]
+

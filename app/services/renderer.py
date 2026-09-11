@@ -206,8 +206,21 @@ class PPTXRenderer:
         if number is not None:
             text_x, text_w = x + 0.8, w - 1.05
 
-        size = 18 if fixed_height else 16
-        floor = 17 if fixed_height else 13
+        word_count = len(clean_text(text).split())
+        # For concise copy (1-liner / short points), elevate typography so text comfortably fills card
+        if word_count <= 12 and not bullet_list:
+            size = 20
+            floor = 16
+        elif word_count <= 22:
+            size = 18
+            floor = 15
+        elif fixed_height:
+            size = 17
+            floor = 14
+        else:
+            size = 16
+            floor = 13
+
         while size > floor and not cls._fits(text, text_w, h - 0.4, size, bullet_list):
             size -= 1
 
@@ -216,14 +229,16 @@ class PPTXRenderer:
         lines = sum(max(1, math.ceil(len(line) / capacity)) for line in paragraphs)
         spacing = max(0, len(paragraphs) - 1) * 5 if bullet_list else 0
         actual_h = (lines * size * 1.25 + spacing) / 72 + 0.46
-        card_h = h if fixed_height else min(h, max(0.85, actual_h))
+        card_h = h if fixed_height else min(h, max(1.2, actual_h))
 
         cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, card_h, fill)
         if number is not None:
-            cls._shape(slide, MSO_SHAPE.OVAL, x + 0.2, y + 0.25, 0.4, 0.4, accent)
-            cls._text(slide, str(number), x + 0.2, y + 0.25, 0.4, 0.4, RGBColor(255, 255, 255), font_name, 11, bold=True, center=True)
+            disc_y = y + (card_h - 0.4) / 2 if fixed_height else y + 0.25
+            cls._shape(slide, MSO_SHAPE.OVAL, x + 0.2, disc_y, 0.4, 0.4, accent)
+            cls._text(slide, str(number), x + 0.2, disc_y, 0.4, 0.4, RGBColor(255, 255, 255), font_name, 11, bold=True, center=True)
             text_x, text_w = x + 0.8, w - 1.05
-        text_shape = cls._text(slide, text, text_x, y + 0.2, text_w, card_h - 0.4, foreground, font_name, size, bullet_list=bullet_list)
+        text_y = y + 0.2 if not fixed_height else y + max(0.12, (card_h - actual_h) / 2)
+        text_shape = cls._text(slide, text, text_x, text_y, text_w, card_h - 0.3, foreground, font_name, size, bullet_list=bullet_list)
         if fixed_height:
             text_shape.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
 
@@ -596,7 +611,9 @@ class PPTXRenderer:
                     if not re.match(r"^(?:Fig|Figure|Map)\b", caption, re.I):
                         caption = f"Fig. {index + 1} - {caption}"
                     cls._text(slide, cls._short_caption(caption), 6.85, 6.20, 5.75, 0.45, primary, body_font, 10.5, italic=True, center=True)
-                elif slide_data.archetype_fields.get("qa_balanced_cards"):
+                elif slide_data.archetype_fields.get("qa_balanced_cards") or (
+                    len(bullets) <= 3 and sum(len(str(b).split()) for b in bullets) <= 36 and not image_bytes and slide_data.takeaway
+                ):
                     # A lead band plus balanced evidence cards uses the full
                     # canvas even when the source supplies concise copy.
                     content_y = 2.15
