@@ -336,6 +336,19 @@ class PPTXRenderer:
             slide.notes_slide.notes_text_frame.text = notes
 
             # --- Consulting Archetype Dispatch ---
+            if not arch_id:
+                layout_to_arch = {
+                    LayoutFamily.BIG_QUESTIONS: "A29",
+                    LayoutFamily.TIMELINE_BAND: "A24",
+                    LayoutFamily.COUNCIL_EIGHT: "A25",
+                    LayoutFamily.TWO_HIGHWAYS: "A26",
+                    LayoutFamily.FORTS_QUOTE_EMBLEM: "A27",
+                    LayoutFamily.CONCEPT_DEFINITION_IMAGE: "A28",
+                    LayoutFamily.STEPPED_VALUE_CHAIN: "A30",
+                }
+                if layout in layout_to_arch:
+                    arch_id = layout_to_arch[layout]
+
             if arch_id and ArchetypeRenderer.can_render(arch_id):
                 if ArchetypeRenderer.render(slide, arch_id, slide_data, design_system, image_bytes, cls):
                     # Redraw page pill on top to ensure never obscured

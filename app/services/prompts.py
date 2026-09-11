@@ -156,7 +156,7 @@ You must output a strictly valid JSON object matching this schema:
       "slideId": "s01",
       "purpose": "Specific teaching or communication purpose, appropriate to the subject",
       "message": "Action-oriented headline summarizing this slide's core takeaway",
-      "layoutHint": "hero | big_questions | timeline_columns | timeline | two_column | concept | diagram_hierarchy | saptanga | dark_quote | quote | comparison | card_grid | metrics_grid | image_focus | closing | legacy"
+      "layoutHint": "hero | big_questions | timeline_band | council_eight | two_highways | forts_quote_emblem | concept_definition_image | stepped_value_chain | two_column | concept | diagram_hierarchy | saptanga | dark_quote | quote | comparison | card_grid | metrics_grid | image_focus | closing | legacy"
     }
   ]
 }
@@ -167,7 +167,7 @@ Rules:
    - If not specified: for attached comprehensive textbook chapters or in-depth reference documents (10+ pages), generate a thorough, chapter-complete presentation of 20 to 25 slides covering foundations, inquiries, chronology, mechanisms, evidence, case studies, administration, and legacy; for short briefs, plan 6 to 10 slides.
 2. For comprehensive decks (e.g. 20-25 slides), organize slides into cohesive thematic chapters (foundations, inquiries, chronology, systemic features, military/trade, regional centers, imperial framework, governance hierarchy, primary accounts, epigraphy/reforms, society, art & architecture, legacy).
 3. NEVER use generic placeholder words like 'Lorem ipsum' or 'Strategic Milestone'. Every slide purpose and message MUST directly reflect the user's specific domain, company, or request.
-4. Consulting layout hints include: 'hero', 'big_questions', 'timeline_columns', 'timeline', 'two_column', 'concept', 'diagram_hierarchy', 'saptanga', 'dark_quote', 'quote', 'comparison', 'card_grid', 'metrics_grid', 'process_steps', 'image_focus', 'closing', 'legacy'.
+4. Consulting layout hints include: 'hero', 'big_questions', 'timeline_band', 'council_eight', 'two_highways', 'forts_quote_emblem', 'concept_definition_image', 'stepped_value_chain', 'timeline_columns', 'timeline', 'two_column', 'concept', 'diagram_hierarchy', 'saptanga', 'dark_quote', 'quote', 'comparison', 'card_grid', 'metrics_grid', 'process_steps', 'image_focus', 'closing', 'legacy'.
 """
 
 SLIDE_WRITER_SYSTEM_PROMPT = """You are a subject-aware Slide Writer at deckpilotAI. Your job is to formulate high-impact, scannable slide content for each slide in the planned presentation.

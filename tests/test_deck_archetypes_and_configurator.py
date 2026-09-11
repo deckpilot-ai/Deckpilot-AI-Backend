@@ -21,15 +21,117 @@ from app.tools.design_auto_configurator import DesignAutoConfigurator
 
 
 def test_layout_archetypes_catalog_integrity():
-    """Verify all 23 archetypes are registered with valid schemas and families."""
-    assert len(LAYOUT_ARCHETYPES) == 23
-    for arch_id in (f"A{i}" for i in range(1, 24)):
+    """Verify all 30 archetypes are registered with valid schemas and families."""
+    assert len(LAYOUT_ARCHETYPES) == 30
+    for arch_id in (f"A{i}" for i in range(1, 31)):
         assert arch_id in LAYOUT_ARCHETYPES
         arch = LAYOUT_ARCHETYPES[arch_id]
         assert "family" in arch
         assert "name" in arch
         assert "when_to_use" in arch
         assert "schema_keys" in arch
+
+
+def test_new_layout_families_rendering():
+    """Verify rendering of newly added layout archetypes (A24-A30)."""
+    from app.agents.design_intelligence import DesignIntelligenceAgent
+
+    goal = PresentationGoal(topic="The Rise of the Marathas and Constitutional Federalism", target_slide_count=7)
+    ds = DesignIntelligenceAgent.generate_design_system(goal)
+
+    slides = [
+        SlideSpec(
+            headline="The Big Questions of State Formation",
+            eyebrow="CHAPTER 1 · INQUIRY",
+            layout_family=LayoutFamily.BIG_QUESTIONS,
+            bullets=[
+                "Who were the key actors and what drove their mobilization?",
+                "What administrative institutions enabled durable statecraft?",
+                "How did fiscal and military policies sustain expansion?",
+                "What enduring legacy shaped subsequent constitutional design?",
+            ],
+            takeaway="Four core questions guide the analysis of institutional evolution.",
+        ),
+        SlideSpec(
+            headline="Chronology of the Maratha Sovereign State",
+            eyebrow="CHAPTER 2 · TIMELINE",
+            layout_family=LayoutFamily.TIMELINE_BAND,
+            bullets=[
+                "1630: Early Foundations and Clan Roots in the Western Ghats",
+                "1657: Naval Power and Coastal Fortress Construction",
+                "1674: Coronation as Chhatrapati and Sovereign Recognition",
+                "1707: Pan-Indian Expansion and the Peshwa Governance Era",
+            ],
+            takeaway="A continuous institutional evolution from regional hill autonomy to subcontinental power.",
+        ),
+        SlideSpec(
+            headline="The Ashta Pradhana Mandala",
+            eyebrow="CHAPTER 3 · GOVERNANCE",
+            layout_family=LayoutFamily.COUNCIL_EIGHT,
+            bullets=[
+                "Peshwa: Prime Minister overseeing civil and military governance.",
+                "Amatya: Finance Minister managing revenue and treasury.",
+                "Sachiv: Royal Secretary handling state correspondence.",
+                "Mantri: Chronicler keeping official court records.",
+                "Senapati: Commander-in-Chief leading armed forces.",
+                "Sumant: Foreign Minister managing diplomacy.",
+                "Nyayadhish: Chief Justice administering civil justice.",
+                "Panditrao: High Priest supervising religious endowments.",
+            ],
+            takeaway="A structured eight-member council distributing executive authority.",
+        ),
+        SlideSpec(
+            headline="Two Routes to a Federation",
+            eyebrow="CHAPTER 4 · COMPARISON",
+            layout_family=LayoutFamily.TWO_HIGHWAYS,
+            bullets=[
+                "Coming Together: Independent sovereign units pool authority to form a larger federal union.",
+                "Holding Together: A large unitary nation decides to divide constitutional power between national and regional tiers.",
+            ],
+            takeaway="Distinct historical pathways produce different balances of regional autonomy.",
+        ),
+        SlideSpec(
+            headline="The Strategic Core of the State: Forts",
+            eyebrow="CHAPTER 5 · DOCTRINE",
+            layout_family=LayoutFamily.FORTS_QUOTE_EMBLEM,
+            bullets=[
+                "Military Bastions: Permanent hill fortresses neutralised superior conventional armies.",
+                "Fiscal Sanctuaries: Sovereign treasuries and mints remained secure in rugged terrain.",
+                "Administrative Hubs: Territorial law and tax administration radiated from fort command.",
+            ],
+            takeaway="Forts are the core of the state. What is a kingdom without forts? It is like a house without walls.",
+        ),
+        SlideSpec(
+            headline="Defining Federalism and Shared Rule",
+            eyebrow="CHAPTER 6 · CONCEPTS",
+            layout_family=LayoutFamily.CONCEPT_DEFINITION_IMAGE,
+            bullets=[
+                "Constitutional Division: Authority divided between central union and constituent states.",
+                "Dual Jurisdiction: Each tier possesses guaranteed autonomy in specified legislative fields.",
+                "Judicial Guardrails: Supreme Court acts as arbiter of jurisdictional disputes.",
+            ],
+            takeaway="A system of government where power is constitutionally divided between central and regional tiers.",
+        ),
+        SlideSpec(
+            headline="The Market Value Chain: Cotton to Cloth",
+            eyebrow="CHAPTER 7 · VALUE CHAIN",
+            layout_family=LayoutFamily.STEPPED_VALUE_CHAIN,
+            bullets=[
+                "Farmer & Cultivator: Harvests raw cotton pods and sells to regional traders.",
+                "Ginning & Spinning Mill: Cleans raw cotton and spins fibers into industrial yarn.",
+                "Weaving & Dyeing: Converts yarn into finished textiles and vibrant garments.",
+                "Wholesale Merchant: Distributes bulk garments to national distribution centers.",
+                "Retail Consumer Outlet: Sells finished garments to shoppers in city markets.",
+            ],
+            takeaway="Value accumulates across each stage reflecting logistical transport, processing, and margin.",
+        ),
+    ]
+
+    pptx_bytes = PPTXRenderer.render_presentation(slides, ds, deck_title="Historical & Civic Frameworks")
+    assert len(pptx_bytes) > 20000
+    report = PPTXRenderer.validate_deck(pptx_bytes, 7)
+    assert report["status"] == "passed"
+    assert report["overall_quality_score"] >= 75.0
 
 
 def test_palette_generator_semantic_matching():

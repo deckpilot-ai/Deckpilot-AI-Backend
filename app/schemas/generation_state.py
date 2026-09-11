@@ -90,7 +90,7 @@ class LayoutFamily(str, Enum):
     TEXT_IMAGE = "text_image"
     SECTION_DIVIDER = "section_divider"
     CLOSING = "closing"
-    # Consulting Archetype Identifiers (A1-A23)
+    # Consulting Archetype Identifiers (A1-A30)
     A1_TITLE_BLOB = "A1"
     A2_TITLE_SPLIT = "A2"
     A3_DIVIDER_HERO = "A3"
@@ -114,6 +114,21 @@ class LayoutFamily(str, Enum):
     A21_KPI_CLUSTER = "A21"
     A22_HUB_SPOKE = "A22"
     A23_VERTICAL_PIPELINE = "A23"
+    A24_TIMELINE_BAND = "A24"
+    A25_COUNCIL_EIGHT = "A25"
+    A26_TWO_HIGHWAYS = "A26"
+    A27_FORTS_QUOTE_EMBLEM = "A27"
+    A28_CONCEPT_DEFINITION_IMAGE = "A28"
+    A29_BIG_QUESTIONS = "A29"
+    A30_STEPPED_VALUE_CHAIN = "A30"
+    # Specific semantic family patterns
+    BIG_QUESTIONS = "big_questions"
+    TIMELINE_BAND = "timeline_band"
+    COUNCIL_EIGHT = "council_eight"
+    TWO_HIGHWAYS = "two_highways"
+    FORTS_QUOTE_EMBLEM = "forts_quote_emblem"
+    CONCEPT_DEFINITION_IMAGE = "concept_definition_image"
+    STEPPED_VALUE_CHAIN = "stepped_value_chain"
 
 
 class ChartType(str, Enum):
@@ -303,15 +318,42 @@ class SlideSpec(BaseModel):
                     "IMAGE_AND_TEXT": LayoutFamily.TEXT_IMAGE,
                     "TABLE": LayoutFamily.TABLE_FOCUS,
                     "CHART": LayoutFamily.CHART_FOCUS,
+                    "BIG_QUESTIONS": LayoutFamily.BIG_QUESTIONS,
+                    "FOUR_CARD_NUMBERED_GRID": LayoutFamily.BIG_QUESTIONS,
+                    "TIMELINE_BAND": LayoutFamily.TIMELINE_BAND,
+                    "CHRONOLOGY_HORIZONTAL": LayoutFamily.TIMELINE_BAND,
+                    "COUNCIL_EIGHT": LayoutFamily.COUNCIL_EIGHT,
+                    "ASHTA_PRADHANA": LayoutFamily.COUNCIL_EIGHT,
+                    "FEATURE_GRID_EIGHT": LayoutFamily.COUNCIL_EIGHT,
+                    "TWO_HIGHWAYS": LayoutFamily.TWO_HIGHWAYS,
+                    "TWO_ROUTES": LayoutFamily.TWO_HIGHWAYS,
+                    "FORTS_QUOTE_EMBLEM": LayoutFamily.FORTS_QUOTE_EMBLEM,
+                    "CORE_STATE_QUOTE": LayoutFamily.FORTS_QUOTE_EMBLEM,
+                    "CONCEPT_DEFINITION_IMAGE": LayoutFamily.CONCEPT_DEFINITION_IMAGE,
+                    "VOCAB_CALLOUT_IMAGE": LayoutFamily.CONCEPT_DEFINITION_IMAGE,
+                    "STEPPED_VALUE_CHAIN": LayoutFamily.STEPPED_VALUE_CHAIN,
+                    "MARKET_CHAIN": LayoutFamily.STEPPED_VALUE_CHAIN,
                 }
-                for i in range(1, 24):
-                    layout_map[f"A{i}"] = getattr(LayoutFamily, f"A{i}_{'TITLE_BLOB' if i==1 else 'TITLE_SPLIT' if i==2 else 'DIVIDER_HERO' if i==3 else 'ROADMAP_AGENDA' if i==4 else 'DEFINITION' if i==5 else 'TWO_ENTITY_COMPARISON' if i==6 else 'TWO_COLUMN_CONTRAST' if i==7 else 'STAT_IMAGE_HIGHLIGHT' if i==8 else 'PROCESS_CHAIN' if i==9 else 'NUMBERED_PROCESS' if i==10 else 'STAGE_COLUMNS' if i==11 else 'BEFORE_AFTER' if i==12 else 'ICON_GRID' if i==13 else 'CHART_INSIGHT' if i==14 else 'DUAL_STAT_COMPARISON' if i==15 else 'NATIVE_TABLE' if i==16 else 'CLOSING_TAKEAWAYS' if i==17 else 'RECAP_CHECKLIST' if i==18 else 'GLOSSARY_GRID' if i==19 else 'ORG_HIERARCHY' if i==20 else 'KPI_CLUSTER' if i==21 else 'HUB_SPOKE' if i==22 else 'VERTICAL_PIPELINE'}")
+                for i in range(1, 31):
+                    suffix = (
+                        'TITLE_BLOB' if i==1 else 'TITLE_SPLIT' if i==2 else 'DIVIDER_HERO' if i==3 else
+                        'ROADMAP_AGENDA' if i==4 else 'DEFINITION' if i==5 else 'TWO_ENTITY_COMPARISON' if i==6 else
+                        'TWO_COLUMN_CONTRAST' if i==7 else 'STAT_IMAGE_HIGHLIGHT' if i==8 else 'PROCESS_CHAIN' if i==9 else
+                        'NUMBERED_PROCESS' if i==10 else 'STAGE_COLUMNS' if i==11 else 'BEFORE_AFTER' if i==12 else
+                        'ICON_GRID' if i==13 else 'CHART_INSIGHT' if i==14 else 'DUAL_STAT_COMPARISON' if i==15 else
+                        'NATIVE_TABLE' if i==16 else 'CLOSING_TAKEAWAYS' if i==17 else 'RECAP_CHECKLIST' if i==18 else
+                        'GLOSSARY_GRID' if i==19 else 'ORG_HIERARCHY' if i==20 else 'KPI_CLUSTER' if i==21 else
+                        'HUB_SPOKE' if i==22 else 'VERTICAL_PIPELINE' if i==23 else 'TIMELINE_BAND' if i==24 else
+                        'COUNCIL_EIGHT' if i==25 else 'TWO_HIGHWAYS' if i==26 else 'FORTS_QUOTE_EMBLEM' if i==27 else
+                        'CONCEPT_DEFINITION_IMAGE' if i==28 else 'BIG_QUESTIONS' if i==29 else 'STEPPED_VALUE_CHAIN'
+                    )
+                    layout_map[f"A{i}"] = getattr(LayoutFamily, f"A{i}_{suffix}")
                 if lf in layout_map:
                     obj["layout_family"] = layout_map[lf]
                 elif lf_norm in layout_map:
                     obj["layout_family"] = layout_map[lf_norm]
-                elif lf in [e.value for e in LayoutFamily]:
-                    obj["layout_family"] = LayoutFamily(lf)
+                elif lf.lower() in [e.value for e in LayoutFamily]:
+                    obj["layout_family"] = LayoutFamily(lf.lower())
         return super().model_validate(obj, **kwargs)
 
     def __init__(self, **data: Any):
@@ -348,6 +390,7 @@ class SlideSpec(BaseModel):
 
         lf = data.get("layout_family")
         if isinstance(lf, str):
+            lf_norm = lf.upper().replace("-", "_").strip()
             layout_map = {
                 "hero_title": LayoutFamily.HERO,
                 "kpi_grid": LayoutFamily.METRICS_GRID,
@@ -359,11 +402,41 @@ class SlideSpec(BaseModel):
                 "image_and_text": LayoutFamily.TEXT_IMAGE,
                 "table": LayoutFamily.TABLE_FOCUS,
                 "chart": LayoutFamily.CHART_FOCUS,
+                "big_questions": LayoutFamily.BIG_QUESTIONS,
+                "four_card_numbered_grid": LayoutFamily.BIG_QUESTIONS,
+                "timeline_band": LayoutFamily.TIMELINE_BAND,
+                "chronology_horizontal": LayoutFamily.TIMELINE_BAND,
+                "council_eight": LayoutFamily.COUNCIL_EIGHT,
+                "ashta_pradhana": LayoutFamily.COUNCIL_EIGHT,
+                "two_highways": LayoutFamily.TWO_HIGHWAYS,
+                "two_routes": LayoutFamily.TWO_HIGHWAYS,
+                "forts_quote_emblem": LayoutFamily.FORTS_QUOTE_EMBLEM,
+                "core_state_quote": LayoutFamily.FORTS_QUOTE_EMBLEM,
+                "concept_definition_image": LayoutFamily.CONCEPT_DEFINITION_IMAGE,
+                "vocab_callout_image": LayoutFamily.CONCEPT_DEFINITION_IMAGE,
+                "stepped_value_chain": LayoutFamily.STEPPED_VALUE_CHAIN,
+                "market_chain": LayoutFamily.STEPPED_VALUE_CHAIN,
             }
+            for i in range(1, 31):
+                suffix = (
+                    'TITLE_BLOB' if i==1 else 'TITLE_SPLIT' if i==2 else 'DIVIDER_HERO' if i==3 else
+                    'ROADMAP_AGENDA' if i==4 else 'DEFINITION' if i==5 else 'TWO_ENTITY_COMPARISON' if i==6 else
+                    'TWO_COLUMN_CONTRAST' if i==7 else 'STAT_IMAGE_HIGHLIGHT' if i==8 else 'PROCESS_CHAIN' if i==9 else
+                    'NUMBERED_PROCESS' if i==10 else 'STAGE_COLUMNS' if i==11 else 'BEFORE_AFTER' if i==12 else
+                    'ICON_GRID' if i==13 else 'CHART_INSIGHT' if i==14 else 'DUAL_STAT_COMPARISON' if i==15 else
+                    'NATIVE_TABLE' if i==16 else 'CLOSING_TAKEAWAYS' if i==17 else 'RECAP_CHECKLIST' if i==18 else
+                    'GLOSSARY_GRID' if i==19 else 'ORG_HIERARCHY' if i==20 else 'KPI_CLUSTER' if i==21 else
+                    'HUB_SPOKE' if i==22 else 'VERTICAL_PIPELINE' if i==23 else 'TIMELINE_BAND' if i==24 else
+                    'COUNCIL_EIGHT' if i==25 else 'TWO_HIGHWAYS' if i==26 else 'FORTS_QUOTE_EMBLEM' if i==27 else
+                    'CONCEPT_DEFINITION_IMAGE' if i==28 else 'BIG_QUESTIONS' if i==29 else 'STEPPED_VALUE_CHAIN'
+                )
+                layout_map[f"A{i}"] = getattr(LayoutFamily, f"A{i}_{suffix}")
             if lf in layout_map:
                 data["layout_family"] = layout_map[lf]
-            elif lf in [e.value for e in LayoutFamily]:
-                data["layout_family"] = LayoutFamily(lf)
+            elif lf_norm in layout_map:
+                data["layout_family"] = layout_map[lf_norm]
+            elif lf.lower() in [e.value for e in LayoutFamily]:
+                data["layout_family"] = LayoutFamily(lf.lower())
 
         super().__init__(**data)
 

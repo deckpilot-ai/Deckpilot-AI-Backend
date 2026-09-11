@@ -679,3 +679,391 @@ class ArchetypeRenderer:
         r_cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.7, 6.35, 1.6, 0.06, primary, "recap-tick")
         tagline = data.takeaway or "Key concepts verified — proceeding to operational implementation."
         r_cls._text(slide, tagline[:120], 0.7, 6.5, 11.0, 0.4, primary, body_font, 11.5, italic=True)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # A24: Chronology / Horizontal Timeline Band
+    # ──────────────────────────────────────────────────────────────────────────
+    @classmethod
+    def _render_a24(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
+        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
+        primary = hex_to_rgb(ds.colors.primary)
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
+        tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
+        tint_b = hex_to_rgb(getattr(ds.colors, "tint_b", ds.colors.neutral))
+        white = RGBColor(255, 255, 255)
+        title_font = ds.typography.title_font.name
+        body_font = ds.typography.body_font.name
+
+        # Optional intro / era summary banner
+        card_y = 2.45
+        card_h = 4.25
+        if data.takeaway:
+            r_cls._text(slide, clean_text(data.takeaway)[:150], 0.6, 1.95, 12.1, 0.45, hex_to_rgb(ds.colors.text_secondary), body_font, 13)
+            card_y = 2.55
+            card_h = 4.15
+
+        milestones = data.bullets[:5] if len(data.bullets) >= 4 else (data.bullets if data.bullets else [
+            "1630: Foundation & Early Sovereignty",
+            "1657: Naval Power & Coastal Fortresses",
+            "1674: Grand Coronation & State Consolidation",
+            "1707: Pan-Indian Expansion & Peshwa Era",
+        ])
+        count = max(1, len(milestones))
+        cw = (12.1 - 0.28 * (count - 1)) / count
+
+        # Continuous Horizontal Connecting Bar
+        r_cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.6, card_y + 0.35, 12.1, 0.06, primary, "timeline-connector-bar")
+
+        for k, m in enumerate(milestones):
+            cx = 0.6 + k * (cw + 0.28)
+            # Alternate card tints
+            bg_col = tint_a if k % 2 == 0 else tint_b
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, cx, card_y, cw, card_h, bg_col, f"timeline-card-{k+1}", corner_radius=0.04)
+
+            # Parse year / era & description
+            if ":" in m:
+                parts = m.split(":", 1)
+                year_tag = parts[0].strip()
+                desc_text = parts[1].strip()
+            elif " - " in m:
+                parts = m.split(" - ", 1)
+                year_tag = parts[0].strip()
+                desc_text = parts[1].strip()
+            else:
+                words = m.split()
+                year_tag = words[0] if words else f"Phase {k+1}"
+                desc_text = " ".join(words[1:]) if len(words) > 1 else m
+
+            # Top Milestone Year Pill
+            pill_w = min(cw - 0.4, max(1.2, len(year_tag) * 0.12 + 0.4))
+            pill_x = cx + (cw - pill_w) / 2
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, pill_x, card_y + 0.15, pill_w, 0.46, ink, f"year-pill-{k+1}", corner_radius=0.2)
+            r_cls._text(slide, year_tag[:18], pill_x, card_y + 0.18, pill_w, 0.38, white, title_font, 12, bold=True, center=True)
+
+            # Headline & Event narrative
+            if " · " in desc_text:
+                dparts = desc_text.split(" · ", 1)
+                event_title = dparts[0].strip()
+                event_body = dparts[1].strip()
+            elif ":" in desc_text:
+                dparts = desc_text.split(":", 1)
+                event_title = dparts[0].strip()
+                event_body = dparts[1].strip()
+            else:
+                event_title = desc_text[:40]
+                event_body = desc_text[40:].strip()
+
+            r_cls._text(slide, event_title, cx + 0.15, card_y + 0.78, cw - 0.3, 0.75, primary, title_font, 13.5, bold=True, center=True)
+            r_cls._shape(slide, MSO_SHAPE.RECTANGLE, cx + (cw - 0.8) / 2, card_y + 1.6, 0.8, 0.03, accent, f"rule-{k+1}")
+            if event_body:
+                r_cls._text(slide, clean_text(event_body)[:160], cx + 0.15, card_y + 1.75, cw - 0.3, card_h - 1.9, hex_to_rgb(ds.colors.text_secondary), body_font, 11, center=True)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # A25: Council of Eight / 8-Feature Governance Grid
+    # ──────────────────────────────────────────────────────────────────────────
+    @classmethod
+    def _render_a25(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
+        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
+        primary = hex_to_rgb(ds.colors.primary)
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
+        tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
+        white = RGBColor(255, 255, 255)
+        title_font = ds.typography.title_font.name
+        body_font = ds.typography.body_font.name
+
+        items = data.bullets[:8] if len(data.bullets) >= 6 else (data.bullets if data.bullets else [
+            "Peshwa: Prime Minister and head of civil and military administration.",
+            "Amatya: Finance Minister overseeing state treasury and accounts.",
+            "Sachiv: Secretary responsible for royal correspondence and decrees.",
+            "Mantri: Chronicler keeping daily court records and intelligence.",
+            "Senapati: Commander-in-Chief leading military expeditions.",
+            "Sumant: Foreign Minister managing diplomacy and external relations.",
+            "Nyayadhish: Chief Justice administering judicial rulings.",
+            "Panditrao: High Priest managing religious grants and moral welfare.",
+        ])
+
+        count = len(items)
+        cols = 4 if count >= 7 else (3 if count == 6 else (2 if count <= 4 else 4))
+        rows = math.ceil(count / cols)
+        cw = (12.1 - 0.25 * (cols - 1)) / cols
+        ch = (4.75 - 0.25 * (rows - 1)) / rows
+
+        for k, item in enumerate(items):
+            r = k // cols
+            c = k % cols
+            x = 0.6 + c * (cw + 0.25)
+            y = 2.05 + r * (ch + 0.25)
+
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, cw, ch, tint_a, f"council-cell-{k+1}", corner_radius=0.04)
+
+            # Circular number disc badge
+            r_cls._shape(slide, MSO_SHAPE.OVAL, x + 0.2, y + 0.2, 0.45, 0.45, primary, f"council-badge-{k+1}")
+            r_cls._text(slide, f"0{k+1}", x + 0.2, y + 0.22, 0.45, 0.4, white, body_font, 10.5, bold=True, center=True)
+
+            parts = item.split(":", 1) if ":" in item else [item[:28], item[28:]]
+            role_name = parts[0].strip()
+            role_desc = parts[1].strip() if len(parts) > 1 else ""
+
+            r_cls._text(slide, role_name, x + 0.75, y + 0.18, cw - 0.85, 0.38, ink, title_font, 13, bold=True)
+            if role_desc:
+                r_cls._text(slide, clean_text(role_desc)[:110], x + 0.2, y + 0.68, cw - 0.4, ch - 0.75, hex_to_rgb(ds.colors.text_secondary), body_font, 10.5)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # A26: Two Highways / Dual Route Map Split
+    # ──────────────────────────────────────────────────────────────────────────
+    @classmethod
+    def _render_a26(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
+        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
+        primary = hex_to_rgb(ds.colors.primary)
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
+        tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
+        tint_b = hex_to_rgb(getattr(ds.colors, "tint_b", ds.colors.neutral))
+        white = RGBColor(255, 255, 255)
+        title_font = ds.typography.title_font.name
+        body_font = ds.typography.body_font.name
+
+        left_w = 6.2
+        mid = max(1, math.ceil(len(data.bullets) / 2))
+        grp1 = data.bullets[:mid] or ["Independent units pool sovereignty together to form a larger union."]
+        grp2 = data.bullets[mid:] or ["A large central power divides authority between national and state tiers."]
+
+        routes = [
+            ("ROUTE 01: COMING TOGETHER", grp1, tint_a),
+            ("ROUTE 02: HOLDING TOGETHER", grp2, tint_b),
+        ]
+
+        # Left 52%: 2 Stacked Route Cards
+        for j, (hdr, grp, bg) in enumerate(routes):
+            ry = 2.05 + j * 2.45
+            rh = 2.25
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, ry, left_w, rh, bg, f"route-card-{j+1}", corner_radius=0.04)
+
+            # Route Header Pill
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.85, ry + 0.18, 3.8, 0.38, primary if j == 0 else ink, f"route-pill-{j+1}", corner_radius=0.15)
+            r_cls._text(slide, hdr, 0.85, ry + 0.20, 3.8, 0.32, white, body_font, 10.5, bold=True, center=True)
+
+            body_text = "\n".join(grp[:2])
+            r_cls._text(slide, clean_text(body_text)[:180], 0.85, ry + 0.68, left_w - 0.5, rh - 0.8, hex_to_rgb(ds.colors.text_primary), body_font, 11.5, bullet_list=len(grp) > 1)
+
+        # Right 45%: Framed Photo Mat / Map Frame
+        r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.1, 2.05, 5.6, 4.7, white, "map-frame", corner_radius=0.03)
+        if img:
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.25, 2.2, 5.3, 3.9, tint_a, "photo-mat", corner_radius=0.02)
+            r_cls._render_picture(slide, img, 7.35, 2.3, 5.1, 3.7)
+            caption = data.image_caption or "Comparative territorial and constitutional map"
+            r_cls._text(slide, clean_text(caption)[:90], 7.25, 6.25, 5.3, 0.38, primary, body_font, 10.5, italic=True, center=True)
+        else:
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.25, 2.2, 5.3, 4.35, tint_a, "synthesis-box", corner_radius=0.03)
+            r_cls._text(slide, "STRATEGIC COMPARISON", 7.55, 2.45, 4.7, 0.35, primary, body_font, 12, bold=True)
+            takeaway = data.takeaway or "Constitutional balance requires continuous institutional calibration."
+            r_cls._text(slide, clean_text(takeaway)[:200], 7.55, 2.95, 4.7, 3.2, hex_to_rgb(ds.colors.text_primary), title_font, 14)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # A27: Core State Quote with Emblem Disc
+    # ──────────────────────────────────────────────────────────────────────────
+    @classmethod
+    def _render_a27(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
+        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
+        primary = hex_to_rgb(ds.colors.primary)
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
+        tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
+        white = RGBColor(255, 255, 255)
+        title_font = ds.typography.title_font.name
+        body_font = ds.typography.body_font.name
+
+        # Left 50%: Structured Operational Bullet Cards
+        pillars = data.bullets[:3] if data.bullets else [
+            "Strategic Strongholds: Forts served as permanent military garrisons and treasury centers.",
+            "Territorial Defence: Rugged hill geography neutralized overwhelming enemy numbers.",
+            "Administrative Hubs: Local revenue, justice, and governance radiated from the fortress.",
+        ]
+        left_w = 5.8
+        card_h = (4.75 - 0.2 * (len(pillars) - 1)) / max(1, len(pillars))
+
+        for k, p in enumerate(pillars):
+            py = 2.05 + k * (card_h + 0.2)
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, py, left_w, card_h, tint_a, f"pillar-card-{k+1}", corner_radius=0.04)
+            r_cls._shape(slide, MSO_SHAPE.OVAL, 0.85, py + 0.2, 0.45, 0.45, primary, f"pillar-disc-{k+1}")
+            r_cls._text(slide, f"0{k+1}", 0.85, py + 0.22, 0.45, 0.4, white, body_font, 11, bold=True, center=True)
+
+            pparts = p.split(":", 1) if ":" in p else [p[:32], p[32:]]
+            r_cls._text(slide, pparts[0].strip(), 1.45, py + 0.18, left_w - 1.6, 0.38, ink, title_font, 13.5, bold=True)
+            if len(pparts) > 1:
+                r_cls._text(slide, clean_text(pparts[1].strip())[:140], 1.45, py + 0.58, left_w - 1.6, card_h - 0.7, hex_to_rgb(ds.colors.text_secondary), body_font, 11)
+
+        # Right 46%: Tinted Quote Card with Emblem Disc
+        qw = 6.05
+        qx = 6.65
+        r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, qx, 2.05, qw, 4.75, ink, "quote-hero-card", corner_radius=0.04)
+
+        # Center top star / emblem disc
+        disc_x = qx + (qw - 1.1) / 2
+        r_cls._shape(slide, MSO_SHAPE.OVAL, disc_x, 2.35, 1.1, 1.1, accent, "quote-emblem-disc")
+        r_cls._text(slide, "★", disc_x, 2.35, 1.1, 1.1, white, body_font, 26, bold=True, center=True)
+
+        quote_txt = (
+            data.takeaway or
+            "Forts are the core of the state. What is a kingdom without forts? It is like a house without walls, exposed to every storm."
+        )
+        r_cls._text(slide, f'"{clean_text(quote_txt)}"', qx + 0.5, 3.65, qw - 1.0, 2.0, white, title_font, 16, italic=True, center=True)
+
+        # Author / Provenance line
+        r_cls._shape(slide, MSO_SHAPE.RECTANGLE, qx + (qw - 1.8) / 2, 5.75, 1.8, 0.04, accent, "author-tick")
+        author_txt = "Historical Doctrine & Strategic Precedent"
+        if data.speaker_notes and ":" in data.speaker_notes:
+            author_txt = data.speaker_notes.split(":")[0].strip()[:50]
+        r_cls._text(slide, author_txt, qx + 0.5, 5.95, qw - 1.0, 0.45, tint(white, 0.35), body_font, 11, bold=True, center=True)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # A28: Concept Definition Card with Photo Mat
+    # ──────────────────────────────────────────────────────────────────────────
+    @classmethod
+    def _render_a28(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
+        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
+        primary = hex_to_rgb(ds.colors.primary)
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
+        tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
+        white = RGBColor(255, 255, 255)
+        title_font = ds.typography.title_font.name
+        body_font = ds.typography.body_font.name
+
+        left_w = 6.2
+        # Top Definition in Ink
+        r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 2.05, left_w, 2.3, ink, "def-top-card", corner_radius=0.04)
+        r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.85, 2.25, 2.2, 0.34, accent, "concept-pill", corner_radius=0.15)
+        r_cls._text(slide, "KEY CONCEPT", 0.85, 2.27, 2.2, 0.28, white, body_font, 10, bold=True, center=True)
+
+        def_text = data.takeaway or (data.bullets[0] if data.bullets else "Core structural definition of the institutional framework.")
+        r_cls._text(slide, clean_text(def_text)[:220], 0.85, 2.7, left_w - 0.5, 1.45, white, title_font, 15)
+
+        # Bottom 2 Characteristic Cards in Tint
+        attr_bullets = data.bullets[1:3] if len(data.bullets) > 2 else (data.bullets[:2] if data.bullets else ["Institutional Scope", "Operational Delivery"])
+        for j, attr in enumerate(attr_bullets[:2]):
+            ay = 4.5 + j * 1.15
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, ay, left_w, 1.05, tint_a, f"attr-row-{j+1}", corner_radius=0.04)
+            r_cls._shape(slide, MSO_SHAPE.OVAL, 0.85, ay + 0.15, 0.35, 0.35, primary, f"attr-disc-{j+1}")
+            r_cls._text(slide, str(j + 1), 0.85, ay + 0.16, 0.35, 0.32, white, body_font, 10, bold=True, center=True)
+            aparts = attr.split(":", 1) if ":" in attr else [attr[:35], attr[35:]]
+            r_cls._text(slide, aparts[0].strip(), 1.35, ay + 0.12, left_w - 1.5, 0.35, primary, title_font, 13, bold=True)
+            if len(aparts) > 1:
+                r_cls._text(slide, clean_text(aparts[1].strip())[:110], 1.35, ay + 0.48, left_w - 1.5, 0.5, hex_to_rgb(ds.colors.text_secondary), body_font, 11)
+
+        # Right 45%: Framed Photo Mat
+        r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.1, 2.05, 5.6, 4.7, white, "artifact-frame", corner_radius=0.03)
+        if img:
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.25, 2.2, 5.3, 3.9, tint_a, "photo-mat", corner_radius=0.02)
+            r_cls._render_picture(slide, img, 7.35, 2.3, 5.1, 3.7)
+            caption = data.image_caption or "Documentary reference artifact"
+            r_cls._text(slide, clean_text(caption)[:90], 7.25, 6.25, 5.3, 0.38, primary, body_font, 10.5, italic=True, center=True)
+        else:
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.25, 2.2, 5.3, 4.35, tint_a, "narrative-fill", corner_radius=0.03)
+            r_cls._text(slide, "FRAMEWORK HIGHLIGHTS", 7.55, 2.45, 4.7, 0.35, primary, body_font, 12, bold=True)
+            r_cls._text(slide, "\n".join(data.bullets), 7.55, 2.95, 4.7, 3.2, hex_to_rgb(ds.colors.text_primary), body_font, 12.5, bullet_list=True)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # A29: The Big Questions (4 Hero Numbered Cards)
+    # ──────────────────────────────────────────────────────────────────────────
+    @classmethod
+    def _render_a29(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
+        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
+        primary = hex_to_rgb(ds.colors.primary)
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
+        tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
+        white = RGBColor(255, 255, 255)
+        title_font = ds.typography.title_font.name
+        body_font = ds.typography.body_font.name
+
+        questions = data.bullets[:4] if len(data.bullets) >= 4 else (data.bullets if data.bullets else [
+            "Who were the key actors and what drove their mobilization?",
+            "What administrative institutions enabled durable statecraft?",
+            "How did fiscal and military policies sustain expansion?",
+            "What enduring legacy shaped subsequent constitutional design?",
+        ])
+        count = max(1, len(questions))
+        cw = (12.1 - 0.3 * (count - 1)) / count
+        card_h = 4.65
+        card_y = 2.05
+
+        for j, q in enumerate(questions):
+            cx = 0.6 + j * (cw + 0.3)
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, cx, card_y, cw, card_h, tint_a, f"question-card-{j+1}", corner_radius=0.04)
+
+            # Centered Large Circular Badge
+            badge_size = 1.15
+            badge_x = cx + (cw - badge_size) / 2
+            r_cls._shape(slide, MSO_SHAPE.OVAL, badge_x, card_y + 0.35, badge_size, badge_size, primary, f"q-badge-{j+1}")
+            r_cls._text(slide, f"0{j+1}", badge_x, card_y + 0.38, badge_size, badge_size - 0.1, white, title_font, 26, bold=True, center=True)
+
+            # Parse question title vs explanation
+            if "\n" in q:
+                parts = q.split("\n", 1)
+            elif ":" in q:
+                parts = q.split(":", 1)
+            elif "?" in q:
+                parts = q.split("?", 1)
+                parts[0] = parts[0] + "?"
+            else:
+                parts = [q]
+
+            q_title = parts[0].strip()
+            q_desc = parts[1].strip() if len(parts) > 1 else ""
+
+            r_cls._text(slide, q_title, cx + 0.2, card_y + 1.7, cw - 0.4, 1.3, primary, title_font, 15, bold=True, center=True)
+            r_cls._shape(slide, MSO_SHAPE.RECTANGLE, cx + (cw - 1.2) / 2, card_y + 3.1, 1.2, 0.04, accent, f"q-rule-{j+1}")
+
+            if q_desc:
+                r_cls._text(slide, clean_text(q_desc)[:150], cx + 0.2, card_y + 3.25, cw - 0.4, card_h - 3.4, hex_to_rgb(ds.colors.text_secondary), body_font, 11.5, center=True)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # A30: Stepped Value Chain / Journey of Goods Flow
+    # ──────────────────────────────────────────────────────────────────────────
+    @classmethod
+    def _render_a30(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
+        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
+        primary = hex_to_rgb(ds.colors.primary)
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
+        tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
+        tint_b = hex_to_rgb(getattr(ds.colors, "tint_b", ds.colors.neutral))
+        white = RGBColor(255, 255, 255)
+        title_font = ds.typography.title_font.name
+        body_font = ds.typography.body_font.name
+
+        steps = data.bullets[:5] if len(data.bullets) >= 4 else (data.bullets if data.bullets else [
+            "Primary Production: Cultivation, harvesting, and raw commodity aggregation.",
+            "Wholesale Trading: Mandi auction, bulk sorting, and regional price discovery.",
+            "Processing & Value-Add: Milling, packaging, quality standard compliance.",
+            "Retail Distribution: Neighborhood shops, hypermarkets, and digital fulfilment.",
+        ])
+
+        count = max(1, len(steps))
+        step_w = (12.1 - 0.35 * (count - 1)) / count
+        step_y = 2.05
+        step_h = 3.65
+
+        for k, st in enumerate(steps):
+            sx = 0.6 + k * (step_w + 0.35)
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, sx, step_y, step_w, step_h, tint_a, f"step-box-{k+1}", corner_radius=0.04)
+
+            # Step Pill
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, sx + 0.2, step_y + 0.2, step_w - 0.4, 0.42, ink, f"step-hdr-{k+1}", corner_radius=0.15)
+            r_cls._text(slide, f"STEP 0{k+1}", sx + 0.2, step_y + 0.23, step_w - 0.4, 0.35, white, body_font, 11, bold=True, center=True)
+
+            parts = st.split(":", 1) if ":" in st else [st[:30], st[30:]]
+            r_cls._text(slide, parts[0].strip(), sx + 0.15, step_y + 0.8, step_w - 0.3, 0.7, primary, title_font, 13.5, bold=True, center=True)
+            r_cls._shape(slide, MSO_SHAPE.RECTANGLE, sx + (step_w - 0.8) / 2, step_y + 1.6, 0.8, 0.03, accent, f"step-rule-{k+1}")
+
+            if len(parts) > 1:
+                r_cls._text(slide, clean_text(parts[1].strip())[:140], sx + 0.15, step_y + 1.75, step_w - 0.3, step_h - 1.9, hex_to_rgb(ds.colors.text_secondary), body_font, 11, center=True)
+
+            # Chevron Arrow between steps
+            if k < count - 1:
+                arrow_x = sx + step_w + 0.08
+                arrow_y = step_y + step_h / 2 - 0.2
+                r_cls._shape(slide, MSO_SHAPE.CHEVRON, arrow_x, arrow_y, 0.22, 0.4, primary, f"flow-arrow-{k+1}")
+
+        # Summary / Value-Add Band at Bottom
+        r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 5.9, 12.1, 0.85, tint_b, "value-band", corner_radius=0.04)
+        band_text = data.takeaway or "Value increments at each exchange tier, reflecting logistical transport, risk, and margin."
+        r_cls._text(slide, "CHAIN DYNAMICS & VALUE MARGIN", 0.85, 5.98, 4.0, 0.28, primary, body_font, 10, bold=True)
+        r_cls._text(slide, clean_text(band_text)[:200], 0.85, 6.28, 11.5, 0.42, hex_to_rgb(ds.colors.text_primary), body_font, 11.5)
+
