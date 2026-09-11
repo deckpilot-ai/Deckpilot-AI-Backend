@@ -458,6 +458,8 @@ class PresentationGoal(BaseModel):
     # Explicit instructions from the user prompt (colors, themes, slide structure, sections, etc.)
     # that MUST be honoured by all downstream LLM agents.
     user_directives: str = ""
+    # Structured slide-by-slide specifications extracted directly from user prompt
+    explicit_slides: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AssetMetadata(BaseModel):

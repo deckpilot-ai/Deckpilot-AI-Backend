@@ -301,3 +301,54 @@ def test_strip_citations_removes_file_and_page_leakage():
         assert "#page=" not in b
 
 
+def test_explicit_user_prompt_details_and_outlines_preserved():
+    from app.agents.requirements_agent import RequirementsAgent
+    from app.agents.storyline_agent import StorylineAgent
+    from app.services.design_system import fallback_plan
+
+    prompt = """
+    Create a presentation on Quantum Computing Architecture:
+    Slide 1: Executive Overview - Next-generation computing paradigm
+    Slide 2: Physical Realizations & Qubit Hardware [Layout: Two Column]
+      - Superconducting Transmon circuits operate near absolute zero
+      - Trapped Ion systems offer superior coherence times
+    Slide 3: Algorithmic Advantage & Speedup [Layout: Metrics Grid]
+      - Shor's algorithm provides exponential speedup for factoring
+      - Grover's algorithm provides quadratic speedup for search
+    Slide 4: Key Technical Bottlenecks
+      - Quantum error correction overhead requires 1000 physical qubits per logical qubit
+      - Cryogenic scaling and RF control line density
+    Slide 5: Commercial Outlook & 2030 Horizon [Layout: Timeline Band]
+      - 2024: Noisy Intermediate-Scale Quantum (NISQ) demonstrations
+      - 2027: Early fault-tolerant logical qubit operations
+      - 2030: Quantum utility in materials science and cryptography
+    """
+
+    # 1. Requirements Agent extracts all 5 slides, custom bullets, and layout hints
+    explicit_slides = RequirementsAgent.extract_explicit_slides(prompt)
+    assert len(explicit_slides) == 5
+    assert explicit_slides[0]["headline"] == "Executive Overview"
+    assert "Superconducting" in explicit_slides[1]["bullets"][0]
+    assert explicit_slides[2]["layoutHint"] == "metrics_grid"
+    assert explicit_slides[4]["layoutHint"] == "timeline_band"
+
+    goal = RequirementsAgent.analyze_requirements(prompt)
+    assert goal.target_slide_count == 5
+    assert len(goal.explicit_slides) == 5
+    assert "EXPLICIT_SLIDE_OUTLINE" in goal.user_directives
+
+    # 2. Storyline Agent generates slide specs directly reflecting user's outline
+    specs = StorylineAgent.create_storyline_plan(goal)
+    assert len(specs) == 5
+    assert specs[0].headline.startswith("Executive Overview")
+    assert any("Superconducting" in b for b in specs[1].bullets)
+    assert any("2030" in b for b in specs[4].bullets)
+
+    # 3. Fallback Plan directly returns user explicit slides
+    fb = fallback_plan(prompt)
+    assert len(fb["slides"]) == 5
+    assert fb["generationMode"] == "user_explicit_outline"
+    assert fb["slides"][0]["headline"] == "Executive Overview"
+
+
+

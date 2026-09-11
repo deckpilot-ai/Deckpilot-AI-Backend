@@ -299,6 +299,16 @@ def fallback_plan(prompt: str, count: int | None = None, title: str | None = Non
             ).strip()
             title = (clean_p[:60].strip() if clean_p else None) or "Presentation"
 
+    # --- Check for explicit slide outline provided by user in prompt ---
+    from app.agents.requirements_agent import RequirementsAgent
+    explicit_slides = RequirementsAgent.extract_explicit_slides(prompt)
+    if explicit_slides:
+        return {
+            "deckTitle": title,
+            "slides": explicit_slides[:count] if count else explicit_slides,
+            "generationMode": "user_explicit_outline",
+        }
+
     # --- Extract topics dynamically from document grounding ---
     dynamic_topics = _extract_topics_from_grounding(grounding, count) if grounding.strip() else []
 

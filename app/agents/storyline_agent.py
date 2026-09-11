@@ -39,6 +39,7 @@ class StorylineAgent:
 
         slides_input = (llm_plan_spec or {}).get("slides", [])
         planned_specs: list[SlideSpec] = []
+        explicit_slides = getattr(goal, "explicit_slides", []) or []
 
         # Semantically match available assets to slides first, preventing wrong image assignment
         if assets and slides_input:
@@ -52,17 +53,18 @@ class StorylineAgent:
         for i in range(count):
             slide_id = f"s{i+1:02d}"
             raw_slide = slides_input[i] if i < len(slides_input) and isinstance(slides_input[i], dict) else {}
+            explicit_s = explicit_slides[i] if i < len(explicit_slides) and isinstance(explicit_slides[i], dict) else {}
 
             # 1. Slide Role & Position
             is_first = (i == 0)
             is_last = (i == count - 1)
 
-            purpose = raw_slide.get("purpose") or raw_slide.get("objective") or f"Key topic analysis for section {i+1}"
-            headline = raw_slide.get("headline") or raw_slide.get("message") or f"Strategic Milestone {i+1}: Delivering Scalable Value"
-            bullets = raw_slide.get("bullets") or []
+            purpose = raw_slide.get("purpose") or explicit_s.get("purpose") or raw_slide.get("objective") or f"Key topic analysis for section {i+1}"
+            headline = raw_slide.get("headline") or explicit_s.get("headline") or raw_slide.get("message") or f"Strategic Milestone {i+1}: Delivering Scalable Value"
+            bullets = raw_slide.get("bullets") or explicit_s.get("bullets") or []
 
             # 2. Select Layout Family with Visual Rhythm
-            layout_hint = raw_slide.get("layoutHint") or raw_slide.get("layout_hint") or ""
+            layout_hint = raw_slide.get("layoutHint") or raw_slide.get("layout_hint") or explicit_s.get("layoutHint") or ""
             chosen_layout = cls._determine_layout(
                 i, count, layout_hint, recent_layouts, raw_slide, assets, goal
             )

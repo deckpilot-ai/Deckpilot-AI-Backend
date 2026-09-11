@@ -168,6 +168,7 @@ Rules:
 2. For comprehensive decks (e.g. 20-25 slides), organize slides into cohesive thematic chapters (foundations, inquiries, chronology, systemic features, military/trade, regional centers, imperial framework, governance hierarchy, primary accounts, epigraphy/reforms, society, art & architecture, legacy).
 3. NEVER use generic placeholder words like 'Lorem ipsum' or 'Strategic Milestone'. Every slide purpose and message MUST directly reflect the user's specific domain, company, or request.
 4. Consulting layout hints include: 'hero', 'big_questions', 'timeline_band', 'council_eight', 'two_highways', 'forts_quote_emblem', 'concept_definition_image', 'stepped_value_chain', 'timeline_columns', 'timeline', 'two_column', 'concept', 'diagram_hierarchy', 'saptanga', 'dark_quote', 'quote', 'comparison', 'card_grid', 'metrics_grid', 'process_steps', 'image_focus', 'closing', 'legacy'.
+5. USER DIRECTIVE & OUTLINE ADHERENCE: If the user provided specific slide topics, slide titles, explicit slide-by-slide outlines, custom bullet points, or numbered sections in their prompt, YOU MUST ADHERE STRICTLY to the user's provided structure, topics, and sequence. Never replace the user's explicit topics with generic placeholders.
 """
 
 SLIDE_WRITER_SYSTEM_PROMPT = """You are a subject-aware Slide Writer at deckpilotAI. Your job is to formulate high-impact, scannable slide content for each slide in the planned presentation.
@@ -205,6 +206,7 @@ Rules:
 6. ALWAYS populate speakerNotes with 2-4 substantive sentences to guide the presenter. Never leave it empty.
 7. Include metrics[] only for data-heavy slides (financial, KPI, market-size). Omit for narrative/conceptual slides.
 8. NEVER output raw file citations, filenames, page links, or document anchors like '(source data.pdf#page=15)' or '(source.pdf)' in the visible headline, bullets, or takeaway. Express all evidence directly in clean, natural presentation language. Place specific page citations inside speakerNotes.
+9. USER-SPECIFIED DETAILS: If the user provided specific facts, numbers, bullets, comparison points, or custom takeaways in the prompt, incorporate those exact user-specified details into the corresponding slides.
 """
 
 BRAND_STYLE_SYSTEM_PROMPT = """You are Visual Design Director at deckpilotAI. Select a tailored corporate palette and typography hierarchy suited to the presentation topic.

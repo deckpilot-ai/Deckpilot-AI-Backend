@@ -99,11 +99,96 @@ class RequirementsAgent:
         return ""
 
     @classmethod
+    def extract_explicit_slides(cls, user_prompt: str) -> list[dict[str, Any]]:
+        """Extract explicit slide-by-slide structure, titles, bullets, and layout hints from prompt."""
+        slides: list[dict[str, Any]] = []
+        lines = user_prompt.strip().splitlines()
+        
+        current_slide: dict[str, Any] | None = None
+        
+        # Regex to detect a slide header line
+        # e.g., "Slide 1: Executive Summary", "Slide 1 - Problem", "1. Solution Architecture", "1) Market Overview"
+        slide_header_re = re.compile(
+            r"^(?:(?:slide|page|section|part)\s*(\d+)[:\.\-\s]+|(\d+)[\.\)]\s+)(.*)$",
+            re.IGNORECASE,
+        )
+        bullet_re = re.compile(r"^\s*[-*•>]\s+(.*)$")
+        
+        for line in lines:
+            trimmed = line.strip()
+            if not trimmed:
+                continue
+            
+            m = slide_header_re.match(trimmed)
+            if m:
+                num_str = m.group(1) or m.group(2)
+                title_cand = m.group(3).strip()
+                
+                if title_cand and len(title_cand) >= 2:
+                    if current_slide:
+                        slides.append(current_slide)
+                    
+                    # Extract layout hint if in parentheses e.g. "Roadmap (Timeline)" or "[Layout: Metrics Grid]"
+                    layout_cand = ""
+                    m_lay = re.search(r"[\(\[\{](?:layout|style|template|pattern)?\s*:?\s*([a-zA-Z0-9_\-\s]+)[\)\]\}]$", title_cand, re.IGNORECASE)
+                    if m_lay:
+                        inner = m_lay.group(1).strip().lower().replace(" ", "_").replace("-", "_")
+                        inner = re.sub(r"^(?:layout|template|style)_+", "", inner)
+                        if inner in (
+                            "timeline", "timeline_band", "roadmap", "two_column", "card_grid", "comparison",
+                            "metrics", "metrics_grid", "process", "process_steps", "hero",
+                            "closing", "quote", "council_eight", "big_questions",
+                            "stepped_value_chain", "two_highways", "forts_quote_emblem",
+                            "concept_definition_image", "table_focus", "chart_focus",
+                            "three_column", "grid", "cards", "executive_summary"
+                        ):
+                            layout_cand = inner
+                            title_cand = title_cand[:m_lay.start()].strip()
+                    
+                    headline = title_cand
+                    bullets = []
+                    if " - " in title_cand:
+                        parts = title_cand.split(" - ", 1)
+                        headline = parts[0].strip()
+                        if len(parts) > 1 and parts[1].strip():
+                            bullets.append(parts[1].strip())
+                    elif ":" in title_cand and len(title_cand.split(":")[0].split()) <= 4:
+                        parts = title_cand.split(":", 1)
+                        headline = parts[0].strip()
+                        if len(parts) > 1 and parts[1].strip():
+                            bullets.append(parts[1].strip())
+                            
+                    current_slide = {
+                        "slideId": f"s{len(slides) + 1:02d}",
+                        "headline": headline,
+                        "purpose": headline,
+                        "message": headline,
+                        "bullets": bullets,
+                        "layoutHint": layout_cand,
+                    }
+                    continue
+            
+            # If current_slide is active, check if this line is a bullet or detail for it
+            if current_slide is not None:
+                bm = bullet_re.match(trimmed)
+                if bm:
+                    current_slide["bullets"].append(bm.group(1).strip())
+                elif trimmed.startswith(("Takeaway:", "Note:", "Key message:", "Conclusion:")):
+                    current_slide["takeaway"] = trimmed.split(":", 1)[1].strip()
+                elif len(trimmed) < 140 and not re.match(r"^(?:create|generate|make|build|prepare|please|also)\b", trimmed, re.I):
+                    current_slide["bullets"].append(trimmed)
+
+        if current_slide:
+            slides.append(current_slide)
+            
+        return slides if len(slides) >= 2 else []
+
+    @classmethod
     def extract_user_directives(cls, user_prompt: str) -> str:
         """Parse ALL explicit user instructions from the prompt into a structured directive block.
 
         Captures: colors, themes, dark/light mode, fonts, tone, preferred layouts,
-        named sections/chapters, include/exclude rules.
+        named sections/chapters, include/exclude rules, and explicit slide breakdowns.
         The result is injected verbatim into every downstream LLM call so no user
         instruction is ever silently dropped due to prompt truncation.
         """
@@ -153,6 +238,18 @@ class RequirementsAgent:
             if len(val) > 2:
                 directives.append(f"EXCLUDE: {val}")
 
+        # Check for explicit slide outline in prompt
+        explicit_slides = cls.extract_explicit_slides(user_prompt)
+        if explicit_slides:
+            directives.append("EXPLICIT_SLIDE_OUTLINE (MUST ADHERE STRICTLY IN EXACT ORDER):")
+            for s in explicit_slides:
+                slide_line = f"  * {s.get('slideId')}: {s.get('headline')}"
+                if s.get('layoutHint'):
+                    slide_line += f" [Layout: {s.get('layoutHint')}]"
+                directives.append(slide_line)
+                for b in s.get('bullets', []):
+                    directives.append(f"      - {b}")
+
         # Deduplicate preserving order
         seen: set[str] = set()
         unique: list[str] = []
@@ -186,8 +283,11 @@ class RequirementsAgent:
         }
 
         # 1. Slide Count detection (supports "12 page", "12 slides", "deck of 12", "12-page", "twelve slides")
+        explicit_slides = cls.extract_explicit_slides(user_prompt)
         if target_slide_count is not None and target_slide_count > 0:
             slide_count = target_slide_count
+        elif explicit_slides:
+            slide_count = len(explicit_slides)
         else:
             count_match = re.search(
                 r"\b(\d+)\s*[-_]?(?:slides?|pages?|pgs?|screens?|cards?|sections?|parts?)\b"
@@ -304,4 +404,5 @@ class RequirementsAgent:
             required_charts=req_charts,
             required_tables=req_tables,
             user_directives=cls.extract_user_directives(user_prompt),
+            explicit_slides=explicit_slides,
         )
