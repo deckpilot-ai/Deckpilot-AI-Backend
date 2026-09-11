@@ -111,15 +111,15 @@ BENCHMARK_PALETTES = {
         tint_a="#F7EEE3", tint_b="#FBF6EF", alert="#C63A28",
     ),
     "economy": ColorTokens(
-        ink="#1F3864", primary="#5B9BD5", secondary="#2F5597",
-        tint_a="#F2F2F2", tint_b="#FFFFFF", alert="#C00000",
+        ink="#1F3864", primary="#2F5597", secondary="#5B9BD5",
+        tint_a="#EEF2F8", tint_b="#F8FAFC", alert="#C00000",
     ),
     "constitution": ColorTokens(
-        ink="#13294B", primary="#4A7AA7", secondary="#1E3A8A",
+        ink="#13294B", primary="#1E3A8A", secondary="#3B82F6",
         tint_a="#EEF4F8", tint_b="#F5F8FA", alert="#B91C1C",
     ),
     "markets": ColorTokens(
-        ink="#132A52", primary="#C68A2E", secondary="#2563EB",
+        ink="#132A52", primary="#2563EB", secondary="#0284C7",
         tint_a="#EEF2F8", tint_b="#F8FAFC", alert="#DC2626",
     ),
     "healthcare": ColorTokens(
@@ -131,8 +131,8 @@ BENCHMARK_PALETTES = {
         tint_a="#F0F9FF", tint_b="#F8FAFC", alert="#EF4444",
     ),
     "governance": ColorTokens(
-        ink="#20302C", primary="#C28A2C", secondary="#16A085",
-        tint_a="#F1F6F4", tint_b="#F9FBFB", alert="#DC2626",
+        ink="#0C3B39", primary="#0E7C7B", secondary="#16A085",
+        tint_a="#E9F3F1", tint_b="#F4FBF9", alert="#DC2626",
     ),
 }
 

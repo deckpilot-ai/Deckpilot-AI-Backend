@@ -277,6 +277,7 @@ class SlideSpec(BaseModel):
     
     # Rendering metadata
     dark_background: bool = False
+    background_override: str | None = None
     layout_hint: str = ""
 
     @field_validator("bullets", mode="before")

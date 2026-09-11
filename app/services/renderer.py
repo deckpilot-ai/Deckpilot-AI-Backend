@@ -299,13 +299,16 @@ class PPTXRenderer:
             dark = slide_data.dark_background or (layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE) and design_system.subject_domain != "markets") or arch_id in ("A1", "A3")
 
             slide.background.fill.solid()
-            slide.background.fill.fore_color.rgb = ink if dark else paper
+            bg_color = hex_to_rgb(slide_data.background_override) if getattr(slide_data, "background_override", None) else (ink if dark else paper)
+            slide.background.fill.fore_color.rgb = bg_color
 
             fg = white if dark else text_primary
             body_col = tint(white, 0.18) if dark else text_secondary
             fill = tint(ink, 0.18) if dark else card_fill
 
             title = slide_data.headline or slide_data.key_message or slide_data.objective
+            if title and len(title) > 400:
+                raise ValueError("Slide text exceeds its layout budget; shorten the source copy and regenerate")
             eyebrow = slide_data.eyebrow or f"CHAPTER {(index // 4) + 1}"
             bullets = [b for b in slide_data.bullets if isinstance(b, str) and b.strip()]
             image_bytes = images.get(slide_data.image_artifact_id or "")

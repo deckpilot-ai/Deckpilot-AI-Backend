@@ -402,5 +402,45 @@ async def test_targeted_slide_revision_preserves_other_slides():
     assert revised_deck["slides"][4] == initial_deck["slides"][4]
 
 
+def test_theme_and_palette_consistency_check_and_repair():
+    from app.schemas.generation_state import DesignSystem, ColorPalette
+    from app.services.deck_archetypes import BENCHMARK_PALETTES
+    from app.agents.repair_agent import RepairAgent
+    
+    # Verify benchmark palettes have harmonic primary/secondary tokens (no clashing warm/cool mix in markets)
+    markets_palette = BENCHMARK_PALETTES["markets"]
+    assert markets_palette.primary == "#2563EB"
+    assert markets_palette.secondary == "#0284C7"
+    assert markets_palette.ink == "#132A52"
 
+    ds = DesignSystem(
+        subject_domain="markets",
+        colors=ColorPalette(
+            primary="#2563EB",
+            secondary="#0284C7",
+            accent="#0284C7",
+            ink="#132A52",
+            paper="#FFFFFF",
+            card_fill="#F8FAFC",
+        )
+    )
 
+    # 5 slides: 4 blue/navy slides, 1 slide with an accidental clashing orange background override
+    slides = [
+        SlideSpec(slide_id="s1", slide_number=1, headline="Market Overview", layout_family=LayoutFamily.HERO),
+        SlideSpec(slide_id="s2", slide_number=2, headline="Sector Analysis", bullets=["Growth in tech", "Banking resilience"], layout_family=LayoutFamily.TWO_COLUMN),
+        SlideSpec(slide_id="s3", slide_number=3, headline="Macro Trends", bullets=["Inflation cooled", "Rates normalized"], layout_family=LayoutFamily.CARD_GRID),
+        SlideSpec(slide_id="s4", slide_number=4, headline="Outlier Slide", bullets=["Point A", "Point B"], layout_family=LayoutFamily.CARD_GRID, dark_background=True, background_override="#EA580C"),
+        SlideSpec(slide_id="s5", slide_number=5, headline="Conclusion", bullets=["Summary"], layout_family=LayoutFamily.CLOSING),
+    ]
+
+    pptx_bytes = PPTXRenderer.render_presentation(slides, ds, deck_title="Indian Economy")
+    report = PresentationQAAgent.evaluate_presentation(slides, ds, pptx_bytes=pptx_bytes)
+
+    # QA should flag background/theme inconsistency QA-089 or QA-088
+    issue_ids = {issue.checkpoint_id for issue in report.issues}
+    assert "QA-089" in issue_ids or "QA-088" in issue_ids
+
+    # Repair should normalize the clashing background override
+    repaired_slides = RepairAgent.apply_corrections(slides, report, topic="Indian Economy", design_system=ds)
+    assert repaired_slides[3].background_override is None or repaired_slides[3].background_override == ""

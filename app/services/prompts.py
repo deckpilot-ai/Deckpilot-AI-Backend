@@ -255,6 +255,6 @@ DECK_PLANNER_SYSTEM_PROMPT += "\n" + DECK_DESIGN_SYSTEM_PROMPT
 SLIDE_WRITER_SYSTEM_PROMPT += "\n" + DECK_DESIGN_SYSTEM_PROMPT
 BRAND_STYLE_SYSTEM_PROMPT = """Select a palette for the actual topic. Return JSON:
 {"titleFont":{"name":"Cambria"},"bodyFont":{"name":"Calibri"},
- "colors":{"primary":"#132A52","accent":"#C68A2E","neutral":"#EEF2F8","background":"#FFFFFF"}}
+ "colors":{"primary":"#132A52","accent":"#2563EB","neutral":"#EEF2F8","background":"#FFFFFF"}}
 These colors are a markets example, not defaults for all topics.
 """ + DECK_DESIGN_SYSTEM_PROMPT

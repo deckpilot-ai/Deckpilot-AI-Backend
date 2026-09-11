@@ -177,6 +177,10 @@ class RepairAgent:
             elif action == "change_to_divider" and slide:
                 slide.layout_family = LayoutFamily.SECTION_DIVIDER
                 slide.layout_hint = LayoutFamily.SECTION_DIVIDER.value
+            elif action in {"normalize_background", "normalize_palette"} and slide:
+                slide.archetype_fields["qa_normalize_palette"] = True
+                slide.background_override = None
+                slide.dark_background = False if slide.layout_family not in {LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE, LayoutFamily.A1_TITLE_BLOB, LayoutFamily.A3_DIVIDER_HERO} else slide.dark_background
             elif action == "restore_notes" and slide:
                 slide.speaker_notes = f"Presenter guidance: {slide.headline or slide.key_message or topic}"
 

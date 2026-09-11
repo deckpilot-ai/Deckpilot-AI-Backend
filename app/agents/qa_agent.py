@@ -576,6 +576,9 @@ class PresentationQAAgent:
             except Exception:  # noqa: BLE001 - malformed notes XML must become a QA finding
                 issues.append(cls._issue("missing_notes", ValidationSeverity.LOW, ValidationCategory.TECHNICAL, idx, "Slide has no accessible speaker notes", spec.slide_id if spec else ""))
 
+        # Validate color and theme consistency across all slides
+        cls._check_color_consistency(prs, specs, issues)
+
         # Reuse package-level integrity checks, mapping legacy issues to stable IDs.
         stream_report = PPTXValidator.validate_pptx_stream(pptx_bytes, len(specs))
         for old in stream_report.issues:
@@ -584,6 +587,100 @@ class PresentationQAAgent:
             old.checkpoint_id = CHECKPOINT_ID_BY_SLUG[slug]
             old.repair_action = CHECKPOINT_BY_ID[old.checkpoint_id].repair_action
             issues.append(old)
+
+    @classmethod
+    def _check_color_consistency(cls, prs: Any, specs: list[SlideSpec], issues: list[ValidationIssue]) -> None:
+        """Verify that slide colors and card themes remain consistent across the entire deck."""
+        slide_dominant_hues: list[tuple[int, str]] = []
+        
+        for idx, slide in enumerate(prs.slides, 1):
+            spec = specs[idx - 1] if idx <= len(specs) else None
+            slide_colors: list[tuple[int, int, int]] = []
+            
+            # Slide background represents full canvas surface
+            try:
+                if getattr(slide, "background", None) and getattr(slide.background, "fill", None):
+                    color = getattr(slide.background.fill, "fore_color", None)
+                    if color and getattr(color, "rgb", None):
+                        rgb = color.rgb
+                        for _ in range(6):
+                            slide_colors.append((rgb[0], rgb[1], rgb[2]))
+            except Exception:
+                pass
+
+            if spec and getattr(spec, "background_override", None):
+                bg_ov = str(spec.background_override).lstrip("#")
+                if len(bg_ov) == 6:
+                    try:
+                        r_ov, g_ov, b_ov = int(bg_ov[0:2], 16), int(bg_ov[2:4], 16), int(bg_ov[4:6], 16)
+                        for _ in range(8):
+                            slide_colors.append((r_ov, g_ov, b_ov))
+                    except Exception:
+                        pass
+            
+            for shape in slide.shapes:
+                try:
+                    if getattr(shape, "fill", None) and getattr(shape.fill, "type", None):
+                        color = getattr(shape.fill, "fore_color", None)
+                        if color and getattr(color, "rgb", None):
+                            rgb = color.rgb
+                            slide_colors.append((rgb[0], rgb[1], rgb[2]))
+                except Exception:
+                    pass
+                
+                if getattr(shape, "has_text_frame", False):
+                    for paragraph in shape.text_frame.paragraphs:
+                        for run in paragraph.runs:
+                            try:
+                                if run.font.color and run.font.color.rgb:
+                                    rgb = run.font.color.rgb
+                                    slide_colors.append((rgb[0], rgb[1], rgb[2]))
+                            except Exception:
+                                pass
+
+            warm_count = 0
+            cool_count = 0
+            for r, g, b in slide_colors:
+                if max(r, g, b) - min(r, g, b) < 25:
+                    continue
+                if r > 150 and r > b + 40:
+                    warm_count += 1
+                elif (b > r + 25) or (g > r + 25 and b >= r):
+                    cool_count += 1
+
+            if warm_count > cool_count:
+                slide_dominant_hues.append((idx, "warm"))
+            elif cool_count > warm_count:
+                slide_dominant_hues.append((idx, "cool"))
+            else:
+                slide_dominant_hues.append((idx, "neutral"))
+
+        cool_slides = [idx for idx, tone in slide_dominant_hues if tone == "cool"]
+        warm_slides = [idx for idx, tone in slide_dominant_hues if tone == "warm"]
+        total = len(slide_dominant_hues)
+
+        if len(cool_slides) >= max(2, int(total * 0.5)) and 0 < len(warm_slides) <= 3:
+            for s_idx in warm_slides:
+                spec = specs[s_idx - 1] if s_idx <= len(specs) else None
+                issues.append(cls._issue(
+                    "background_inconsistency",
+                    ValidationSeverity.HIGH,
+                    ValidationCategory.DESIGN,
+                    s_idx,
+                    f"Slide {s_idx} uses a warm/orange theme that conflicts with the dominant cool/blue deck palette",
+                    spec.slide_id if spec else "",
+                ))
+        elif len(warm_slides) >= max(2, int(total * 0.5)) and 0 < len(cool_slides) <= 3:
+            for s_idx in cool_slides:
+                spec = specs[s_idx - 1] if s_idx <= len(specs) else None
+                issues.append(cls._issue(
+                    "background_inconsistency",
+                    ValidationSeverity.HIGH,
+                    ValidationCategory.DESIGN,
+                    s_idx,
+                    f"Slide {s_idx} uses a cool/blue theme that conflicts with the dominant warm deck palette",
+                    spec.slide_id if spec else "",
+                ))
 
     @staticmethod
     def _overlap_ratio(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:

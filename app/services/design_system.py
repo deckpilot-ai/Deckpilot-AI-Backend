@@ -42,11 +42,11 @@ full visual inspection unless every slide was actually rendered and inspected.
 
 PALETTES = {
     "history": ("#6B221C", "#E4791F", "#F7EEE3"),
-    "governance": ("#0C3B39", "#E08A1E", "#E9F3F1"),
-    "sustainability": ("#20302C", "#C28A2C", "#F1F6F4"),
-    "markets": ("#132A52", "#C68A2E", "#EEF2F8"),
-    "health": ("#164B50", "#D27950", "#EDF5F4"),
-    "technology": ("#292447", "#D99448", "#F0EEF6"),
+    "governance": ("#0C3B39", "#0E7C7B", "#E9F3F1"),
+    "sustainability": ("#0F2922", "#059669", "#F1F6F4"),
+    "markets": ("#132A52", "#2563EB", "#EEF2F8"),
+    "health": ("#164B50", "#0D9488", "#EDF5F4"),
+    "technology": ("#0F172A", "#0284C7", "#F0F9FF"),
 }
 
 

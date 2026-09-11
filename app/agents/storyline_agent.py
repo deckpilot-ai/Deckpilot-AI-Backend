@@ -191,14 +191,8 @@ class StorylineAgent:
             else:
                 eyebrow = f"Section {(i // 4) + 1}"
 
-            if raw_slide.get("takeaway"):
-                takeaway = raw_slide.get("takeaway")
-            elif getattr(goal, "presentation_type", None) == PresentationType.RESEARCH_EDUCATION:
-                takeaway = f"Core Insight: Primary evidence and historical analysis of {headline.lower()}."
-            else:
-                takeaway = f"Strategic Takeaway: Actionable focus on {headline.lower()}."
-
-            speaker_notes = raw_slide.get("speakerNotes") or raw_slide.get("speaker_notes") or f"In this slide, walk the audience through {purpose.lower()}. Emphasize key findings and historical context."
+            takeaway = raw_slide.get("takeaway") or explicit_s.get("takeaway") or ""
+            speaker_notes = raw_slide.get("speakerNotes") or raw_slide.get("speaker_notes") or f"Presenter guidance: {headline}"
 
             # Select consulting layout archetype
             from app.services.deck_archetypes import ArchetypeSelector

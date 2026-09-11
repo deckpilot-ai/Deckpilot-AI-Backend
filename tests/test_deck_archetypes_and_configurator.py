@@ -146,7 +146,7 @@ def test_palette_generator_semantic_matching():
 
     econ_pal = PaletteGenerator.generate_palette("Sectors of the Indian Economy")
     assert econ_pal.ink == "#1F3864"
-    assert econ_pal.primary == "#5B9BD5"
+    assert econ_pal.primary == "#2F5597"
 
 
 def test_archetype_selector_anti_pattern_avoidance():
