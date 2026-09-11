@@ -50,8 +50,40 @@ PALETTES = {
 }
 
 
+def strip_citations(text: str) -> str:
+    """Strip raw document citations, filenames, page links, and bracketed anchors."""
+    if not text:
+        return ""
+    val = str(text)
+    # 1. Parenthetical / bracketed file references e.g. (source data.pdf#page=15), [doc.pdf:12], (source.pdf)
+    val = re.sub(
+        r"\s*\(\s*(?:source\s*:?\s*)?[^)\s]+\.(?:pdf|docx?|pptx?|xlsx?|txt|csv|html?)(?:#(?:page=\d+|[a-zA-Z0-9_\-]+))?\s*(?:,\s*p(?:age|\.)\s*\d+)?\s*\)",
+        "",
+        val,
+        flags=re.IGNORECASE,
+    )
+    val = re.sub(
+        r"\s*\[\s*(?:source\s*:?\s*)?[^\]\s]+\.(?:pdf|docx?|pptx?|xlsx?|txt|csv|html?)(?:#(?:page=\d+|[a-zA-Z0-9_\-]+))?\s*(?:,\s*p(?:age|\.)\s*\d+)?\s*\]",
+        "",
+        val,
+        flags=re.IGNORECASE,
+    )
+    # 2. Standalone file links with anchors e.g. source data.pdf#page=15, report.pdf#page=3
+    val = re.sub(
+        r"\b(?:source\s*:?\s*)?[a-zA-Z0-9_\- ]+\.(?:pdf|docx?|pptx?|xlsx?)(?:#(?:page=\d+|[a-zA-Z0-9_\-]+))",
+        "",
+        val,
+        flags=re.IGNORECASE,
+    )
+    # 3. Clean up any trailing space before punctuation e.g. "territories ." -> "territories."
+    val = re.sub(r"\s+([.,;:!?])", r"\1", val)
+    return val
+
+
 def clean_text(value: Any) -> str:
-    return re.sub(r"[ \t]+", " ", str(value or "").replace("\u2014", " - ").replace("**", "")).strip()
+    cleaned = strip_citations(str(value or ""))
+    cleaned = cleaned.replace("\u2014", " - ").replace("**", "").replace("Â·", " • ").replace("â€”", " - ").replace("", "")
+    return re.sub(r"[ \t]+", " ", cleaned).strip()
 
 
 def default_brand(topic: str) -> dict[str, Any]:

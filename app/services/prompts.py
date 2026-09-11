@@ -204,6 +204,7 @@ Rules:
 5. Whenever a source figure, map, sculpture, coin, or illustration from the grounded data matches the slide's topic, assign its imageArtifactId and imageCaption.
 6. ALWAYS populate speakerNotes with 2-4 substantive sentences to guide the presenter. Never leave it empty.
 7. Include metrics[] only for data-heavy slides (financial, KPI, market-size). Omit for narrative/conceptual slides.
+8. NEVER output raw file citations, filenames, page links, or document anchors like '(source data.pdf#page=15)' or '(source.pdf)' in the visible headline, bullets, or takeaway. Express all evidence directly in clean, natural presentation language. Place specific page citations inside speakerNotes.
 """
 
 BRAND_STYLE_SYSTEM_PROMPT = """You are Visual Design Director at deckpilotAI. Select a tailored corporate palette and typography hierarchy suited to the presentation topic.

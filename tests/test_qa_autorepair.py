@@ -272,3 +272,32 @@ def test_repetitive_box_patterns_detected_and_differentiated():
     # Check that consecutive identical layouts are broken
     assert layouts[1] != layouts[2] or layouts[2] != layouts[3]
 
+
+def test_strip_citations_removes_file_and_page_leakage():
+    from app.services.design_system import clean_text, strip_citations
+
+    raw_bullets = [
+        "Satraps were governors left by overlords to manage far-off territories (source data.pdf#page=15).",
+        "Empires maintained armies to conquer and defend borders (source data.pdf#page=6).",
+        "Control of rivers and trade networks was a key imperial strategy (source data.pdf#page=8).",
+        "Documented evidence in [research_report.pdf#page=22, p. 23] highlights fiscal strength.",
+    ]
+    cleaned = [clean_text(b) for b in raw_bullets]
+    assert cleaned[0] == "Satraps were governors left by overlords to manage far-off territories."
+    assert cleaned[1] == "Empires maintained armies to conquer and defend borders."
+    assert cleaned[2] == "Control of rivers and trade networks was a key imperial strategy."
+    assert "pdf" not in cleaned[3].lower()
+
+    slide = SlideSpec(
+        slide_id="s01",
+        slide_number=1,
+        headline="Post-Mauryan period: regional rulers",
+        bullets=raw_bullets,
+        layout_family=LayoutFamily.TWO_COLUMN,
+    )
+    repaired = RepairAgent.apply_corrections([slide], PresentationQAAgent.evaluate_presentation([slide], DesignSystem()))
+    for b in repaired[0].bullets:
+        assert ".pdf" not in b
+        assert "#page=" not in b
+
+

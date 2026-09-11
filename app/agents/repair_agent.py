@@ -13,12 +13,13 @@ from app.schemas.generation_state import (
     SlideSpec,
     ValidationSeverity,
 )
+from app.services.design_system import strip_citations
 from app.services.image_matcher import MIN_SEMANTIC_RELEVANCE, ImageMatcher
 
 
 def _clean_text(text: Any) -> str:
-    value = str(text or "")
-    value = value.replace("Â·", " • ").replace("â€”", " - ").replace("�", "")
+    value = strip_citations(str(text or ""))
+    value = value.replace("Â·", " • ").replace("â€”", " - ").replace("", "")
     value = re.sub(r"\b(\w{3,})\s+\1\b", r"\1", value, flags=re.IGNORECASE)
     value = re.sub(r"([!?.,])\1+", r"\1", value)
     return re.sub(r"\s+", " ", value).strip()
