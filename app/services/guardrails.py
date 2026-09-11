@@ -109,10 +109,12 @@ SPEED_PATTERNS = [
 
 # Revision and targeted slide edit triggers
 REVISION_PATTERNS = [
-    r"\b(?:change|update|edit|modify|rewrite|replace|revise|fix|tweak|adjust|swap)\s+(?:slide|page|s|the\s*(?:\d+(?:st|nd|rd|th)?|[a-zA-Z]+)?\s*slide|title|headline|bullets?|theme|color|palette|layout)\b",
-    r"\bin\s+(?:slide\s*\d+|the\s*(?:\d+(?:st|nd|rd|th)?|[a-zA-Z]+)?\s*slide)[,\s]+(?:change|update|edit|modify|make|replace|add|remove|fix)\b",
-    r"\b(?:make|set)\s+(?:slide\s*\d+|the\s*(?:\d+(?:st|nd|rd|th)?|[a-zA-Z]+)?\s*slide|title|theme|palette)\s+(?:dark|light|blue|green|shorter|longer|two\s*column|timeline|cards?|metrics)\b",
+    r"\b(?:change|update|edit|modify|rewrite|replace|revise|fix|tweak|adjust|swap|redo|rework|rebuild|re-generate|regenerate)\s+(?:slide|page|s|the\s*(?:\d+(?:st|nd|rd|th)?|[a-zA-Z]+)?\s*slide|title|headline|bullets?|theme|color|palette|layout|ppt|presentation|deck|numbers?|elements?)\b",
+    r"\bin\s+(?:slide\s*\d+|the\s*(?:\d+(?:st|nd|rd|th)?|[a-zA-Z]+)?\s*slide)[,\s]+(?:change|update|edit|modify|make|replace|add|remove|fix|set)\b",
+    r"\b(?:make|set)\s+(?:slide\s*\d+|the\s*(?:\d+(?:st|nd|rd|th)?|[a-zA-Z]+)?\s*slide|title|theme|palette|all\s+slides?|all\s+pages?|deck|presentation)\s+(?:dark|light|blue|green|navy|emerald|saffron|shorter|longer|two\s*column|timeline|cards?|metrics)\b",
     r"\b(?:add|remove|delete)\s+(?:a\s+)?(?:bullet|slide|point|card)\s+(?:to|from|on|in)\s+slide\s*\d+\b",
+    r"\b(?:fix|correct|resolve|update)\s+(?:this|created|existing|the)?\s*(?:ppt|presentation|deck|slides?|color\s*theme|colors?|numbers?|mismatch|styling)\b",
+    r"\b(?:there\s+is\s+a\s+)?(?:mismatch|inconsistency|issue|problem|bug)\s+(?:in|with)?\s*(?:color|colors|numbers?|elements?|theme|slides?)\b",
 ]
 
 # Presentation creation triggers

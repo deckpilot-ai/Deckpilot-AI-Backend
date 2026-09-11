@@ -42,9 +42,6 @@ class RevisionAgent:
     ) -> list[int]:
         """Identifies which slide index(es) (0-indexed) the user wants to revise."""
         slides = deck_spec.get("slides", [])
-        if not slides:
-            return []
-
         targets: set[int] = set()
         lower = prompt.lower()
 
@@ -53,7 +50,10 @@ class RevisionAgent:
         for num_str in m_slides:
             try:
                 val = int(num_str)
-                if 1 <= val <= len(slides):
+                if slides:
+                    if 1 <= val <= len(slides):
+                        targets.add(val - 1)
+                elif val >= 1:
                     targets.add(val - 1)
             except ValueError:
                 pass
@@ -93,7 +93,12 @@ class RevisionAgent:
     def is_global_theme_change(cls, prompt: str) -> bool:
         """Checks if the user prompt is requesting a global theme/color/font change."""
         lower = prompt.lower()
-        theme_words = ["theme", "palette", "dark mode", "light mode", "obsidian", "corporate light", "color scheme", "accent color"]
+        theme_words = [
+            "theme", "palette", "dark mode", "light mode", "obsidian", "corporate light",
+            "color scheme", "accent color", "blue color", "make all", "all page",
+            "mismatch in color", "color mismatch", "numbers blue", "elements blue",
+            "colors to blue", "color theme", "blue theme"
+        ]
         has_theme = any(w in lower for w in theme_words)
         has_slide_target = bool(re.search(r"\bslide\s*\d+\b", lower))
         return has_theme and not has_slide_target

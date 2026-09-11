@@ -14,6 +14,8 @@ LAYOUTS = (
     "two_column", "editorial", "hierarchy", "image_focus", "bar_chart",
     "big_questions", "timeline_columns", "diagram_hierarchy", "saptanga", "stat_callouts",
     "dark_quote", "legacy", "two_column_definition",
+    "A1", "A2", "A3", "A4", "A5", "A6", "A8", "A10", "A11", "A13", "A14", "A15",
+    "A16", "A17", "A18", "A24", "A25", "A26", "A27", "A28", "A29", "A30",
 )
 
 DECK_DESIGN_SYSTEM_PROMPT = """
@@ -363,7 +365,7 @@ def prepare_deck(spec: dict[str, Any], evidence: str) -> dict[str, Any]:
     for slide in result.get("slides", []):
         layout = slide.get("layoutHint", "two_column")
         layout = {"chart": "metrics_grid", "metrics": "metrics_grid", "title": "hero"}.get(layout, layout)
-        if layout not in LAYOUTS:
+        if layout not in LAYOUTS and not (isinstance(layout, str) and layout.upper().startswith("A") and layout[1:].isdigit()):
             layout = "two_column"
         metrics = slide.get("metrics", [])
         valid_metrics = []
@@ -398,6 +400,8 @@ def prepare_deck(spec: dict[str, Any], evidence: str) -> dict[str, Any]:
         previous = layout
     slides = result.get("slides", [])
     if len(slides) >= 2:
-        slides[0]["layoutHint"] = "hero"
-        slides[-1]["layoutHint"] = "closing"
+        if not (isinstance(slides[0].get("layoutHint"), str) and slides[0]["layoutHint"].upper() in ("A1", "A2", "A3")):
+            slides[0]["layoutHint"] = "hero"
+        if not (isinstance(slides[-1].get("layoutHint"), str) and slides[-1]["layoutHint"].upper() in ("A17", "A18", "A27")):
+            slides[-1]["layoutHint"] = "closing"
     return result

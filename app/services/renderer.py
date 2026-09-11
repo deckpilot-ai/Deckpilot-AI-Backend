@@ -634,8 +634,8 @@ class PPTXRenderer:
                     # canvas even when the source supplies concise copy.
                     content_y = 2.15
                     if slide_data.takeaway:
-                        cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, content_y, 12.1, 1.05, tint(accent, 0.91), "lead-band", corner_radius=0.04)
-                        cls._text(slide, "KEY IDEA", 0.85, content_y + 0.12, 1.25, 0.28, accent, body_font, 11, bold=True, name="lead-card-label")
+                        cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, content_y, 12.1, 1.05, tint(primary, 0.91), "lead-band", corner_radius=0.04)
+                        cls._text(slide, "KEY IDEA", 0.85, content_y + 0.12, 1.25, 0.28, primary, body_font, 11, bold=True, name="lead-card-label")
                         lead_color = ink if dark else fg
                         cls._text(slide, slide_data.takeaway, 2.0, content_y + 0.10, 10.35, 0.76, lead_color, title_font, 18, bold=True)
                         content_y = 3.45
@@ -649,7 +649,7 @@ class PPTXRenderer:
                         text_w = card_w - 1.03
                         card_font, text_h, top_pad = cls._balanced_card_metrics(item, text_w, card_h)
                         marker_y = content_y + top_pad + 0.03
-                        cls._shape(slide, MSO_SHAPE.OVAL, x + 0.22, marker_y, 0.46, 0.46, accent, f"evidence-disc-{j+1}")
+                        cls._shape(slide, MSO_SHAPE.OVAL, x + 0.22, marker_y, 0.46, 0.46, primary, f"evidence-disc-{j+1}")
                         cls._text(slide, str(j + 1), x + 0.22, marker_y + 0.03, 0.46, 0.35, white, body_font, 11, bold=True, center=True, name=f"evidence-disc-number-{j+1}")
                         cls._text(
                             slide,

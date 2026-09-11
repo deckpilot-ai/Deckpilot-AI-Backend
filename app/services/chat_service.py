@@ -345,45 +345,39 @@ class ChatService:
         eff_ctx = ContextCompactionService.get_effective_context(db, project_id)
 
         # -------------------------------------------------------------
-        # MODE 3: AUTOPILOT MODE (Default: End-to-end execution)
+        # MODE 3: AUTOPILOT MODE (Reasoning Engine & Tool Dispatch)
         # -------------------------------------------------------------
-        existing_deck = db.scalar(
-            select(DeckVersion)
-            .where(DeckVersion.project_id == project_id, DeckVersion.status == "ready")
-            .order_by(DeckVersion.version.desc())
+        from app.services.reasoning_engine import ReasoningEngine
+        reasoning = await ReasoningEngine.reason_and_route(
+            db=db,
+            project_id=project_id,
+            user_id=user_id,
+            content=input_guardrail.sanitized_content or content,
+            has_attachments=has_attachments,
+            attachment_ids=attachment_ids,
+            mode=mode,
         )
 
-        is_revision = input_guardrail.intent == IntentCategory.REVISION or (
-            existing_deck is not None and any(w in input_guardrail.sanitized_content.lower() for w in ("change slide", "update slide", "edit slide", "modify slide", "rewrite slide", "replace slide", "in slide", "make slide"))
-        )
-        should_generate = (input_guardrail.intent == IntentCategory.DECK_GENERATION) or is_revision
-
-        if should_generate:
-            intent_type = "revise" if (is_revision and existing_deck is not None) else "generate"
-            # Check for decisions if prompt is concise and it's a new deck
-            decision_questions = None
-            if intent_type == "generate" and len(input_guardrail.sanitized_content.split()) <= 7:
-                decision_questions = [
-                    {
-                        "id": "deck_depth",
-                        "question": "Target slide count for this presentation?",
-                        "options": ["5 Slides (Executive Brief)", "10 Slides (Standard Pitch)", "20 Slides (Full Diligence)"]
-                    }
-                ]
-
+        if reasoning.get("should_generate"):
             return {
-                "intent": intent_type,
+                "intent": reasoning.get("intent", "generate"),
                 "mode": "autopilot",
                 "should_generate": True,
                 "user_message": user_msg_dict,
                 "assistant_message": None,
                 "plan_spec": None,
-                "decision_questions": decision_questions,
+                "decision_questions": reasoning.get("decision_questions"),
                 "guardrail_info": {
                     "input": input_guardrail.model_dump(),
                     "output": None,
                 },
             }
+
+        existing_deck = db.scalar(
+            select(DeckVersion)
+            .where(DeckVersion.project_id == project_id, DeckVersion.status == "ready")
+            .order_by(DeckVersion.version.desc())
+        )
 
         # Conversational query in Autopilot mode (not a direct greeting/thanks, e.g. custom question)
         deck_context_note = ""

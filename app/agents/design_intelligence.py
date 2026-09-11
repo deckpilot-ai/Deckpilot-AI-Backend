@@ -115,6 +115,11 @@ class DesignIntelligenceAgent:
         # 1. Determine base palette from PaletteGenerator
         from app.services.deck_archetypes import PaletteGenerator
         tokens = PaletteGenerator.generate_palette(goal.topic)
+
+        # Check if user directives specify a color
+        user_directives = getattr(goal, "user_directives", "").lower()
+        if user_directives:
+            tokens = PaletteGenerator.generate_palette(f"{goal.topic} {user_directives}")
         
         colors = ColorPalette(
             ink=tokens.ink,
@@ -152,6 +157,15 @@ class DesignIntelligenceAgent:
                     val = hint_cols.get(k)
                     if isinstance(val, str) and re.match(r"^#[0-9A-Fa-f]{6}$", val):
                         setattr(colors, k, val)
+
+        # Enforce Palette Coherence: If primary is in blue/navy/indigo range, ensure accent is also harmonious blue/indigo
+        prim_lower = colors.primary.lower()
+        if prim_lower in ("#132a52", "#1e3a8a", "#2563eb", "#0284c7", "#1f3864", "#2f5597", "#0f172a"):
+            # If accent was inadvertently set to contrasting orange/amber, harmonize it with the primary blue palette
+            acc_lower = colors.accent.lower()
+            if acc_lower in ("#e4791f", "#d97706", "#f59e0b", "#ea580c", "#f97316"):
+                colors.accent = colors.primary
+                colors.secondary = "#0284C7" if prim_lower != "#0284c7" else "#38BDF8"
 
         typography = TypographyHierarchy(
             title_font=FontConfig(name=dominant_title),

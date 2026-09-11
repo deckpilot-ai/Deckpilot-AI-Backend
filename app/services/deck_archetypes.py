@@ -104,7 +104,7 @@ class ColorTokens:
 BENCHMARK_PALETTES = {
     "federalism": ColorTokens(
         ink="#0C3B39", primary="#0E7C7B", secondary="#16A085",
-        tint_a="#E9F3F1", tint_b="#F6EFE2", alert="#C63A28",
+        tint_a="#E9F3F1", tint_b="#F4FBF9", alert="#C63A28",
     ),
     "marathas": ColorTokens(
         ink="#7E2C22", primary="#E4791F", secondary="#6B221C",
@@ -134,6 +134,18 @@ BENCHMARK_PALETTES = {
         ink="#0C3B39", primary="#0E7C7B", secondary="#16A085",
         tint_a="#E9F3F1", tint_b="#F4FBF9", alert="#DC2626",
     ),
+    "indigo": ColorTokens(
+        ink="#1E1B4B", primary="#4F46E5", secondary="#818CF8",
+        tint_a="#EEF2FF", tint_b="#F5F3FF", alert="#E11D48",
+    ),
+    "emerald": ColorTokens(
+        ink="#064E3B", primary="#059669", secondary="#10B981",
+        tint_a="#ECFDF5", tint_b="#F0FDF4", alert="#DC2626",
+    ),
+    "obsidian": ColorTokens(
+        ink="#090D16", primary="#38BDF8", secondary="#0284C7",
+        tint_a="#0F172A", tint_b="#1E293B", alert="#F43F5E",
+    ),
 }
 
 
@@ -148,9 +160,21 @@ class PaletteGenerator:
     ) -> ColorTokens:
         topic_lower = topic.lower()
 
-        # Check semantic keywords
-        if any(w in topic_lower for w in ("maratha", "empire", "history", "medieval", "heritage", "ancient", "civilisation")):
+        # 1. Explicit user theme/color directives have highest priority
+        if any(w in topic_lower for w in ("blue", "navy", "royal blue", "sky blue", "modern indigo")):
+            if "indigo" in topic_lower:
+                return BENCHMARK_PALETTES["indigo"]
+            return BENCHMARK_PALETTES["markets"]
+        if any(w in topic_lower for w in ("obsidian", "dark mode", "dark theme", "black")):
+            return BENCHMARK_PALETTES["obsidian"]
+        if any(w in topic_lower for w in ("emerald", "green", "mint", "forest")):
+            return BENCHMARK_PALETTES["emerald"]
+        if any(w in topic_lower for w in ("teal", "cyan", "medical", "clinical")):
+            return BENCHMARK_PALETTES["healthcare"]
+        if any(w in topic_lower for w in ("saffron", "maratha", "orange", "terracotta", "shivaji", "peshwa")):
             return BENCHMARK_PALETTES["marathas"]
+
+        # 2. Semantic domain matching
         if any(w in topic_lower for w in ("federal", "civic", "constitution", "parliament", "democracy", "government", "policy")):
             return BENCHMARK_PALETTES["federalism"]
         if any(w in topic_lower for w in ("economy", "market", "finance", "fiscal", "revenue", "trade", "banking", "sector")):

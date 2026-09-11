@@ -24,7 +24,9 @@ dependencies = [
   "openpyxl>=3.1",
   "Pillow>=11.3",
   "opencv-python-headless>=4.12",
-  "matplotlib>=3.10"
+  "matplotlib>=3.10",
+  "langgraph>=1.2.0",
+  "langchain-core>=1.6.0"
 ]
 
 [project.optional-dependencies]

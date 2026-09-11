@@ -492,19 +492,23 @@ class JobOrchestrator:
                 _emit("font_brand_detection", "running", "Preserving presentation design system and analyzing revision directives...")
 
                 goal: PresentationGoal = context.get("presentation_goal") or RequirementsAgent.analyze_requirements(user_prompt)
+                is_theme_change = RevisionAgent.is_global_theme_change(user_prompt)
                 design_system: DesignSystem = DesignIntelligenceAgent.generate_design_system(
                     goal=goal,
                     reference_profile=reference_ppt_profile,
                 )
                 context["design_system"] = design_system
-                context["brand_style"] = prev_spec.get("brandStyle") or {
-                    "colors": design_system.colors.model_dump(),
-                    "titleFont": design_system.typography.title_font.model_dump(),
-                    "bodyFont": design_system.typography.body_font.model_dump(),
-                    "subject": design_system.subject_domain,
-                }
+                if is_theme_change or not prev_spec.get("brandStyle"):
+                    context["brand_style"] = {
+                        "colors": design_system.colors.model_dump(),
+                        "titleFont": design_system.typography.title_font.model_dump(),
+                        "bodyFont": design_system.typography.body_font.model_dump(),
+                        "subject": design_system.subject_domain,
+                    }
+                else:
+                    context["brand_style"] = prev_spec.get("brandStyle")
                 _update_task("font_brand_detection", "completed", completed=True)
-                _emit("font_brand_detection", "completed", "Retained presentation design system and brand styling.")
+                _emit("font_brand_detection", "completed", "Updated presentation design system and brand styling." if is_theme_change else "Retained presentation design system and brand styling.")
 
                 _update_task("deck_planner", "completed", completed=True)
                 _emit("deck_planner", "completed", f"Retaining all {len(prev_spec.get('slides', []))} planned slides for targeted revision.")
@@ -985,6 +989,45 @@ class JobOrchestrator:
                                         slide["imageCaption"] = meta.get("caption") or art.source_locator or "Uploaded reference image"
                         except Exception:
                             logger.warning("Source image %s unavailable", art.id)
+
+                # If no or few uploaded/extracted images exist, fetch stock photos from Unsplash/Pexels
+                if len(source_images) < 2 and job_mode != "export":
+                    try:
+                        from app.services.image_provider import ImageProviderService
+                        raw_slides = context.get("deck_spec", {}).get("slides", [])
+                        topic = context.get("deck_spec", {}).get("deckTitle") or user_prompt
+                        slide_queries = [
+                            f"{s.get('headline', '')} {s.get('purpose', '')}"
+                            for s in raw_slides if s.get('headline')
+                        ]
+                        stock_assets = await ImageProviderService.fetch_stock_assets_for_presentation(
+                            project_id=project_id,
+                            topic=topic,
+                            slide_queries=slide_queries,
+                            max_images=min(4, max(1, len(raw_slides) // 2)),
+                        )
+                        for asset_id, img_bytes, meta in stock_assets:
+                            source_images[asset_id] = img_bytes
+                            new_art = Artifact(
+                                id=asset_id,
+                                project_id=project_id,
+                                job_id=job_id,
+                                type="image",
+                                storage_key=meta.storage_key,
+                                json_data=json.dumps({
+                                    "caption": meta.caption,
+                                    "nearby_text": meta.nearby_text,
+                                    "semantic_summary": meta.semantic_summary,
+                                    "quality_score": meta.quality_score,
+                                }),
+                                sha256=meta.sha256,
+                                source_locator=meta.source_file,
+                            )
+                            db.add(new_art)
+                            existing_artifacts.append(new_art)
+                        db.commit()
+                    except Exception as stock_err:
+                        logger.warning("Stock image fetching advisory: %s", stock_err)
 
                 # Semantically match available documentary source_images to slides
                 if source_images:
