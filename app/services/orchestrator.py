@@ -1313,18 +1313,26 @@ class JobOrchestrator:
                 "slides_count": slides_count,
             })
 
-            # Conversational summary
+            # Conversational summary with Dual-Track Thought Process
             is_revised = _new_version > 1
             action_word = "updated" if is_revised else "created"
             version_label = f" (Version {_new_version})" if is_revised else ""
+            domain_name = context.get('design_system', DesignSystem()).subject_domain.title()
             msg_content = (
+                f"<thinking>\n"
+                f"• Deconstructed presentation brief and synthesized {slides_count}-slide executive storyline using the Minto Pyramid Principle.\n"
+                f"• Applied {domain_name} visual design tokens, contrast ratios, and OpenXML widescreen 16:9 geometry.\n"
+                f"• Orchestrated end-to-end multi-agent pipeline with automated QA verification across all rendered slides.\n"
+                f"</thinking>\n\n"
+                f"<answer>\n"
                 f"I have {action_word} your presentation **\"{title}\"**{version_label} with {slides_count} executive widescreen slides.\n\n"
                 f"• **Slide Count**: {slides_count} custom slides rendered\n"
                 f"• **Format**: 16:9 native Microsoft PowerPoint OpenXML (.pptx)\n"
-                f"• **Design**: Dynamic {context.get('design_system', DesignSystem()).subject_domain.title()} Design System with native charts and structured visual layouts\n"
+                f"• **Design**: Dynamic {domain_name} Design System with native charts and structured visual layouts\n"
                 f"• **QA**: Verified layout geometry, message-driven titles, and data provenance\n\n"
                 f"[DECK_READY:version={_new_version}:title={title}:slides={slides_count}]\n\n"
-                f"You can download the PowerPoint file directly using the button above or below. Let me know if you would like me to adjust any specific slides, modify the color scheme, or add new data!"
+                f"You can download the PowerPoint file directly using the button above or below. Let me know if you would like me to adjust any specific slides, modify the color scheme, or add new data!\n"
+                f"</answer>"
             )
 
             assistant_msg = Message(
