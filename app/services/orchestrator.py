@@ -34,6 +34,7 @@ from app.schemas.generation_state import (
     PresentationType,
     QAReport,
     SlideSpec,
+    ValidationSeverity,
 )
 from app.services.attachment_pipeline import wait_for_pending_attachments
 from app.services.compaction import ContextCompactionService
@@ -1170,7 +1171,7 @@ class JobOrchestrator:
                                             db=db,
                                             slide=target_slide,
                                             issues=s_issues,
-                                            user_id=context.get("user_id"),
+                                            user_id=user_id,
                                             job_id=job_id,
                                         )
                                     except Exception as llm_rep_err:
