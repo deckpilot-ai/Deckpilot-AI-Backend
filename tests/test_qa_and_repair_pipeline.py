@@ -311,3 +311,138 @@ def test_image_matcher_semantic_allocation():
     assigned_slides = [s for s in slides if s.image_artifact_id]
     assert len(assigned_slides) >= 1
     assert any(s.image_artifact_id == "art_ashoka_edicts" for s in assigned_slides)
+
+
+def test_repair_agent_handles_diverse_qa_actions():
+    """Verify RepairAgent resolves citations, softened claims, bold reduction, and unit inferences."""
+    from app.schemas.generation_state import ValidationIssue, ValidationCategory, QAReport
+
+    spec = SlideSpec(
+        slide_number=1,
+        headline="**Overview**",
+        bullets=[
+            "Our solution is the only solution and always guarantees 100% uptime (Smith et al., 2020).",
+            "**Critical feature with bold formatting**",
+        ],
+        metrics=[{"value": "85", "label": ""}],
+    )
+
+    issues = [
+        ValidationIssue(
+            checkpoint_id="QA-004",
+            severity=ValidationSeverity.MEDIUM,
+            category=ValidationCategory.CONTENT,
+            slide_number=1,
+            slide_id="s01",
+            message="Title is too vague",
+            repair_action="clarify_title",
+        ),
+        ValidationIssue(
+            checkpoint_id="QA-022",
+            severity=ValidationSeverity.MEDIUM,
+            category=ValidationCategory.CONTENT,
+            slide_number=1,
+            slide_id="s01",
+            message="Absolute unverified claims",
+            repair_action="soften_claim",
+        ),
+        ValidationIssue(
+            checkpoint_id="QA-024",
+            severity=ValidationSeverity.MEDIUM,
+            category=ValidationCategory.CONTENT,
+            slide_number=1,
+            slide_id="s01",
+            message="Academic citation in body",
+            repair_action="move_citation_to_notes",
+        ),
+        ValidationIssue(
+            checkpoint_id="QA-034",
+            severity=ValidationSeverity.LOW,
+            category=ValidationCategory.DESIGN,
+            slide_number=1,
+            slide_id="s01",
+            message="Overuse of bold",
+            repair_action="reduce_bold",
+        ),
+        ValidationIssue(
+            checkpoint_id="QA-038",
+            severity=ValidationSeverity.MEDIUM,
+            category=ValidationCategory.DATA,
+            slide_number=1,
+            slide_id="s01",
+            message="Metric missing unit or label",
+            repair_action="infer_or_flag_units",
+        ),
+    ]
+
+    report = QAReport(status="needs_repair", checkpoints_passed=115, checkpoints_total=120, issues=issues)
+    repaired = RepairAgent.apply_corrections([spec], report, topic="Enterprise Cloud Strategy")
+
+    res = repaired[0]
+    # 1. Clarified title
+    assert "Enterprise Cloud Strategy" in res.headline or len(res.headline) > len("Overview")
+    # 2. Softened claims & removed citation
+    assert "Smith et al" not in res.bullets[0]
+    assert "Smith et al" in res.speaker_notes
+    assert "the only solution" not in res.bullets[0]
+    # 3. Reduced bold
+    assert "**" not in res.bullets[1]
+    # 4. Inferred metric units and label
+    assert "%" in res.metrics[0]["value"]
+    assert len(res.metrics[0]["label"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_repair_agent_llm_slide_repair(monkeypatch):
+    """Verify RepairAgent.repair_slide_with_llm integrates with LLM to repair slide defects."""
+    from app.services.provider_router import ProviderRouter
+    from app.schemas.generation_state import ValidationIssue, ValidationCategory
+
+    mock_llm_response = {
+        "headline": "Streamlined Cloud Workflow Automation",
+        "bullets": [
+            "Unified control plane reduces reconciliation latency across clusters",
+            "Automated policy enforcement mitigates multi-region audit risks",
+            "Predictable operational cost scaling replaces bespoke consulting models",
+        ],
+        "takeaway": "Enterprise-grade governance drives sustainable workflow efficiency.",
+        "layoutHint": "two_column",
+        "metrics": [{"value": "3x", "label": "Throughput Velocity"}],
+    }
+
+    async def fake_call_llm(*args, **kwargs):
+        return mock_llm_response
+
+    monkeypatch.setattr(ProviderRouter, "call_llm", fake_call_llm)
+
+    spec = SlideSpec(
+        slide_number=2,
+        headline="A very bad narrative paragraph title that goes on forever and ever.",
+        bullets=["Weak bullet 1", "Weak bullet 2"],
+        layout_family=LayoutFamily.CARD_GRID,
+    )
+
+    issues = [
+        ValidationIssue(
+            checkpoint_id="QA-121",
+            severity=ValidationSeverity.HIGH,
+            category=ValidationCategory.CONTENT,
+            slide_number=2,
+            slide_id="s02",
+            message="Title phrased like narrative sentence",
+            repair_action="rewrite_title",
+        )
+    ]
+
+    repaired_slide = await RepairAgent.repair_slide_with_llm(
+        db=None,
+        slide=spec,
+        issues=issues,
+    )
+
+    assert repaired_slide.headline == "Streamlined Cloud Workflow Automation"
+    assert len(repaired_slide.bullets) == 3
+    assert repaired_slide.takeaway == "Enterprise-grade governance drives sustainable workflow efficiency."
+    assert repaired_slide.layout_family == LayoutFamily.TWO_COLUMN
+    assert repaired_slide.metrics[0]["value"] == "3x"
+

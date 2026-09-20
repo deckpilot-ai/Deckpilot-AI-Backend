@@ -164,12 +164,18 @@ def _validate_agent_output(
         if not any(parsed.get(k) for k in ("colors", "brandStyle", "palette", "typography", "subject", "theme")):
             return False, "font_brand_detection output missing style, colors, or typography keys", {}
 
+    elif agent_type == "repair_agent":
+        slide_cand = parsed.get("slide") or parsed
+        if not isinstance(slide_cand, dict) or not any(k in slide_cand for k in ("headline", "bullets", "takeaway", "layoutHint")):
+            return False, "repair_agent output missing slide fields (headline, bullets, takeaway)", {}
+
     return True, "", parsed
 
 
 AGENT_CAPABILITY_REQUIREMENTS: dict[str, list[str]] = {
     "deck_planner": ["reasoning", "presentation_planning", "structured_output"],
     "slide_writer": ["structured_output", "reasoning"],
+    "repair_agent": ["structured_output", "reasoning"],
     "font_brand_detection": ["vision"],
     "slide_visual_inspector": ["vision"],
     "qa_agent": ["vision", "reasoning"],

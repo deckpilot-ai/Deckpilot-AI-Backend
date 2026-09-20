@@ -1156,14 +1156,14 @@ class JobOrchestrator:
                             design_system=ds_obj,
                         )
 
-                        # 2. Slide-level LLM repairs for high-severity content/title issues
-                        high_issues_by_slide: dict[int, list[Any]] = defaultdict(list)
+                        # 2. Slide-level LLM repairs for slides with evaluated QA issues
+                        issues_by_slide: dict[int, list[Any]] = defaultdict(list)
                         for issue in qa_report.issues:
-                            if issue.severity in (ValidationSeverity.CRITICAL, ValidationSeverity.HIGH) and issue.slide_number:
-                                high_issues_by_slide[issue.slide_number].append(issue)
+                            if issue.slide_number and issue.severity != ValidationSeverity.LOW:
+                                issues_by_slide[issue.slide_number].append(issue)
 
-                        if high_issues_by_slide and settings.app_env != "test":
-                            for s_num, s_issues in high_issues_by_slide.items():
+                        if issues_by_slide and settings.app_env != "test":
+                            for s_num, s_issues in issues_by_slide.items():
                                 if 1 <= s_num <= len(slide_specs):
                                     target_slide = slide_specs[s_num - 1]
                                     try:
