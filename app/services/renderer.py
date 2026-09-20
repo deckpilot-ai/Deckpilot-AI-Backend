@@ -413,20 +413,20 @@ class PPTXRenderer:
                     main_t = raw_t
 
                 if image_bytes:
-                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 1.1, 4.2, 0.38, tint(ink, 0.28), "kicker-pill", corner_radius=0.15)
+                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 1.1, 4.2, 0.38, tint(ink, 0.28) if dark else tint(primary, 0.1), "kicker-pill", corner_radius=0.15)
                     cls._text(slide, eyebrow.upper(), 0.7, 1.13, 4.0, 0.32, accent, title_font, 11.5, bold=True)
                     t_size = 46 if len(main_t) < 28 else (38 if len(main_t) < 45 else 32)
-                    cls._text(slide, main_t, 0.6, 1.65, 6.0, 1.85, white, title_font, t_size, title=True)
+                    cls._text(slide, main_t, 0.6, 1.65, 6.0, 1.85, fg, title_font, t_size, title=True)
                     cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.6, 3.65, 1.8, 0.07, accent, "accent-rule")
                     if raw_sub:
-                        cls._text(slide, raw_sub, 0.6, 3.90, 6.0, 1.6, tint(white, 0.15), body_font, 16.5)
-                    cls._text(slide, "COMPREHENSIVE RESEARCH EVALUATION", 0.6, 6.30, 6.0, 0.35, tint(white, 0.38), body_font, 10.5, bold=True)
+                        cls._text(slide, raw_sub, 0.6, 3.90, 6.0, 1.6, body_col, body_font, 16.5)
+                    cls._text(slide, "COMPREHENSIVE RESEARCH EVALUATION", 0.6, 6.30, 6.0, 0.35, tint(fg, 0.4) if dark else body_col, body_font, 10.5, bold=True)
 
-                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.5, 1.25, 5.2, 4.95, tint(ink, 0.25), "photo-container", corner_radius=0.03)
-                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.7, 1.40, 4.8, 4.15, card_fill, "photo-mat", corner_radius=0.02)
+                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.5, 1.25, 5.2, 4.95, tint(ink, 0.25) if dark else fill, "photo-container", corner_radius=0.03)
+                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.7, 1.40, 4.8, 4.15, card_fill if dark else white, "photo-mat", corner_radius=0.02)
                     cls._render_picture(slide, image_bytes, 7.8, 1.50, 4.6, 3.95)
                     caption = slide_data.image_caption or "Documentary reference figure"
-                    cls._text(slide, cls._short_caption(caption), 7.5, 5.85, 5.2, 0.45, tint(white, 0.15), body_font, 10, italic=True, center=True)
+                    cls._text(slide, cls._short_caption(caption), 7.5, 5.85, 5.2, 0.45, body_col, body_font, 10, italic=True, center=True)
                 else:
                     cls._text(slide, main_t, 0.6, 1.1, 12.1, 1.65, fg, title_font, 46, title=True)
                     cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.6, 2.95, 1.8, 0.07, accent, "accent-rule")
@@ -434,7 +434,7 @@ class PPTXRenderer:
                         cls._text(slide, raw_sub, 0.6, 3.15, 12.1, 0.95, body_col, body_font, 18)
                     if bullets:
                         cls._text(slide, "\n".join(bullets), 0.6, 4.25, 12.1, 1.95, body_col, body_font, 12.5, bullet_list=True)
-                    cls._text(slide, "COMPREHENSIVE RESEARCH EVALUATION", 0.6, 6.30, 12.1, 0.35, tint(white, 0.38), body_font, 11, bold=True)
+                    cls._text(slide, "COMPREHENSIVE RESEARCH EVALUATION", 0.6, 6.30, 12.1, 0.35, tint(fg, 0.4) if dark else body_col, body_font, 11, bold=True)
 
             elif layout in (LayoutFamily.CHART_FOCUS, LayoutFamily.CHART_INSIGHT) and slide_data.chart_spec:
                 ChartEngine.render_chart(slide, slide_data.chart_spec, design_system, 0.6, 2.15, 7.2, 4.2)
