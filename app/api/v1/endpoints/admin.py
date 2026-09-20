@@ -501,11 +501,22 @@ async def test_all_provider_models(
     db: Annotated[Session, Depends(get_db)],
 ):
     """Test all configured models for a provider concurrently and return performance metrics."""
+    provider = db.scalar(select(AIProvider).where(AIProvider.id == provider_id))
+    if not provider:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
+
     try:
         results = await ProviderRouter.test_provider_all_models(db=db, provider_id=provider_id)
+        total_models = len(results)
+        successful = sum(1 for r in results if r.get("success"))
+        failed = total_models - successful
         return {
             "provider_id": provider_id,
-            "total_tested": len(results),
+            "provider_name": provider.name,
+            "total_models": total_models,
+            "total_tested": total_models,
+            "successful": successful,
+            "failed": failed,
             "results": results,
         }
     except ValueError as exc:
