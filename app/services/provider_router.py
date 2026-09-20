@@ -163,6 +163,21 @@ def _validate_agent_output(
     return True, "", parsed
 
 
+AGENT_CAPABILITY_REQUIREMENTS: dict[str, list[str]] = {
+    "deck_planner": ["reasoning", "presentation_planning", "structured_output"],
+    "slide_writer": ["structured_output", "reasoning"],
+    "font_brand_detection": ["vision"],
+    "slide_visual_inspector": ["vision"],
+    "qa_agent": ["vision", "reasoning"],
+    "visual_qa_evaluator": ["vision"],
+    "copilot_chat": ["fast_text"],
+    "title_intelligence": ["fast_text", "structured_output"],
+    "storyline_generator": ["structured_output", "reasoning"],
+    "revision_agent": ["structured_output", "reasoning"],
+    "extraction_agent": ["structured_output", "fast_text"],
+}
+
+
 class ProviderRouter:
     @staticmethod
     def sync_environment_providers(db: Session) -> None:
@@ -1116,13 +1131,15 @@ class ProviderRouter:
                     "base_priority": combined_priority,
                 })
 
-        # 3. Rank candidates by composite health score
-        ranked = health_tracker.rank_candidates(all_candidates)
+        # 3. Rank candidates by dynamic capability requirements and quality-weighted health score
+        required_caps = AGENT_CAPABILITY_REQUIREMENTS.get(agent_type, ["structured_output"])
+        ranked = health_tracker.rank_candidates_for_capabilities(all_candidates, required_capabilities=required_caps)
 
         if ranked:
             logger.info(
-                "Adaptive routing for %s: top candidate %s/%s (score=%.1f), %d total candidates",
+                "Adaptive routing for %s (req=%s): top candidate %s/%s (score=%.1f), %d total candidates",
                 agent_type,
+                required_caps,
                 ranked[0]["provider_name"],
                 ranked[0]["model_id"],
                 ranked[0].get("composite_score", 0),
@@ -1279,7 +1296,7 @@ class ProviderRouter:
                             "Provider %s model %s output failed contract validation for %s: %s — failing over to next model/provider",
                             provider.name, model_id, agent_type, fail_reason,
                         )
-                        health_tracker.record_failure(provider.name, model_id)
+                        health_tracker.record_schema_validation_failure(provider.name, model_id, agent_type, fail_reason)
                         continue
                     parsed = normalized
 
@@ -1385,7 +1402,7 @@ class ProviderRouter:
                     # ── End context-length retry ──────────────────────────────────────
 
                     # Record failure in health tracker
-                    health_tracker.record_failure(provider.name, model_id)
+                    health_tracker.record_production_error(provider.name, model_id, resp.status_code, raw_text[:200])
 
                     if provider.name == "codecraft":
                         CodeCraftModelManager.mark_rate_limited(model_id, cooldown_seconds=60)
@@ -1428,7 +1445,7 @@ class ProviderRouter:
 
             except Exception as model_err:
                 # Record failure in health tracker
-                health_tracker.record_failure(provider.name, model_id)
+                health_tracker.record_production_error(provider.name, model_id, None, str(model_err))
 
                 # Only skip the entire provider if the network host cannot be reached at all (ConnectError / DNS failure)
                 if isinstance(model_err, httpx.ConnectError):

@@ -751,18 +751,36 @@ def cleanup_logs(
 
 
 @router.get("/provider-health")
+@router.get("/providers/health")
 def get_provider_health(
     admin: Annotated[User, Depends(require_admin)],
 ):
     """Return live health metrics for all tracked LLM providers and models.
 
-    Shows EWMA latency, circuit breaker state, success rates, and composite
-    routing scores used by the adaptive router to distribute traffic.
+    Shows EWMA latency, fine-grained health state, circuit breaker state, success rates,
+    capability rankings, and composite routing scores used by the adaptive router.
     """
     from app.services.health_tracker import health_tracker
 
     return {
         "success": True,
+        **health_tracker.get_status_overview(),
+    }
+
+
+@router.post("/providers/health/scan")
+async def trigger_provider_health_scan(
+    admin: Annotated[User, Depends(require_admin)],
+):
+    """Trigger an immediate out-of-band health probe scan across all providers and models."""
+    from app.services.background_tasks import execute_health_scan
+    from app.services.health_tracker import health_tracker
+
+    result = await execute_health_scan()
+    return {
+        "success": True,
+        "message": f"Health scan completed: {result.get('healthy', 0)}/{result.get('scanned', 0)} models healthy.",
+        "result": result,
         **health_tracker.get_status_overview(),
     }
 

@@ -55,9 +55,10 @@ def test_bynara_sync_environment_providers(db_session: Session):
     assert "stepfun-3.7-flash" not in model_ids
 
 
-@pytest.mark.asyncio
-async def test_bynara_fetch_models_filters_to_free(db_session: Session):
+def test_bynara_fetch_models_filters_to_free(db_session: Session):
     """Verify fetch_provider_models for Bynara filters out paid models."""
+    import asyncio
+
     mock_response_data = {
         "data": [
             {"id": "agnes-2.5-flash", "name": "Agnes 2.5 Flash"},
@@ -67,17 +68,20 @@ async def test_bynara_fetch_models_filters_to_free(db_session: Session):
         ]
     }
 
-    async def mock_get(url, *args, **kwargs):
-        return httpx.Response(200, json=mock_response_data, request=httpx.Request("GET", url))
+    async def _run():
+        async def mock_get(url, *args, **kwargs):
+            return httpx.Response(200, json=mock_response_data, request=httpx.Request("GET", url))
 
-    with patch("httpx.AsyncClient.get", side_effect=mock_get):
-        discovered = await ProviderRouter.fetch_provider_models(
-            base_url="https://router.bynara.id/v1",
-            api_key=settings.bynara_api_key,
-        )
+        with patch("httpx.AsyncClient.get", side_effect=mock_get):
+            discovered = await ProviderRouter.fetch_provider_models(
+                base_url="https://router.bynara.id/v1",
+                api_key=settings.bynara_api_key,
+            )
 
-    discovered_ids = {m["id"] for m in discovered}
-    assert "agnes-2.5-flash" not in discovered_ids
-    assert "stepfun-3.7-flash" not in discovered_ids
-    assert "ling-3.0-flash-vl-free" in discovered_ids
-    assert "nemotron-3-ultra-free" in discovered_ids
+        discovered_ids = {m["id"] for m in discovered}
+        assert "agnes-2.5-flash" not in discovered_ids
+        assert "stepfun-3.7-flash" not in discovered_ids
+        assert "ling-3.0-flash-vl-free" in discovered_ids
+        assert "nemotron-3-ultra-free" in discovered_ids
+
+    asyncio.run(_run())

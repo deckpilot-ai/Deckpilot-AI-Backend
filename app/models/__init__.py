@@ -10,6 +10,7 @@ from app.models.message import Message
 from app.models.project import Project
 from app.models.provider import AgentRoute, AIKey, AIProvider, AIProviderModel
 from app.models.session import UserSession
+from app.models.system_lock import SystemLock
 from app.models.user import User
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "GenerationJob",
     "Message",
     "Project",
+    "SystemLock",
     "UsageEvent",
     "User",
     "UserSession",

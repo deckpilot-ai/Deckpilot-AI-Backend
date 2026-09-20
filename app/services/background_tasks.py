@@ -1,10 +1,12 @@
-"""Lifecycle-managed registry for in-process background work."""
+"""Lifecycle-managed registry for in-process background work and scheduled health monitoring."""
 
 import asyncio
-import logging
-import time
 from collections.abc import Coroutine
+import logging
+import socket
+import time
 from typing import Any
+import uuid
 
 import httpx
 from sqlalchemy import select, update
@@ -12,13 +14,14 @@ from sqlalchemy.orm import Session
 
 from app.core.encryption import decrypt_secret
 from app.models.job import AgentTask, GenerationJob
-from app.models.provider import AIKey, AIProvider
+from app.models.provider import AIKey, AIProvider, AIProviderModel
+from app.models.system_lock import SystemLock
 
 logger = logging.getLogger(__name__)
 
-# Health probe configuration
 HEALTH_PROBE_INTERVAL_SECONDS = 60
-HEALTH_PROBE_TIMEOUT_SECONDS = 8.0
+HEALTH_PROBE_TIMEOUT_SECONDS = 10.0
+INSTANCE_ID = f"{socket.gethostname()}-{uuid.uuid4().hex[:8]}"
 
 
 class BackgroundTaskRegistry:
@@ -74,120 +77,197 @@ def fail_interrupted_jobs(db: Session) -> int:
     return len(job_ids)
 
 
-async def _probe_single_provider(
+async def _probe_single_model(
+    semaphore: asyncio.Semaphore,
+    client: httpx.AsyncClient,
     provider_name: str,
     base_url: str,
     api_key: str,
-) -> tuple[str, float | None, bool]:
-    """Probe a single provider's /models endpoint. Returns (name, latency_ms, success)."""
-    cleaned_url = base_url.rstrip("/")
-    # Determine models endpoint
-    models_url = f"{cleaned_url}/models"
+    model_id: str,
+) -> tuple[str, str, int, float, str | None]:
+    """Execute lightweight non-expensive probe ("Return exactly: OK") against an individual model."""
+    async with semaphore:
+        cleaned_url = base_url.rstrip("/")
+        chat_url = f"{cleaned_url}/chat/completions"
 
-    headers: dict[str, str] = {
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://deckpilot.ai",
-        "X-Title": "deckpilotAI",
-    }
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+        headers: dict[str, str] = {
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://deckpilot.ai",
+            "X-Title": "deckpilotAI",
+        }
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
 
-    try:
+        effective_model_id = model_id.replace("models/", "") if provider_name == "gemini" else model_id
+        payload = {
+            "model": effective_model_id,
+            "messages": [{"role": "user", "content": "Return exactly: OK"}],
+            "max_tokens": 5,
+            "temperature": 0.0,
+        }
+
         start = time.perf_counter()
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(HEALTH_PROBE_TIMEOUT_SECONDS, connect=4.0)
-        ) as client:
-            resp = await client.get(models_url, headers=headers)
-        latency_ms = (time.perf_counter() - start) * 1000
-
-        if resp.status_code == 200:
-            return (provider_name, latency_ms, True)
-        else:
-            logger.debug(
-                "Health probe %s returned HTTP %s",
-                provider_name,
-                resp.status_code,
-            )
-            return (provider_name, latency_ms, False)
-    except Exception as exc:
-        logger.debug("Health probe %s failed: %s", provider_name, exc)
-        return (provider_name, None, False)
+        try:
+            resp = await client.post(chat_url, headers=headers, json=payload)
+            latency_ms = (time.perf_counter() - start) * 1000
+            err_msg = resp.text[:150] if resp.status_code != 200 else None
+            return (provider_name, model_id, resp.status_code, latency_ms, err_msg)
+        except httpx.TimeoutException:
+            latency_ms = (time.perf_counter() - start) * 1000
+            return (provider_name, model_id, 504, latency_ms, "Timeout")
+        except Exception as exc:
+            latency_ms = (time.perf_counter() - start) * 1000
+            return (provider_name, model_id, 503, latency_ms, str(exc)[:150])
 
 
-async def start_health_probe_loop() -> None:
-    """Background coroutine that probes all enabled providers every HEALTH_PROBE_INTERVAL_SECONDS.
-
-    Runs indefinitely until cancelled. Records results in the HealthTracker
-    so the adaptive router always has fresh latency and availability data.
-    """
-    # Import here to avoid circular imports
+async def execute_health_scan() -> dict[str, Any]:
+    """Inspect all enabled AI providers & models, execute lightweight probes, and update rankings."""
     from app.core.network_security import validate_provider_base_url
     from app.db.engine import SessionLocal
     from app.services.health_tracker import health_tracker
 
+    probe_targets: list[dict[str, Any]] = []
+    all_candidate_dicts: list[dict[str, Any]] = []
+
+    with SessionLocal() as db:
+        # Check and ensure table exists if needed
+        try:
+            providers = db.scalars(select(AIProvider).where(AIProvider.enabled == 1)).all()
+        except Exception:
+            logger.warning("Unable to load providers for health check", exc_info=True)
+            return {"scanned": 0, "healthy": 0}
+
+        now_ts = int(time.time())
+        for provider in providers:
+            try:
+                base_url = validate_provider_base_url(provider.base_url)
+            except ValueError:
+                continue
+
+            # Find active key
+            key_record = db.scalar(
+                select(AIKey).where(
+                    AIKey.provider_id == provider.id,
+                    AIKey.enabled == 1,
+                    (AIKey.cooldown_until == None) | (AIKey.cooldown_until <= now_ts),
+                )
+            )
+            if not key_record:
+                continue
+            try:
+                secret = decrypt_secret(key_record.encrypted_secret)
+            except Exception:
+                continue
+
+            # Find all enabled models for this provider
+            models = db.scalars(
+                select(AIProviderModel).where(
+                    AIProviderModel.provider_id == provider.id,
+                    AIProviderModel.enabled == 1,
+                )
+            ).all()
+
+            for m in models:
+                candidate = {
+                    "provider_name": provider.name,
+                    "provider": provider,
+                    "provider_base_url": base_url,
+                    "key_record": key_record,
+                    "secret_key": secret,
+                    "model_id": m.model_id,
+                    "display_name": m.display_name,
+                    "base_priority": (provider.priority + m.priority) // 2,
+                }
+                all_candidate_dicts.append(candidate)
+
+                # Check exponential backoff on previously failing models
+                model_health = health_tracker._registry.get(f"{provider.name.lower()}::{m.model_id}")
+                if model_health and model_health.backoff_cycles_remaining > 0:
+                    model_health.backoff_cycles_remaining -= 1
+                    logger.debug(
+                        "Skipping probe for backoff candidate %s/%s (%d cycles left)",
+                        provider.name, m.model_id, model_health.backoff_cycles_remaining,
+                    )
+                    continue
+
+                probe_targets.append({
+                    "provider_name": provider.name,
+                    "base_url": base_url,
+                    "api_key": secret,
+                    "model_id": m.model_id,
+                })
+
+    if not probe_targets:
+        if all_candidate_dicts:
+            health_tracker.refresh_capability_rankings(all_candidate_dicts)
+        return {"scanned": 0, "healthy": 0}
+
+    # Bounded concurrency with asyncio.Semaphore
+    semaphore = asyncio.Semaphore(8)
+    req_timeout = httpx.Timeout(HEALTH_PROBE_TIMEOUT_SECONDS, connect=4.0)
+
+    async with httpx.AsyncClient(timeout=req_timeout) as client:
+        tasks = [
+            _probe_single_model(
+                semaphore=semaphore,
+                client=client,
+                provider_name=t["provider_name"],
+                base_url=t["base_url"],
+                api_key=t["api_key"],
+                model_id=t["model_id"],
+            )
+            for t in probe_targets
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    healthy_count = 0
+    for r in results:
+        if isinstance(r, Exception):
+            continue
+        pname, mid, status_code, latency_ms, err_msg = r
+        health_tracker.record_probe_result(
+            provider_name=pname,
+            model_id=mid,
+            status_code=status_code,
+            latency_ms=latency_ms,
+            error_msg=err_msg,
+        )
+        if status_code == 200:
+            healthy_count += 1
+
+    # Refresh capability rankings across all candidate models
+    health_tracker.refresh_capability_rankings(all_candidate_dicts)
+
     logger.info(
-        "Starting health probe loop (interval=%ds)",
-        HEALTH_PROBE_INTERVAL_SECONDS,
+        "60s Health Monitor completed: %d/%d models healthy across %d providers",
+        healthy_count, len(probe_targets), len(set(t["provider_name"] for t in probe_targets)),
     )
+    return {"scanned": len(probe_targets), "healthy": healthy_count}
+
+
+async def start_health_probe_loop() -> None:
+    """Background coroutine that executes a health scan every 60 seconds with distributed locking."""
+    from app.db.engine import SessionLocal
+
+    logger.info("Starting 60s LLM Health Monitor loop (instance=%s)", INSTANCE_ID)
 
     while True:
         try:
-            # Collect enabled providers and their keys
-            probe_targets: list[tuple[str, str, str]] = []
+            # Distributed lock: only one backend instance executes the scan
             with SessionLocal() as db:
-                providers = db.scalars(
-                    select(AIProvider).where(AIProvider.enabled == 1)
-                ).all()
-                for provider in providers:
-                    try:
-                        base_url = validate_provider_base_url(provider.base_url)
-                    except ValueError:
-                        continue
-
-                    # Find first active key
-                    now_ts = int(time.time())
-                    key_record = db.scalar(
-                        select(AIKey).where(
-                            AIKey.provider_id == provider.id,
-                            AIKey.enabled == 1,
-                            (AIKey.cooldown_until == None) | (AIKey.cooldown_until <= now_ts),
-                        )
-                    )
-                    if not key_record:
-                        continue
-                    try:
-                        secret = decrypt_secret(key_record.encrypted_secret)
-                    except Exception:
-                        continue
-
-                    probe_targets.append((provider.name, base_url, secret))
-
-            if probe_targets:
-                # Probe all providers concurrently
-                tasks = [
-                    _probe_single_provider(name, url, key)
-                    for name, url, key in probe_targets
-                ]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                for result in results:
-                    if isinstance(result, Exception):
-                        logger.debug("Probe task exception: %s", result)
-                        continue
-                    pname, latency_ms, success = result
-                    health_tracker.record_probe(pname, latency_ms, success)
-
-                healthy = sum(
-                    1 for r in results if not isinstance(r, Exception) and r[2]
+                locked = SystemLock.acquire(
+                    db=db,
+                    lock_name="llm_health_monitor",
+                    locked_by=INSTANCE_ID,
+                    lease_seconds=55,
                 )
-                logger.info(
-                    "Health probes complete: %d/%d providers healthy",
-                    healthy,
-                    len(probe_targets),
-                )
+
+            if locked:
+                await execute_health_scan()
+            else:
+                logger.debug("Health probe cycle skipped: lock currently held by another backend instance")
 
         except Exception:
-            logger.warning("Health probe loop iteration failed", exc_info=True)
+            logger.warning("Health probe loop iteration encountered error", exc_info=True)
 
         await asyncio.sleep(HEALTH_PROBE_INTERVAL_SECONDS)
-
