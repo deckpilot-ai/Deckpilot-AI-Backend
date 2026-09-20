@@ -433,6 +433,7 @@ class HealthTracker:
                 if cls._instance is None:
                     inst = super().__new__(cls)
                     inst._registry: dict[str, _ModelHealth] = {}
+                    inst._provider_outages: dict[str, tuple[float, float, str, int | None]] = {}
                     inst._data_lock = threading.RLock()
                     inst._last_probe_at: float = 0.0
                     inst._top_model_by_capability: dict[str, str] = {}
@@ -472,12 +473,49 @@ class HealthTracker:
                 health.record_probe_failure(None, "Probe ping failure")
 
     def is_available(self, provider_name: str, model_id: str) -> bool:
-        key = self._key(provider_name, model_id)
+        pname_lower = provider_name.lower()
+        now = time.time()
         with self._data_lock:
+            if pname_lower in self._provider_outages:
+                outage_time, cooldown, _, _ = self._provider_outages[pname_lower]
+                if now - outage_time < cooldown:
+                    return False
+                self._provider_outages.pop(pname_lower, None)
+            key = self._key(provider_name, model_id)
             health = self._registry.get(key)
             if health is None:
                 return True
             return health.is_available_for_traffic()
+
+    def record_account_outage(
+        self,
+        provider_name: str,
+        status_code: int | None,
+        error_msg: str,
+        cooldown_seconds: float = 1800.0,
+    ) -> None:
+        """Mark entire provider as circuit-broken on account outage (401, 402, quota 429)."""
+        now = time.time()
+        pname_lower = provider_name.lower()
+        with self._data_lock:
+            self._provider_outages[pname_lower] = (now, cooldown_seconds, error_msg, status_code)
+            p_prefix = f"{pname_lower}::"
+            for key, health in self._registry.items():
+                if key.startswith(p_prefix):
+                    health.circuit_state = CircuitState.OPEN
+                    health.circuit_opened_at = now
+                    health.CIRCUIT_OPEN_DURATION = max(health.CIRCUIT_OPEN_DURATION, cooldown_seconds)
+                    health.status = (
+                        ModelHealthState.AUTH_ERROR if status_code in (401, 403)
+                        else ModelHealthState.QUOTA_EXCEEDED
+                    )
+                    health.last_error = error_msg
+                    health.last_error_status = status_code
+                    health.consecutive_failures = max(health.consecutive_failures, 3)
+            logger.warning(
+                "HealthTracker: Provider %s placed in full account outage cooldown for %ds (HTTP %s: %s)",
+                provider_name, int(cooldown_seconds), status_code, error_msg[:100],
+            )
 
     def composite_score(self, provider_name: str, model_id: str, base_priority: int) -> float:
         health = self._get_or_create(provider_name, model_id)

@@ -220,20 +220,20 @@ class ProviderRouter:
 
         provider_configs = [
             ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 35),
-            ("groq", "https://api.groq.com/openai/v1", settings.groq_api_key, 32),
+            ("openrouter", "https://openrouter.ai/api/v1", settings.openrouter_api_key, 34),
+            ("groq", "https://api.groq.com/openai/v1", settings.groq_api_key, 33),
+            ("apmix", settings.apmix_base_url or "https://api.apmix.ai/v1", settings.apmix_api_key, 32),
+            ("dahl", settings.dahl_base_url or "https://inference.dahl.global/v1", settings.dahl_api_key, 31),
             ("inceptionlabs", settings.inceptionlabs_base_url or "https://api.inceptionlabs.ai/v1", settings.inceptionlabs_api_key, 30),
-            ("dahl", settings.dahl_base_url or "https://inference.dahl.global/v1", settings.dahl_api_key, 29),
-            ("apmix", settings.apmix_base_url or "https://api.apmix.ai/v1", settings.apmix_api_key, 28),
-            ("bynara", settings.bynara_base_url or "https://router.bynara.id/v1", settings.bynara_api_key, 27),
+            ("bynara", settings.bynara_base_url or "https://router.bynara.id/v1", settings.bynara_api_key, 29),
             ("nvidia", settings.nvidia_base_url or "https://integrate.api.nvidia.com/v1", settings.nvidia_api_key, 25),
-            ("bazaarlink", settings.bazaarlink_base_url or "https://api.bazaarlink.ai/v1", settings.bazaarlink_api_key, 20),
-            ("routeway", settings.routeway_base_url or "https://api.routeway.ai/v1", settings.routeway_api_key, 18),
-            ("codecraft", settings.codecraft_base_url or "https://codecraftapi.com/v1", settings.codecraft_api_key, 15),
-            ("experientiallabs", settings.experientiallabs_base_url or "https://api.experientiallabs.ai/v1", settings.effective_experientiallabs_api_key, 12),
-            ("openrouter", "https://openrouter.ai/api/v1", settings.openrouter_api_key, 10),
-            ("openai", "https://api.openai.com/v1", settings.openai_api_key, 8),
-            ("mistral", "https://api.mistral.ai/v1", settings.mistral_api_key, 6),
-            ("anthropic", "https://api.anthropic.com/v1", settings.anthropic_api_key, 5),
+            ("bazaarlink", settings.bazaarlink_base_url or "https://api.bazaarlink.ai/v1", settings.bazaarlink_api_key, 5),
+            ("routeway", settings.routeway_base_url or "https://api.routeway.ai/v1", settings.routeway_api_key, 5),
+            ("codecraft", settings.codecraft_base_url or "https://codecraftapi.com/v1", settings.codecraft_api_key, 4),
+            ("experientiallabs", settings.experientiallabs_base_url or "https://api.experientiallabs.ai/v1", settings.effective_experientiallabs_api_key, 4),
+            ("openai", "https://api.openai.com/v1", settings.openai_api_key, 3),
+            ("mistral", "https://api.mistral.ai/v1", settings.mistral_api_key, 2),
+            ("anthropic", "https://api.anthropic.com/v1", settings.anthropic_api_key, 1),
         ]
 
         for name, base_url, key_secret, priority in provider_configs:
@@ -260,10 +260,11 @@ class ProviderRouter:
                 if name == "gemini":
                     default_models = [
                         {"model_id": "gemini-3.6-flash", "display_name": "Gemini 3.6 Flash", "priority": 100, "enabled": 1, "context_length": 1000000},
-                        {"model_id": "gemini-flash-latest", "display_name": "Gemini Flash Latest", "priority": 98, "enabled": 1, "context_length": 1000000},
-                        {"model_id": "gemini-2.5-flash", "display_name": "Gemini 2.5 Flash", "priority": 95, "enabled": 1, "context_length": 1000000},
-                        {"model_id": "gemini-2.5-flash-lite", "display_name": "Gemini 2.5 Flash Lite", "priority": 90, "enabled": 1, "context_length": 1000000},
-                        {"model_id": "gemini-2.5-pro", "display_name": "Gemini 2.5 Pro", "priority": 85, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gemini-2.5-flash", "display_name": "Gemini 2.5 Flash", "priority": 98, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gemini-flash-latest", "display_name": "Gemini Flash Latest", "priority": 95, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gemini-2.0-flash", "display_name": "Gemini 2.0 Flash", "priority": 90, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gemini-2.5-flash-lite", "display_name": "Gemini 2.5 Flash Lite (Deprecated)", "priority": 1, "enabled": 0, "context_length": 1000000},
+                        {"model_id": "gemini-2.5-pro", "display_name": "Gemini 2.5 Pro (Deprecated)", "priority": 1, "enabled": 0, "context_length": 1000000},
                     ]
                 elif name == "groq":
                     default_models = [
@@ -1136,10 +1137,10 @@ class ProviderRouter:
                     ]
                 elif "gemini" in p_name:
                     model_candidates = [
-                        ("gemini-2.5-flash", 100),
-                        ("gemini-flash-latest", 98),
-                        ("gemini-2.5-flash-lite", 95),
-                        ("gemini-2.5-pro", 90),
+                        ("gemini-3.6-flash", 100),
+                        ("gemini-2.5-flash", 98),
+                        ("gemini-flash-latest", 95),
+                        ("gemini-2.0-flash", 90),
                     ]
                 elif "nvidia" in p_name:
                     model_candidates = [
@@ -1537,6 +1538,7 @@ class ProviderRouter:
                                 "Provider %s experienced account-level failure (HTTP %s: %s). Skipping remaining models for this provider.",
                                 provider.name, resp.status_code, raw_text[:120],
                             )
+                            health_tracker.record_account_outage(provider.name, resp.status_code, raw_text[:200])
                             skipped_providers.add(provider.name)
                             break  # No point trying other keys — account is dead
 
