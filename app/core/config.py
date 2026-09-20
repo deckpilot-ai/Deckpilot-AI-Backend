@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     )
     allowed_hosts: str = "localhost,127.0.0.1,testserver"
     ai_provider_allowed_hosts: str = (
-        "openrouter.ai,api.openai.com,generativelanguage.googleapis.com,oauth2.googleapis.com,"
+        "openrouter.ai,api.openai.com,generativelanguage.googleapis.com,oauth2.googleapis.com,www.googleapis.com,"
         "api.groq.com,api.mistral.ai,api.anthropic.com,api.experientiallabs.ai,"
         "codecraftapi.com,api.codecraftapi.com,integrate.api.nvidia.com,api.bazaarlink.ai,api.routeway.ai,api.apmix.ai,api.inceptionlabs.ai,router.bynara.id,inference.dahl.global,"
         "api.unsplash.com,images.unsplash.com,api.pexels.com,images.pexels.com,pixabay.com,cdn.pixabay.com"

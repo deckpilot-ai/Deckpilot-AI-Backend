@@ -49,18 +49,25 @@ class AuthService:
 
     @staticmethod
     def verify_google_credential(credential: str) -> dict[str, Any]:
-        """Verify a Google ID Token (credential) against Google's tokeninfo API."""
+        """Verify a Google credential (either ID Token JWT or OAuth2 access token) against Google's API."""
         if not credential or not credential.strip():
             raise ValueError("Empty Google credential.")
 
-        # Google's tokeninfo endpoint performs cryptographic signature verification,
-        # expiration check, and returns verified claims.
+        cred_str = credential.strip()
+        is_id_token = cred_str.count(".") == 2
+
         try:
             with httpx.Client(timeout=10.0) as client:
-                resp = client.get(
-                    "https://oauth2.googleapis.com/tokeninfo",
-                    params={"id_token": credential.strip()},
-                )
+                if is_id_token:
+                    resp = client.get(
+                        "https://oauth2.googleapis.com/tokeninfo",
+                        params={"id_token": cred_str},
+                    )
+                else:
+                    resp = client.get(
+                        "https://oauth2.googleapis.com/tokeninfo",
+                        params={"access_token": cred_str},
+                    )
         except Exception as exc:
             raise ValueError(f"Unable to reach Google authentication service: {exc}") from exc
 
@@ -75,15 +82,37 @@ class AuthService:
             raise ValueError(error_detail)
 
         info = resp.json()
-        iss = info.get("iss", "")
-        if iss not in ("accounts.google.com", "https://accounts.google.com"):
-            raise ValueError("Invalid Google token issuer.")
 
-        # Verify audience if google_client_id is configured
+        if is_id_token:
+            iss = info.get("iss", "")
+            if iss not in ("accounts.google.com", "https://accounts.google.com"):
+                raise ValueError("Invalid Google token issuer.")
+
+        # Verify audience or azp against configured client_id
         if settings.google_client_id and settings.google_client_id.strip():
+            expected_id = settings.google_client_id.strip()
             aud = info.get("aud", "")
-            if aud != settings.google_client_id.strip():
+            azp = info.get("azp", "")
+            if aud != expected_id and azp != expected_id:
                 raise ValueError("Google token was not issued for this application.")
+
+        # If userinfo (name / picture) is not present in tokeninfo response for an access token,
+        # fetch userinfo from Google's userinfo endpoint
+        if not info.get("name") and not is_id_token:
+            try:
+                with httpx.Client(timeout=5.0) as client:
+                    u_resp = client.get(
+                        "https://www.googleapis.com/oauth2/v3/userinfo",
+                        headers={"Authorization": f"Bearer {cred_str}"},
+                    )
+                    if u_resp.status_code == 200:
+                        u_data = u_resp.json()
+                        if u_data.get("name"):
+                            info["name"] = u_data["name"]
+                        if u_data.get("picture"):
+                            info["picture"] = u_data["picture"]
+            except Exception:
+                pass
 
         return info
 
