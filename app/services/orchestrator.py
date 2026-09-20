@@ -493,6 +493,9 @@ class JobOrchestrator:
                 _emit("font_brand_detection", "running", "Preserving presentation design system and analyzing revision directives...")
 
                 goal: PresentationGoal = context.get("presentation_goal") or RequirementsAgent.analyze_requirements(user_prompt)
+                if prev_spec and isinstance(prev_spec.get("slides"), list) and prev_spec["slides"]:
+                    goal = goal.model_copy(update={"target_slide_count": len(prev_spec["slides"])})
+                    context["presentation_goal"] = goal
                 is_theme_change = RevisionAgent.is_global_theme_change(user_prompt)
                 design_system: DesignSystem = DesignIntelligenceAgent.generate_design_system(
                     goal=goal,
@@ -1086,17 +1089,17 @@ class JobOrchestrator:
                         slide.pop("imageArtifactId", None)
 
                 goal_obj = context.get("presentation_goal") or RequirementsAgent.analyze_requirements(user_prompt)
-                if job_mode == "export":
-                    # Export must preserve the saved deck, regardless of whether
-                    # the short export prompt mentions a slide count.  Otherwise
-                    # requirements defaults can silently truncate a 25-slide deck.
+                if job_mode in ("export", "revise") or is_targeted_revision:
+                    # Export and targeted revision must preserve the saved deck count,
+                    # regardless of whether the short prompt mentions a slide count.
                     saved_slide_count = len(context.get("deck_spec", {}).get("slides", []))
-                    goal_obj = goal_obj.model_copy(
-                        update={
-                            "target_slide_count": saved_slide_count,
-                            "topic": context.get("deck_spec", {}).get("deckTitle") or goal_obj.topic,
-                        }
-                    )
+                    if saved_slide_count > 0:
+                        goal_obj = goal_obj.model_copy(
+                            update={
+                                "target_slide_count": saved_slide_count,
+                                "topic": context.get("deck_spec", {}).get("deckTitle") or goal_obj.topic,
+                            }
+                        )
                 ds_obj = context.get("design_system") or DesignIntelligenceAgent.generate_design_system(goal_obj)
 
                 # Convert to SlideSpec models

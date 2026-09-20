@@ -70,6 +70,15 @@ class RepairAgent:
             slide.slide_number = idx
             slide.slide_id = f"s{idx:02d}" if not slide.slide_id or sum(s.slide_id == slide.slide_id for s in slides) > 1 else slide.slide_id
             slide.headline = _clean_text(slide.headline)
+            clean_head = re.sub(r"[^a-zA-Z0-9]", "", slide.headline)
+            if len(clean_head) < 3:
+                slide.headline = _clean_text(
+                    slide.key_message
+                    or slide.takeaway
+                    or slide.objective
+                    or slide.section
+                    or "Key Strategic Update"
+                )[:70]
             slide.key_message = _clean_text(slide.key_message)
             slide.takeaway = _clean_text(slide.takeaway)
             cleaned_bullets: list[str] = []

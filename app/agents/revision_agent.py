@@ -149,6 +149,19 @@ class RevisionAgent:
                     spec = SlideSpec.model_validate(candidate)
                     spec_dict = spec.model_dump()
                     spec_dict["slideId"] = existing_slide.get("slideId", f"s{slide_num:02d}")
+                    
+                    # Self-healing: Ensure substantive headline
+                    clean_head = re.sub(r"[^a-zA-Z0-9]", "", spec_dict.get("headline", ""))
+                    if len(clean_head) < 3:
+                        spec_dict["headline"] = (
+                            spec_dict.get("message")
+                            or existing_slide.get("headline")
+                            or existing_slide.get("message")
+                            or "Strategic Milestone"
+                        )
+                    clean_purpose = re.sub(r"[^a-zA-Z0-9]", "", spec_dict.get("purpose", ""))
+                    if len(clean_purpose) < 3:
+                        spec_dict["purpose"] = existing_slide.get("purpose") or spec_dict["headline"]
                     return spec_dict
         except Exception as e:
             logger.warning("LLM slide revision failed (%s); using deterministic fallback", e)
@@ -179,6 +192,19 @@ class RevisionAgent:
                 revised["bullets"] = [new_bullet_text]
             else:
                 revised.setdefault("bullets", []).append(new_bullet_text)
+
+        # Self-healing check on fallback
+        clean_fallback_head = re.sub(r"[^a-zA-Z0-9]", "", revised.get("headline", ""))
+        if len(clean_fallback_head) < 3:
+            revised["headline"] = (
+                revised.get("message")
+                or existing_slide.get("headline")
+                or existing_slide.get("message")
+                or "Strategic Milestone"
+            )
+        clean_fallback_purp = re.sub(r"[^a-zA-Z0-9]", "", revised.get("purpose", ""))
+        if len(clean_fallback_purp) < 3:
+            revised["purpose"] = existing_slide.get("purpose") or revised["headline"]
 
         return revised
 

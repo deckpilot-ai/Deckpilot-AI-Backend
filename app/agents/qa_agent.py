@@ -114,6 +114,15 @@ class PresentationQAAgent:
         issues.extend(VisualQAEvaluator.evaluate_slide_visual_strategy(slide_specs, design_system, available_assets=assets))
         if pptx_bytes:
             cls._check_rendered_pptx(slide_specs, pptx_bytes, issues)
+            try:
+                from app.services.slide_visual_inspector import SlideVisualInspector
+                _previews, visual_cv_issues = SlideVisualInspector.inspect_presentation_visually(
+                    pptx_bytes=pptx_bytes,
+                    specs=slide_specs,
+                )
+                issues.extend(visual_cv_issues)
+            except Exception as cv_err:
+                logger.debug("Slide visual inspector error: %s", cv_err)
 
         # Preserve useful title-intelligence findings while giving them stable IDs.
         for old in TitleIntelligence.validate_titles([s.headline or s.key_message for s in slide_specs]):

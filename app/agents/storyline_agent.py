@@ -284,6 +284,8 @@ class StorylineAgent:
         if index == total_slides - 1 and total_slides > 1:
             return LayoutFamily.CLOSING
 
+        purpose_lower = f"{raw_slide.get('purpose', '')} {raw_slide.get('headline', '')} {raw_slide.get('message', '')}".lower()
+
         # Content-based layout selection
         if raw_slide.get("chart") or (goal.required_charts and index in (2, 5)):
             return LayoutFamily.CHART_FOCUS
@@ -291,12 +293,20 @@ class StorylineAgent:
             return LayoutFamily.TABLE_FOCUS
         if raw_slide.get("imageArtifactId") or raw_slide.get("image_artifact_id"):
             return LayoutFamily.IMAGE_FOCUS
-        if "process" in raw_slide.get("purpose", "").lower() or "step" in raw_slide.get("purpose", "").lower():
+        if "divider" in purpose_lower or "part " in purpose_lower or "chapter " in purpose_lower:
+            return LayoutFamily.SECTION_DIVIDER
+        if "quote" in purpose_lower or "perspective" in purpose_lower or "voice of" in purpose_lower:
+            return LayoutFamily.QUOTE
+        if "vs" in purpose_lower or "versus" in purpose_lower or "comparison" in purpose_lower or "trade-off" in purpose_lower:
+            return LayoutFamily.COMPARISON
+        if "process" in purpose_lower or "step" in purpose_lower or "workflow" in purpose_lower:
             return LayoutFamily.PROCESS_STEPS
-        if "timeline" in raw_slide.get("purpose", "").lower() or "chronology" in raw_slide.get("purpose", "").lower():
+        if "timeline" in purpose_lower or "chronology" in purpose_lower or "milestone" in purpose_lower or "roadmap" in purpose_lower:
             return LayoutFamily.TIMELINE
-        if "matrix" in raw_slide.get("purpose", "").lower() or "quadrant" in raw_slide.get("purpose", "").lower():
+        if "matrix" in purpose_lower or "quadrant" in purpose_lower:
             return LayoutFamily.MATRIX_QUADRANT
+        if "summary" in purpose_lower or "recap" in purpose_lower or "takeaway" in purpose_lower:
+            return LayoutFamily.A17_CLOSING_TAKEAWAYS
         if raw_slide.get("metrics") and len(raw_slide["metrics"]) >= 2:
             return LayoutFamily.METRICS_GRID
 
