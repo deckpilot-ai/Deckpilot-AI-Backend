@@ -637,8 +637,44 @@ class ProviderRouter:
             async with httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=5.0)) as client:
                 resp = await client.post(url, json=payload, headers=headers)
                 elapsed_ms = round((time.time() - t0) * 1000, 1)
-                if resp.status_code == 200:
+
+                # If URL didn't have /v1 and returned HTML or 404, try /v1/chat/completions fallback
+                content_type = resp.headers.get("content-type", "")
+                if ("text/html" in content_type or resp.status_code in (404, 405)) and "/v1" not in cleaned_url:
+                    alt_url = f"{cleaned_url}/v1/chat/completions"
+                    try:
+                        alt_resp = await client.post(alt_url, json=payload, headers=headers)
+                        alt_content_type = alt_resp.headers.get("content-type", "")
+                        if "application/json" in alt_content_type or alt_resp.status_code == 200:
+                            resp = alt_resp
+                            content_type = alt_content_type
+                            elapsed_ms = round((time.time() - t0) * 1000, 1)
+                    except Exception:
+                        pass
+
+                # Check for HTML content
+                if "text/html" in content_type:
+                    health_tracker.record_failure(provider_name, model_id)
+                    return {
+                        "success": False,
+                        "provider_id": provider_id,
+                        "provider_name": provider_name,
+                        "model_id": model_id,
+                        "model_db_id": model_db_id,
+                        "display_name": display_name or model_id,
+                        "latency_ms": elapsed_ms,
+                        "status_code": resp.status_code,
+                        "error": f"Endpoint returned HTML instead of JSON. Base URL might need /v1 suffix (e.g. {cleaned_url}/v1).",
+                    }
+
+                # Safe JSON parse
+                data = None
+                try:
                     data = resp.json()
+                except Exception:
+                    data = None
+
+                if resp.status_code == 200 and isinstance(data, dict):
                     content = ""
                     if "choices" in data and len(data["choices"]) > 0:
                         choice = data["choices"][0]
@@ -662,6 +698,15 @@ class ProviderRouter:
                     }
                 else:
                     health_tracker.record_failure(provider_name, model_id)
+                    err_msg = ""
+                    if isinstance(data, dict) and "error" in data:
+                        err_obj = data["error"]
+                        if isinstance(err_obj, dict):
+                            err_msg = err_obj.get("message") or str(err_obj)
+                        else:
+                            err_msg = str(err_obj)
+                    if not err_msg:
+                        err_msg = resp.text[:200] if resp.text else f"HTTP {resp.status_code}"
                     return {
                         "success": False,
                         "provider_id": provider_id,
@@ -671,7 +716,7 @@ class ProviderRouter:
                         "display_name": display_name or model_id,
                         "latency_ms": elapsed_ms,
                         "status_code": resp.status_code,
-                        "error": f"HTTP {resp.status_code}: {resp.text[:200]}",
+                        "error": err_msg,
                     }
         except Exception as exc:
             elapsed_ms = round((time.time() - t0) * 1000, 1)
