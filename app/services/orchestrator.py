@@ -678,13 +678,30 @@ class JobOrchestrator:
                     deck_spec = {}
 
                 if "slides" not in deck_spec:
-                    for k in ("presentation", "deck", "data", "deck_spec", "output"):
+                    # Try common wrapper keys
+                    for k in ("presentation", "deck", "data", "deck_spec", "output", "result", "response"):
                         if isinstance(deck_spec.get(k), dict) and "slides" in deck_spec[k]:
                             deck_spec = deck_spec[k]
                             break
                         elif isinstance(deck_spec.get(k), list):
                             deck_spec = {"deckTitle": deck_spec.get("deckTitle", "Presentation"), "slides": deck_spec[k]}
                             break
+
+                # If _parse_llm_response returned {"text": "..."} (JSON parse failed),
+                # try to re-extract JSON from the text string
+                if "slides" not in deck_spec and isinstance(deck_spec.get("text"), str):
+                    raw_text = deck_spec["text"]
+                    import re as _re
+                    _json_match = _re.search(r'(\{[\s\S]*"slides"\s*:\s*\[[\s\S]*\][\s\S]*\})', raw_text)
+                    if _json_match:
+                        try:
+                            recovered = json.loads(_json_match.group(1))
+                            if isinstance(recovered.get("slides"), list) and recovered["slides"]:
+                                deck_spec = recovered
+                                logger.info("Recovered deck_spec from text fallback JSON (%d slides)", len(recovered["slides"]))
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+
 
                 # ── Attempt 3: Dynamic grounding-based offline outline (no hardcoded content) ──
                 if not isinstance(deck_spec.get("slides"), list) or not deck_spec["slides"]:
@@ -763,7 +780,7 @@ class JobOrchestrator:
                             user_id=user_id,
                             job_id=job_id,
                         ),
-                        timeout=50.0,
+                        timeout=60.0,
                     )
 
                     ws_list = []
@@ -779,12 +796,24 @@ class JobOrchestrator:
                                 ws_list = [val]
                                 break
                         if not ws_list:
-                            for wrap_key in ("deck", "presentation", "deck_spec", "output"):
+                            for wrap_key in ("deck", "presentation", "deck_spec", "output", "result", "response"):
                                 if isinstance(writer_out.get(wrap_key), dict):
                                     nested = writer_out[wrap_key].get("slides") or writer_out[wrap_key].get("data")
                                     if isinstance(nested, list):
                                         ws_list = nested
                                         break
+                        # Fallback: if writer_out has {"text": "...json..."}, try to recover
+                        if not ws_list and isinstance(writer_out.get("text"), str):
+                            _raw_text = writer_out["text"]
+                            _json_m = re.search(r'(\{[\s\S]*"slides"\s*:\s*\[[\s\S]*\][\s\S]*\})', _raw_text)
+                            if _json_m:
+                                try:
+                                    _recovered = json.loads(_json_m.group(1))
+                                    if isinstance(_recovered.get("slides"), list):
+                                        ws_list = _recovered["slides"]
+                                        logger.info("Recovered %d slides from text fallback in slide_writer", len(ws_list))
+                                except (json.JSONDecodeError, TypeError):
+                                    pass
 
                     if isinstance(ws_list, list):
                         for idx, s in enumerate(ws_list):
@@ -1041,7 +1070,8 @@ class JobOrchestrator:
                             storage_key=art.storage_key or "",
                         ) for art in existing_artifacts if art.type == "image" and art.id in source_images
                     ]
-                    ImageMatcher.assign_images_semantically(raw_slides, available_assets_meta)
+                    topic = context.get("deck_spec", {}).get("deckTitle") or user_prompt
+                    ImageMatcher.assign_images_semantically(raw_slides, available_assets_meta, topic_context=topic)
 
                 for slide in context.get("deck_spec", {}).get("slides", []):
                     if slide.get("imageArtifactId") and slide.get("imageArtifactId") not in source_images:

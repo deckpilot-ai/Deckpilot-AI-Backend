@@ -4,6 +4,7 @@ Reverse-engineered from consulting-grade benchmark decks (250+ slides, 13.333"x7
 matching the deck-agent-package design system specification.
 """
 
+import colorsys
 from dataclasses import dataclass, field
 import json
 import logging
@@ -11,6 +12,70 @@ import re
 from typing import Any, Literal
 
 logger = logging.getLogger(__name__)
+
+COLOR_NAME_TO_HEX = {
+    "red": "#DC2626", "crimson": "#DC2626", "maroon": "#991B1B", "ruby": "#9F1239", "burgundy": "#881337",
+    "rose": "#E11D48", "coral": "#F43F5E", "pink": "#EC4899", "orange": "#EA580C", "saffron": "#E4791F",
+    "amber": "#D97706", "gold": "#D97706", "terracotta": "#8C2D19", "copper": "#B45309", "rust": "#9A3412",
+    "sepia": "#8C2D19", "parchment": "#D97706", "yellow": "#CA8A04", "green": "#059669", "emerald": "#059669",
+    "mint": "#10B981", "forest": "#064E3B", "sage": "#65A30D", "olive": "#4D7C0F", "teal": "#0D9488",
+    "cyan": "#0284C7", "turquoise": "#06B6D4", "blue": "#2563EB", "navy": "#1E3A8A", "royal": "#1D4ED8",
+    "indigo": "#4F46E5", "purple": "#7C3AED", "violet": "#8B5CF6", "magenta": "#C026D3", "plum": "#7E22CE",
+    "lavender": "#A855F7", "charcoal": "#334155", "slate": "#475569", "obsidian": "#0F172A", "black": "#090D16"
+}
+
+
+def hex_to_hls(hex_str: str) -> tuple[float, float, float]:
+    hex_str = hex_str.lstrip('#')
+    if len(hex_str) == 3:
+        hex_str = ''.join(c*2 for c in hex_str)
+    r = int(hex_str[0:2], 16) / 255.0
+    g = int(hex_str[2:4], 16) / 255.0
+    b = int(hex_str[4:6], 16) / 255.0
+    return colorsys.rgb_to_hls(r, g, b)
+
+
+def hls_to_hex(h: float, l: float, s: float) -> str:
+    r, g, b = colorsys.hls_to_rgb(h, max(0.0, min(1.0, l)), max(0.0, min(1.0, s)))
+    return f"#{round(r * 255):02X}{round(g * 255):02X}{round(b * 255):02X}"
+
+
+def synthesize_palette(primary_hex: str, secondary_hex: str = None, dark_mode: bool = False) -> "ColorTokens":
+    """Synthesizes a complete 7-token executive design system palette algorithmically from primary/secondary hex."""
+    try:
+        h, l, s = hex_to_hls(primary_hex)
+
+        if secondary_hex and re.match(r"^#[0-9A-Fa-f]{6}$", secondary_hex):
+            sec_hex = secondary_hex
+        else:
+            sec_h = (h + 0.08) % 1.0
+            sec_hex = hls_to_hex(sec_h, max(0.35, min(0.65, l)), max(0.6, s))
+
+        if dark_mode:
+            ink = "#090D16"
+            bg = "#090D16"
+            tint_a = "#1E293B"
+            tint_b = "#0F172A"
+            alert = "#F43F5E"
+        else:
+            ink = hls_to_hex(h, 0.12, min(0.9, s * 0.8))
+            bg = "#FFFFFF"
+            tint_a = hls_to_hex(h, 0.95, max(0.15, s * 0.3))
+            tint_b = hls_to_hex(h, 0.98, max(0.08, s * 0.15))
+            alert = "#DC2626" if h < 0.9 else "#E11D48"
+
+        return ColorTokens(
+            ink=ink,
+            primary=primary_hex,
+            secondary=sec_hex,
+            tint_a=tint_a,
+            tint_b=tint_b,
+            alert=alert,
+            background=bg,
+        )
+    except Exception as e:
+        logger.warning("Palette synthesis fallback for %s: %s", primary_hex, e)
+        return BENCHMARK_PALETTES["markets"]
 
 # Fixed Canvas Dimensions (Widescreen 16:9)
 CANVAS_WIDTH_IN: float = 13.333
@@ -110,6 +175,14 @@ BENCHMARK_PALETTES = {
         ink="#7E2C22", primary="#E4791F", secondary="#6B221C",
         tint_a="#F7EEE3", tint_b="#FBF6EF", alert="#C63A28",
     ),
+    "history_sepia": ColorTokens(
+        ink="#3D1E16", primary="#8C2D19", secondary="#D97706",
+        tint_a="#FDF6EE", tint_b="#FFFBEB", alert="#B91C1C",
+    ),
+    "politics_regal": ColorTokens(
+        ink="#1E1B4B", primary="#991B1B", secondary="#475569",
+        tint_a="#FEF2F2", tint_b="#F8FAFC", alert="#B91C1C",
+    ),
     "economy": ColorTokens(
         ink="#1F3864", primary="#2F5597", secondary="#5B9BD5",
         tint_a="#EEF2F8", tint_b="#F8FAFC", alert="#C00000",
@@ -146,11 +219,23 @@ BENCHMARK_PALETTES = {
         ink="#090D16", primary="#38BDF8", secondary="#0284C7",
         tint_a="#0F172A", tint_b="#1E293B", alert="#F43F5E",
     ),
+    "creative_violet": ColorTokens(
+        ink="#2E1065", primary="#7C3AED", secondary="#E11D48",
+        tint_a="#F5F3FF", tint_b="#FFF1F2", alert="#E11D48",
+    ),
+    "amber_warm": ColorTokens(
+        ink="#451A03", primary="#D97706", secondary="#B45309",
+        tint_a="#FFFBEB", tint_b="#FFF8F0", alert="#DC2626",
+    ),
+    "crimson": ColorTokens(
+        ink="#18181B", primary="#DC2626", secondary="#991B1B",
+        tint_a="#FEF2F2", tint_b="#FAFAFA", alert="#991B1B",
+    ),
 }
 
 
 class PaletteGenerator:
-    """Generates a 5-6 token topic-derived color palette per deck-agent-package rule."""
+    """Multi-keyword & algorithmic dynamic palette engine for executive presentation design systems."""
 
     @staticmethod
     def generate_palette(
@@ -159,32 +244,82 @@ class PaletteGenerator:
         style_family: Literal["A", "B"] = "A",
     ) -> ColorTokens:
         topic_lower = topic.lower()
+        dark_mode = any(w in topic_lower for w in ("dark mode", "dark theme", "obsidian", "night", "black background", "dark background"))
 
-        # 1. Explicit user theme/color directives have highest priority
-        if any(w in topic_lower for w in ("blue", "navy", "royal blue", "sky blue", "modern indigo")):
-            if "indigo" in topic_lower:
-                return BENCHMARK_PALETTES["indigo"]
-            return BENCHMARK_PALETTES["markets"]
-        if any(w in topic_lower for w in ("obsidian", "dark mode", "dark theme", "black")):
+        # 1. Parse explicit HEX codes in prompt (highest priority)
+        hex_matches = re.findall(r"#[0-9a-fA-F]{6}\b", topic)
+        if len(hex_matches) >= 2:
+            return synthesize_palette(hex_matches[0], hex_matches[1], dark_mode)
+        elif len(hex_matches) == 1:
+            return synthesize_palette(hex_matches[0], dark_mode=dark_mode)
+
+        # 2. Parse explicit color names & color pairs in prompt
+        found_colors = []
+        for c_name, hex_val in COLOR_NAME_TO_HEX.items():
+            if re.search(r"\b" + c_name + r"\b", topic_lower):
+                found_colors.append(hex_val)
+
+        if len(found_colors) >= 2:
+            return synthesize_palette(found_colors[0], found_colors[1], dark_mode)
+        elif len(found_colors) == 1:
+            return synthesize_palette(found_colors[0], dark_mode=dark_mode)
+
+        # 3. Multi-keyword Domain Vector Scoring Engine
+        domain_scores = {
+            "history": sum(1 for w in (
+                "history", "historical", "war", "revolution", "empire", "dynasty", "medieval",
+                "ancient", "antiquity", "civilization", "heritage", "monarchy", "rome", "roman",
+                "greece", "greek", "king", "queen", "archaeology", "historian"
+            ) if w in topic_lower),
+            "politics": sum(1 for w in (
+                "politic", "political", "election", "diplomacy", "geopolit", "parliament",
+                "congress", "senate", "governance", "civic", "constitution", "democracy",
+                "federal", "government", "policy", "republic", "judicial"
+            ) if w in topic_lower),
+            "sustainability": sum(1 for w in (
+                "sustainab", "environment", "climate", "eco", "renewable", "solar", "wind",
+                "nature", "biodiversity", "green", "carbon", "planet", "ecology", "clean energy"
+            ) if w in topic_lower),
+            "healthcare": sum(1 for w in (
+                "health", "medical", "clinical", "biotech", "pharma", "patient", "doctor",
+                "hospital", "medicine", "vaccine", "genomic", "nursing", "wellness", "therapy"
+            ) if w in topic_lower),
+            "technology": sum(1 for w in (
+                "tech", "cloud", "saas", "software", "ai", "data", "platform", "kubernetes",
+                "code", "cyber", "robot", "quantum", "digital", "algorithm", "devops"
+            ) if w in topic_lower),
+            "finance": sum(1 for w in (
+                "economy", "market", "finance", "fiscal", "revenue", "trade", "banking",
+                "sector", "investment", "m&a", "stock", "budget", "venture", "capital", "wall street"
+            ) if w in topic_lower),
+            "creative": sum(1 for w in (
+                "creative", "marketing", "fashion", "luxury", "media", "music", "art",
+                "design", "entertainment", "brand", "lifestyle", "consumer", "advertising"
+            ) if w in topic_lower),
+        }
+
+        domain_defaults = {
+            "history": ("#8C2D19", "#D97706"),
+            "politics": ("#991B1B", "#475569"),
+            "sustainability": ("#059669", "#10B981"),
+            "healthcare": ("#0D9488", "#14B8A6"),
+            "technology": ("#0284C7", "#38BDF8"),
+            "finance": ("#1F3864", "#5B9BD5"),
+            "creative": ("#7C3AED", "#E11D48"),
+        }
+
+        sorted_domains = sorted(domain_scores.items(), key=lambda x: x[1], reverse=True)
+        top_domain, top_score = sorted_domains[0]
+        second_domain, second_score = sorted_domains[1]
+
+        if top_score > 0:
+            primary_hex = domain_defaults[top_domain][0]
+            # Multi-domain blending: if secondary domain scored, blend its primary color as secondary accent!
+            secondary_hex = domain_defaults[second_domain][0] if second_score > 0 else domain_defaults[top_domain][1]
+            return synthesize_palette(primary_hex, secondary_hex, dark_mode)
+
+        if dark_mode:
             return BENCHMARK_PALETTES["obsidian"]
-        if any(w in topic_lower for w in ("emerald", "green", "mint", "forest")):
-            return BENCHMARK_PALETTES["emerald"]
-        if any(w in topic_lower for w in ("teal", "cyan", "medical", "clinical")):
-            return BENCHMARK_PALETTES["healthcare"]
-        if any(w in topic_lower for w in ("saffron", "maratha", "orange", "terracotta", "shivaji", "peshwa")):
-            return BENCHMARK_PALETTES["marathas"]
-
-        # 2. Semantic domain matching
-        if any(w in topic_lower for w in ("federal", "civic", "constitution", "parliament", "democracy", "government", "policy")):
-            return BENCHMARK_PALETTES["federalism"]
-        if any(w in topic_lower for w in ("economy", "market", "finance", "fiscal", "revenue", "trade", "banking", "sector")):
-            return BENCHMARK_PALETTES["economy"]
-        if any(w in topic_lower for w in ("health", "medical", "clinical", "biotech", "pharma", "patient")):
-            return BENCHMARK_PALETTES["healthcare"]
-        if any(w in topic_lower for w in ("tech", "cloud", "saas", "software", "ai", "data", "platform", "kubernetes")):
-            return BENCHMARK_PALETTES["technology"]
-        if any(w in topic_lower for w in ("sustainab", "environment", "climate", "energy", "green")):
-            return BENCHMARK_PALETTES["governance"]
 
         if style_family == "B" or tone in ("formal_government", "institutional"):
             return BENCHMARK_PALETTES["constitution"]

@@ -60,6 +60,22 @@ def _parse_llm_response(content: str, response_schema: Any | None) -> dict[str, 
         except Exception:
             pass
 
+    # Fix common LLM JSON mistakes: trailing commas, control chars, JS comments
+    sanitized = cleaned
+    if obj_match:
+        sanitized = obj_match.group(1).strip()
+    # Remove trailing commas before } or ]
+    sanitized = re.sub(r",\s*([}\]])", r"\1", sanitized)
+    # Remove single-line // comments
+    sanitized = re.sub(r"//[^\n]*", "", sanitized)
+    # Remove control characters (except newline/tab)
+    sanitized = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", sanitized)
+    try:
+        res = json.loads(sanitized)
+        return res if isinstance(res, dict) else {"data": res}
+    except Exception:
+        pass
+
     # If all JSON parsing attempts fail, return text wrapped in dict
     return {"text": cleaned}
 
@@ -1061,8 +1077,8 @@ class ProviderRouter:
                     timeout_val = 15.0
                     conn_timeout = 4.0
                 elif agent_type == "slide_writer":
-                    timeout_val = 18.0
-                    conn_timeout = 4.0
+                    timeout_val = 30.0
+                    conn_timeout = 5.0
                 else:
                     timeout_val = float(min(settings.llm_read_timeout_seconds or 25.0, 25.0))
                     conn_timeout = 4.0
@@ -1077,7 +1093,31 @@ class ProviderRouter:
 
                 if resp.status_code == 200:
                     resp_data = resp.json()
-                    content = resp_data["choices"][0]["message"]["content"]
+                    # Robust content extraction — handle missing/null content from providers
+                    choices = resp_data.get("choices") or []
+                    if not choices:
+                        logger.warning(
+                            "Provider %s model %s returned 200 but no choices — treating as failure",
+                            provider.name, model_id,
+                        )
+                        health_tracker.record_failure(provider.name, model_id)
+                        continue
+                    message = choices[0].get("message") or {}
+                    content = message.get("content")
+                    if content is None:
+                        # Some providers put content in delta or text fields
+                        content = (
+                            choices[0].get("text")
+                            or (choices[0].get("delta") or {}).get("content")
+                            or ""
+                        )
+                    if not content or not content.strip():
+                        logger.warning(
+                            "Provider %s model %s returned 200 but empty/null content — treating as failure",
+                            provider.name, model_id,
+                        )
+                        health_tracker.record_failure(provider.name, model_id)
+                        continue
                     parsed = _parse_llm_response(content, response_schema)
 
                     # Record success in health tracker

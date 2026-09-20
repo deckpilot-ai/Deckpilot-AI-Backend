@@ -7,8 +7,14 @@ import math
 import re
 from typing import Any
 
-import cv2
-import numpy as np
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+try:
+    import numpy as np
+except ImportError:
+    np = None
 from PIL import Image
 
 from app.schemas.generation_state import AssetMetadata, ImagePlacementMode
@@ -57,6 +63,13 @@ class ImageIntelligence:
         Returns (is_valid, score, reason).
         """
         try:
+            if cv2 is None:
+                img_pil = Image.open(io.BytesIO(image_bytes))
+                w, h = img_pil.size
+                if w < 50 or h < 50:
+                    return False, 0.1, "Resolution too small"
+                return True, 0.85, "Valid image (Pillow fallback)"
+
             arr = np.frombuffer(image_bytes, dtype=np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             if img is None:

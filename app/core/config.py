@@ -44,7 +44,7 @@ class Settings(BaseSettings):
         "openrouter.ai,api.openai.com,generativelanguage.googleapis.com,"
         "api.groq.com,api.mistral.ai,api.anthropic.com,api.experientiallabs.ai,"
         "codecraftapi.com,api.codecraftapi.com,integrate.api.nvidia.com,api.bazaarlink.ai,api.routeway.ai,api.apmix.ai,api.inceptionlabs.ai,"
-        "api.unsplash.com,images.unsplash.com,api.pexels.com,images.pexels.com"
+        "api.unsplash.com,images.unsplash.com,api.pexels.com,images.pexels.com,pixabay.com,cdn.pixabay.com"
     )
 
     # Request limits
@@ -88,6 +88,7 @@ class Settings(BaseSettings):
     unsplash_secret_key: str = "Sre8TS9N9s6xfZahgQfjOiVV5BKqYfUf5l1HKIj8SiQ"
     unsplash_app_id: str = "1063175"
     pexels_api_key: str = "rLUG07NzqsWWuqFUqcFBRGWkHB0KkcqdWwT591VHQR4LmNfwfTSsAyUR"
+    pixabay_api_key: str = "57664903-214397a32b9ca84ea40b6bd18"
 
     @property
     def effective_experientiallabs_api_key(self) -> str:

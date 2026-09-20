@@ -49,8 +49,21 @@ class ImageMatcher:
     """Matches slides to the most relevant documentary image assets with dynamic pacing."""
 
     @classmethod
-    def calculate_relevance(cls, slide_text: str, caption: str) -> float:
+    def calculate_relevance(cls, slide_text: str, caption: str, topic_context: str = "") -> float:
         """Calculate relevance score between slide text and image caption/evidence."""
+        caption_lower = (caption or "").lower()
+        topic_lower = (topic_context or "").lower()
+
+        # Reject corporate stock photos for non-corporate subjects
+        corporate_noise = {"office", "laptop", "handshake", "skyscraper", "suits", "businesswoman", "businessman", "meeting room", "conference table"}
+        is_non_corporate_topic = any(w in topic_lower for w in (
+            "history", "historical", "war", "ancient", "rome", "maratha", "empire", "dynasty",
+            "health", "medical", "cardiology", "doctor", "patient", "biotech", "pharma",
+            "climate", "nature", "forest", "environment", "solar", "space", "astronomy", "art", "craft"
+        ))
+        if is_non_corporate_topic and any(w in caption_lower for w in corporate_noise):
+            return 0.0
+
         slide_tokens = tokenize(slide_text)
         caption_tokens = tokenize(caption)
 
@@ -85,6 +98,7 @@ class ImageMatcher:
         slides: list[SlideSpec] | list[dict[str, Any]],
         available_assets: list[AssetMetadata] | list[dict[str, Any]],
         min_relevance_threshold: float = MIN_SEMANTIC_RELEVANCE,
+        topic_context: str = "",
     ) -> None:
         """Assign assets to slides semantically with dynamic visual ratio. Mutates slides in place."""
         if not slides or not available_assets:
@@ -161,7 +175,7 @@ class ImageMatcher:
                 if a_idx in assigned_assets:
                     continue
                 evidence = f"{asset['caption']} {asset['nearby_text']} {asset['summary']}".strip()
-                score = cls.calculate_relevance(slide_text, evidence or asset["caption"])
+                score = cls.calculate_relevance(slide_text, evidence or asset["caption"], topic_context=topic_context)
 
                 # Pacing bonus: slightly favor even distribution across chapters
                 pacing_bonus = 0.5 if (s_idx % 2 == 1 or s_idx == 0) else 0.0
@@ -220,6 +234,7 @@ class ImageMatcher:
         slides: list[SlideSpec],
         available_assets: list[AssetMetadata],
         min_relevance_threshold: float = MIN_SEMANTIC_RELEVANCE,
+        topic_context: str = "",
     ) -> None:
         """Recompute one-to-one assignments for image-capable slides during repair passes."""
         if not slides or not available_assets:
@@ -248,7 +263,7 @@ class ImageMatcher:
                 if asset.asset_id in reserved_asset_ids or asset.quality_score < 0.4:
                     continue
                 evidence = f"{asset.caption} {asset.nearby_text} {asset.semantic_summary}".strip()
-                score = cls.calculate_relevance(slide_text, evidence or asset.caption)
+                score = cls.calculate_relevance(slide_text, evidence or asset.caption, topic_context=topic_context)
                 if score >= min_relevance_threshold:
                     pairs.append((score, s_idx, a_idx))
 

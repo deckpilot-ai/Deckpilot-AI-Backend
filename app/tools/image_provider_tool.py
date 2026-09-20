@@ -1,7 +1,6 @@
 """Stock Image Provider Tool for DeckPilot AI."""
 
 from typing import Any
-from app.services.image_provider import ImageProviderService, StockImageResult
 from app.schemas.generation_state import AssetMetadata
 
 
@@ -14,8 +13,9 @@ class ImageProviderTool:
         per_page: int = 5,
         orientation: str = "landscape",
         preferred_provider: str = "all",
-    ) -> list[StockImageResult]:
+    ) -> list[Any]:
         """Search Unsplash and Pexels stock images."""
+        from app.services.image_provider import ImageProviderService
         return await ImageProviderService.search_images(
             query=query,
             per_page=per_page,
@@ -31,6 +31,7 @@ class ImageProviderTool:
         orientation: str = "landscape",
     ) -> tuple[str, bytes, AssetMetadata] | None:
         """Download and store a stock image into the project storage."""
+        from app.services.image_provider import ImageProviderService
         return await ImageProviderService.fetch_and_store_stock_asset(
             project_id=project_id,
             query=query,
@@ -46,6 +47,7 @@ class ImageProviderTool:
         max_images: int = 4,
     ) -> list[tuple[str, bytes, AssetMetadata]]:
         """Fetch multiple relevant stock images for a presentation topic and slides."""
+        from app.services.image_provider import ImageProviderService
         return await ImageProviderService.fetch_stock_assets_for_presentation(
             project_id=project_id,
             topic=topic,

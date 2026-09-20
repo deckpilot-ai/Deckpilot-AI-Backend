@@ -30,7 +30,7 @@ class StockImageResult(BaseModel):
     """Normalized stock image metadata from external providers."""
 
     id: str
-    provider: Literal["unsplash", "pexels"]
+    provider: Literal["unsplash", "pexels", "pixabay"]
     url: str
     thumbnail_url: str = ""
     description: str = ""
@@ -42,34 +42,73 @@ class StockImageResult(BaseModel):
 
 
 class ImageProviderService:
-    """Service to search, download, and store stock images from Unsplash and Pexels."""
+    """Service to search, download, and store stock images from Unsplash, Pexels, and Pixabay."""
 
     UNSPLASH_SEARCH_URL = "https://api.unsplash.com/search/photos"
     PEXELS_SEARCH_URL = "https://api.pexels.com/v1/search"
+    PIXABAY_SEARCH_URL = "https://pixabay.com/api/"
 
     @classmethod
-    def clean_search_query(cls, query: str) -> str:
-        """Sanitize and shorten presentation slide text into effective stock search terms."""
-        if not query:
-            return "business presentation"
-        
-        # Remove common markdown, punctuation, and prompt noise
-        cleaned = re.sub(r"[#*`_~\[\](){}<>!?:;,.\"\']+", " ", query)
-        # Remove slide-specific terms
+    def clean_search_query(cls, query: str, topic: str = "") -> str:
+        """Sanitize and ground presentation slide search queries with overall topic context."""
         slide_stopwords = {
             "slide", "presentation", "deck", "overview", "introduction", "conclusion",
             "agenda", "summary", "takeaway", "key", "points", "bullet", "bullets",
             "table", "chart", "figure", "fig", "chapter", "section", "part", "next",
-            "previous", "goal", "objective", "background", "strategy", "analysis"
+            "previous", "goal", "objective", "background", "strategy", "analysis",
+            "first", "second", "third", "fourth", "fifth"
         }
-        tokens = [
-            w for w in cleaned.split()
+
+        topic_clean = re.sub(r"[#*`_~\[\](){}<>!?:;,.\"\']+", " ", topic or "") if topic else ""
+        topic_tokens = [
+            w for w in topic_clean.split()
+            if len(w) >= 3 and w.lower() not in slide_stopwords
+        ][:2]
+
+        cleaned_query = re.sub(r"[#*`_~\[\](){}<>!?:;,.\"\']+", " ", query or "") if query else ""
+        query_tokens = [
+            w for w in cleaned_query.split()
             if len(w) >= 3 and w.lower() not in slide_stopwords
         ]
-        if not tokens:
-            return "professional business"
-        # Keep top 3-5 descriptive words for high search relevance
-        return " ".join(tokens[:4])
+
+        topic_tokens_lower = {t.lower() for t in topic_tokens}
+        distinct_query_tokens = [
+            w for w in query_tokens
+            if w.lower() not in topic_tokens_lower
+        ][:3]
+
+        grounded_tokens = topic_tokens + distinct_query_tokens
+        if not grounded_tokens:
+            return " ".join(topic_tokens) if topic_tokens else "presentation background"
+
+        return " ".join(grounded_tokens)
+
+    @classmethod
+    def verify_semantic_relevance(cls, candidate_desc: str, topic: str, slide_query: str) -> float:
+        """Verifies candidate image alt/description for subject-domain alignment."""
+        desc_lower = (candidate_desc or "").lower()
+        topic_lower = (topic or "").lower()
+        query_lower = (slide_query or "").lower()
+
+        corporate_noise = {"office", "laptop", "handshake", "skyscraper", "suits", "businesswoman", "businessman", "meeting room", "conference table"}
+        
+        is_non_corporate_topic = any(w in topic_lower for w in (
+            "history", "historical", "war", "ancient", "rome", "maratha", "empire", "dynasty",
+            "health", "medical", "cardiology", "doctor", "patient", "biotech", "pharma",
+            "climate", "nature", "forest", "environment", "solar", "space", "astronomy", "art", "craft"
+        ))
+
+        if is_non_corporate_topic:
+            if any(w in desc_lower for w in corporate_noise):
+                return 0.1
+
+        topic_words = set(re.findall(r"\w{4,}", topic_lower))
+        query_words = set(re.findall(r"\w{4,}", query_lower))
+        desc_words = set(re.findall(r"\w{4,}", desc_lower))
+
+        overlap = len((topic_words | query_words) & desc_words)
+        score = min(1.0, 0.4 + (overlap * 0.2))
+        return round(score, 2)
 
     @classmethod
     async def search_unsplash(
@@ -203,6 +242,67 @@ class ImageProviderService:
             return []
 
     @classmethod
+    async def search_pixabay(
+        cls,
+        query: str,
+        per_page: int = 5,
+        orientation: str = "landscape",
+    ) -> list[StockImageResult]:
+        """Search stock images from Pixabay API."""
+        api_key = settings.pixabay_api_key.strip()
+        if not api_key:
+            logger.warning("Pixabay API key not configured")
+            return []
+
+        search_query = cls.clean_search_query(query)
+        pix_orientation = "horizontal" if orientation == "landscape" else "all"
+        params: dict[str, Any] = {
+            "key": api_key,
+            "q": search_query,
+            "image_type": "photo",
+            "orientation": pix_orientation,
+            "per_page": max(3, min(per_page, 30)),
+            "safesearch": "true",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(cls.PIXABAY_SEARCH_URL, params=params)
+                if resp.status_code != 200:
+                    logger.warning("Pixabay search HTTP %d: %s", resp.status_code, resp.text[:200])
+                    return []
+
+                data = resp.json()
+                results: list[StockImageResult] = []
+                for item in data.get("hits", []):
+                    img_url = item.get("largeImageURL") or item.get("webformatURL") or item.get("previewURL")
+                    if not img_url:
+                        continue
+                    
+                    w = int(item.get("imageWidth") or 1920)
+                    h = int(item.get("imageHeight") or 1080)
+                    desc = item.get("tags") or item.get("type") or f"Photo related to {search_query}"
+                    results.append(
+                        StockImageResult(
+                            id=f"pixabay_{item.get('id', uuid.uuid4().hex[:8])}",
+                            provider="pixabay",
+                            url=img_url,
+                            thumbnail_url=item.get("previewURL") or item.get("webformatURL", ""),
+                            description=desc,
+                            photographer=item.get("user", "Pixabay Contributor"),
+                            photographer_url=item.get("pageURL", "https://pixabay.com"),
+                            width=w,
+                            height=h,
+                            aspect_ratio=round(w / max(1, h), 3),
+                        )
+                    )
+                logger.info("Pixabay search for '%s' returned %d results", search_query, len(results))
+                return results
+        except Exception as e:
+            logger.warning("Pixabay API search error: %s", e)
+            return []
+
+    @classmethod
     async def search_images(
         cls,
         query: str,
@@ -210,36 +310,52 @@ class ImageProviderService:
         orientation: str = "landscape",
         preferred_provider: str = "all",
     ) -> list[StockImageResult]:
-        """Search stock images across providers with automatic fallback."""
+        """Search stock images across Unsplash, Pexels, and Pixabay with automatic fallback & interleaving."""
         if preferred_provider == "unsplash":
             results = await cls.search_unsplash(query, per_page, orientation)
             if not results:
                 results = await cls.search_pexels(query, per_page, orientation)
+            if not results:
+                results = await cls.search_pixabay(query, per_page, orientation)
             return results
 
         if preferred_provider == "pexels":
             results = await cls.search_pexels(query, per_page, orientation)
             if not results:
                 results = await cls.search_unsplash(query, per_page, orientation)
+            if not results:
+                results = await cls.search_pixabay(query, per_page, orientation)
             return results
 
-        # Preferred "all": query primary (Unsplash) and fallback to Pexels if empty, or interleave
+        if preferred_provider == "pixabay":
+            results = await cls.search_pixabay(query, per_page, orientation)
+            if not results:
+                results = await cls.search_unsplash(query, per_page, orientation)
+            if not results:
+                results = await cls.search_pexels(query, per_page, orientation)
+            return results
+
+        # Preferred "all": query Unsplash, Pexels, and Pixabay concurrently
         unsplash_task = asyncio.create_task(cls.search_unsplash(query, per_page, orientation))
         pexels_task = asyncio.create_task(cls.search_pexels(query, per_page, orientation))
+        pixabay_task = asyncio.create_task(cls.search_pixabay(query, per_page, orientation))
         
-        unsplash_res, pexels_res = await asyncio.gather(unsplash_task, pexels_task, return_exceptions=True)
+        u_res, p_res, px_res = await asyncio.gather(unsplash_task, pexels_task, pixabay_task, return_exceptions=True)
         
-        u_list = unsplash_res if isinstance(unsplash_res, list) else []
-        p_list = pexels_res if isinstance(pexels_res, list) else []
+        u_list = u_res if isinstance(u_res, list) else []
+        p_list = p_res if isinstance(p_res, list) else []
+        px_list = px_res if isinstance(px_res, list) else []
 
         combined: list[StockImageResult] = []
-        # Interleave results for diversity
-        max_len = max(len(u_list), len(p_list))
+        # Interleave results from all 3 stock providers for diversity
+        max_len = max(len(u_list), len(p_list), len(px_list))
         for i in range(max_len):
             if i < len(u_list):
                 combined.append(u_list[i])
             if i < len(p_list):
                 combined.append(p_list[i])
+            if i < len(px_list):
+                combined.append(px_list[i])
 
         return combined[:per_page]
 
@@ -262,6 +378,7 @@ class ImageProviderService:
         cls,
         project_id: str,
         query: str,
+        topic: str = "",
         preferred_provider: str = "all",
         orientation: str = "landscape",
     ) -> tuple[str, bytes, AssetMetadata] | None:
@@ -272,7 +389,7 @@ class ImageProviderService:
         """
         candidates = await cls.search_images(
             query=query,
-            per_page=3,
+            per_page=4,
             orientation=orientation,
             preferred_provider=preferred_provider,
         )
@@ -281,6 +398,12 @@ class ImageProviderService:
             return None
 
         for candidate in candidates:
+            # Semantic relevance check before downloading
+            rel_score = cls.verify_semantic_relevance(candidate.description, topic=topic, slide_query=query)
+            if rel_score < 0.3:
+                logger.info("Stock image candidate %s rejected due to semantic mismatch (score=%.2f, desc='%s')", candidate.id, rel_score, candidate.description[:60])
+                continue
+
             img_bytes = await cls.download_image_bytes(candidate.url)
             if not img_bytes:
                 continue
@@ -334,8 +457,8 @@ class ImageProviderService:
             )
 
             logger.info(
-                "Successfully fetched and stored stock asset '%s' from %s for query '%s'",
-                asset_id, candidate.provider, query
+                "Successfully fetched and stored stock asset '%s' from %s for query '%s' (relevance=%.2f)",
+                asset_id, candidate.provider, query, rel_score
             )
             return asset_id, img_bytes, meta
 
@@ -353,10 +476,10 @@ class ImageProviderService:
         fetched_assets: list[tuple[str, bytes, AssetMetadata]] = []
         seen_queries: set[str] = set()
 
-        # Build list of queries (slide-specific queries first, followed by topic variations)
+        # Build list of queries (slide-specific queries grounded with presentation topic)
         candidate_queries: list[str] = []
         for q in slide_queries:
-            clean = cls.clean_search_query(q)
+            clean = cls.clean_search_query(q, topic=topic)
             if clean and clean not in seen_queries:
                 seen_queries.add(clean)
                 candidate_queries.append(clean)
@@ -376,6 +499,7 @@ class ImageProviderService:
                 res = await cls.fetch_and_store_stock_asset(
                     project_id=project_id,
                     query=query,
+                    topic=topic,
                     preferred_provider="all",
                     orientation="landscape",
                 )

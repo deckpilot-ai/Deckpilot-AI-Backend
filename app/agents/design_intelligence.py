@@ -99,27 +99,28 @@ class DesignIntelligenceAgent:
         skill = get_skill_for_request(goal.topic, p_type)
 
         # Determine subject domain
-        if "tech" in p_type or "architecture" in p_type or "ai" in topic_lower or "cloud" in topic_lower:
+        if any(w in topic_lower or w in p_type for w in ("tech", "architecture", "ai", "cloud", "software", "data", "cyber", "robot")):
             domain_key = "tech"
-        elif "finance" in p_type or "revenue" in topic_lower or "budget" in topic_lower or "economy" in topic_lower:
+        elif any(w in topic_lower or w in p_type for w in ("finance", "revenue", "budget", "economy", "market", "banking", "investment")):
             domain_key = "finance"
-        elif "history" in topic_lower or "research" in p_type or "maratha" in topic_lower:
+        elif any(w in topic_lower or w in p_type for w in ("history", "war", "empire", "dynasty", "ancient", "maratha", "rome", "heritage", "antiquity", "century")):
             domain_key = "history"
-        elif "health" in topic_lower or "medical" in topic_lower:
+        elif any(w in topic_lower or w in p_type for w in ("health", "medical", "clinical", "biotech", "pharma", "patient", "doctor")):
             domain_key = "healthcare"
-        elif "federal" in topic_lower or "governance" in topic_lower or "civic" in topic_lower:
-            domain_key = "governance"
+        elif any(w in topic_lower or w in p_type for w in ("politic", "election", "federal", "governance", "civic", "parliament", "constitution", "democracy", "government", "policy")):
+            domain_key = "politics"
+        elif any(w in topic_lower or w in p_type for w in ("sustainab", "climate", "eco", "renewable", "environment", "nature", "solar")):
+            domain_key = "sustainability"
+        elif any(w in topic_lower or w in p_type for w in ("creative", "marketing", "fashion", "luxury", "brand", "art", "design", "music", "lifestyle")):
+            domain_key = "creative"
         else:
             domain_key = "executive"
 
         # 1. Determine base palette from PaletteGenerator
         from app.services.deck_archetypes import PaletteGenerator
-        tokens = PaletteGenerator.generate_palette(goal.topic)
-
-        # Check if user directives specify a color
         user_directives = getattr(goal, "user_directives", "").lower()
-        if user_directives:
-            tokens = PaletteGenerator.generate_palette(f"{goal.topic} {user_directives}")
+        search_prompt = f"{goal.topic} {user_directives}".strip()
+        tokens = PaletteGenerator.generate_palette(search_prompt)
         
         colors = ColorPalette(
             ink=tokens.ink,
@@ -142,7 +143,7 @@ class DesignIntelligenceAgent:
         dominant_title = ref_fonts.get("dominant_title_font") or "Cambria"
         dominant_body = ref_fonts.get("dominant_body_font") or "Calibri"
 
-        # Override colors if valid reference colors or LLM hints are provided
+        # Override colors if valid reference colors or custom LLM hints are provided
         ref_colors = (reference_profile or {}).get("colors", {})
         if ref_colors.get("primary_hint") and re.match(r"^#[0-9A-Fa-f]{6}$", ref_colors["primary_hint"]):
             colors.primary = ref_colors["primary_hint"]
@@ -153,15 +154,21 @@ class DesignIntelligenceAgent:
         if llm_brand_hints and isinstance(llm_brand_hints, dict):
             hint_cols = llm_brand_hints.get("colors", {})
             if isinstance(hint_cols, dict):
-                for k in ("ink", "primary", "secondary", "accent", "tint_a", "tint_b", "alert", "neutral"):
-                    val = hint_cols.get(k)
-                    if isinstance(val, str) and re.match(r"^#[0-9A-Fa-f]{6}$", val):
-                        setattr(colors, k, val)
+                primary_val = hint_cols.get("primary")
+                # Ignore static generic default (#132A52 / #0086FF) if topic belongs to non-finance domain
+                is_generic_default = (
+                    primary_val in ("#132A52", "#132a52", "#0086FF", "#0086ff")
+                    and domain_key in ("history", "politics", "sustainability", "creative", "healthcare")
+                )
+                if not is_generic_default:
+                    for k in ("ink", "primary", "secondary", "accent", "tint_a", "tint_b", "alert", "neutral"):
+                        val = hint_cols.get(k)
+                        if isinstance(val, str) and re.match(r"^#[0-9A-Fa-f]{6}$", val):
+                            setattr(colors, k, val)
 
-        # Enforce Palette Coherence: If primary is in blue/navy/indigo range, ensure accent is also harmonious blue/indigo
+        # Enforce Palette Coherence only if primary blue and accent is harsh orange
         prim_lower = colors.primary.lower()
-        if prim_lower in ("#132a52", "#1e3a8a", "#2563eb", "#0284c7", "#1f3864", "#2f5597", "#0f172a"):
-            # If accent was inadvertently set to contrasting orange/amber, harmonize it with the primary blue palette
+        if prim_lower in ("#132a52", "#1e3a8a", "#2563eb", "#0284c7", "#1f3864", "#2f5597"):
             acc_lower = colors.accent.lower()
             if acc_lower in ("#e4791f", "#d97706", "#f59e0b", "#ea580c", "#f97316"):
                 colors.accent = colors.primary

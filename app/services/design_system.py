@@ -94,11 +94,12 @@ def default_brand(topic: str) -> dict[str, Any]:
     
     domain = "markets"
     for key, words in (
-        ("history", r"history|heritage|empire|medieval|maratha|harapp|civilisation|civilization"),
-        ("governance", r"civic|governance|federal|government|parliament|legislature|democracy|constitution"),
-        ("sustainability", r"sustainab|climate|renewable|environment"),
-        ("health", r"health|medical|biotech|clinical"),
-        ("technology", r"technology|software|\bAI\b|kubernetes|cloud|saas"),
+        ("history", r"history|heritage|empire|medieval|maratha|harapp|civilisation|civilization|antiquity|war|rome|roman|dynasty"),
+        ("politics", r"politic|election|parliament|congress|senate|governance|civic|constitution|democracy|federal|government|policy"),
+        ("sustainability", r"sustainab|climate|renewable|environment|eco|solar|nature"),
+        ("health", r"health|medical|biotech|clinical|pharma|patient|doctor"),
+        ("technology", r"technology|software|\bAI\b|kubernetes|cloud|saas|cyber|code|robot"),
+        ("creative", r"creative|marketing|fashion|luxury|brand|art|design|music|lifestyle"),
     ):
         if re.search(words, topic, re.IGNORECASE):
             domain = key

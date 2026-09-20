@@ -1,13 +1,24 @@
 """Reject non-illustrative QR assets without decoding or following their URLs."""
 import re
 
-import cv2
-import numpy as np
-import pymupdf
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+try:
+    import numpy as np
+except ImportError:
+    np = None
+try:
+    import pymupdf
+except ImportError:
+    pymupdf = None
 
 
-def is_documentary_cv_image(image: np.ndarray) -> bool:
+def is_documentary_cv_image(image: Any) -> bool:
     """Inspect OpenCV image: check resolution, variance, aspect ratio, and selective QR detection."""
+    if cv2 is None or np is None or image is None:
+        return True
     height, width = image.shape[:2]
     if min(height, width) < 50 or (height * width) < 6000:
         return False
