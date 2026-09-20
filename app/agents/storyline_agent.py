@@ -18,6 +18,7 @@ from app.schemas.generation_state import (
     TableSpec,
 )
 from app.skills.skill_registry import get_skill_for_request
+from app.services.design_system import clean_text
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,23 @@ class StorylineAgent:
 
             purpose = raw_slide.get("purpose") or explicit_s.get("purpose") or raw_slide.get("objective") or f"Key topic analysis for section {i+1}"
             headline = raw_slide.get("headline") or explicit_s.get("headline") or raw_slide.get("message") or f"Strategic Milestone {i+1}: Delivering Scalable Value"
-            bullets = raw_slide.get("bullets") or explicit_s.get("bullets") or []
+            raw_b = raw_slide.get("bullets") or explicit_s.get("bullets") or []
+            bullets = []
+            for b in raw_b:
+                if isinstance(b, dict):
+                    lbl = b.get("label") or b.get("title") or b.get("header") or ""
+                    val = b.get("value") or b.get("description") or b.get("text") or ""
+                    if lbl and val:
+                        txt = f"{lbl}: {val}"
+                    else:
+                        txt = str(lbl or val)
+                    if txt.strip():
+                        bullets.append(clean_text(txt).strip())
+                elif isinstance(b, str) and clean_text(b).strip():
+                    txt = re.sub(r"^(?:evidence|interpretation|observation|fact|takeaway|role)\s*:\s*", "", clean_text(b), flags=re.IGNORECASE).strip()
+                    if txt:
+                        bullets.append(txt)
+
 
             # 2. Select Layout Family with Visual Rhythm
             layout_hint = raw_slide.get("layoutHint") or raw_slide.get("layout_hint") or explicit_s.get("layoutHint") or ""
@@ -83,7 +100,9 @@ class StorylineAgent:
                 alternatives = [LayoutFamily.TWO_COLUMN, LayoutFamily.CARD_GRID, LayoutFamily.COMPARISON, LayoutFamily.METRICS_GRID]
                 chosen_layout = alternatives[i % len(alternatives)]
 
+            is_consecutive_repeat = bool(recent_layouts) and recent_layouts[-1] == chosen_layout
             recent_layouts.append(chosen_layout)
+
 
             # 4. Associate Charts if data / metrics present
             chart_spec = None
@@ -108,14 +127,19 @@ class StorylineAgent:
                     source_provenance=raw_c.get("source", "Internal Operational Data"),
                 )
             elif (chosen_layout in (LayoutFamily.CHART_FOCUS, LayoutFamily.CHART_INSIGHT)) and not raw_slide.get("metrics"):
-                chart_spec = ChartSpec(
-                    chart_type=ChartType.COLUMN,
-                    title="Performance & Scaling Growth Trajectory",
-                    categories=["FY22", "FY23", "FY24", "FY25 (Proj)"],
-                    series=[{"name": "Enterprise ARR ($M)", "values": [12.4, 24.8, 48.2, 85.0]}],
-                    units="$M",
-                    source_provenance="Internal Operational Data",
-                )
+                topic_context = f"{goal.topic} {purpose} {headline}".lower()
+                is_financial_topic = any(w in topic_context for w in ("revenue", "arr", "mrr", "financial", "growth trajectory", "ebitda", "fiscal", "sales", "valuation"))
+                if is_financial_topic:
+                    chart_spec = ChartSpec(
+                        chart_type=ChartType.COLUMN,
+                        title="Performance & Scaling Growth Trajectory",
+                        categories=["FY22", "FY23", "FY24", "FY25 (Proj)"],
+                        series=[{"name": "Enterprise ARR ($M)", "values": [12.4, 24.8, 48.2, 85.0]}],
+                        units="$M",
+                        source_provenance="Internal Operational Data",
+                    )
+                else:
+                    chosen_layout = LayoutFamily.COMPARISON if len(bullets) == 2 else LayoutFamily.CARD_GRID
 
             # 5. Associate Tables if requested
             table_spec = None
@@ -195,27 +219,64 @@ class StorylineAgent:
             speaker_notes = raw_slide.get("speakerNotes") or raw_slide.get("speaker_notes") or f"Presenter guidance: {headline}"
 
             # Select consulting layout archetype
-            from app.services.deck_archetypes import ArchetypeSelector
+            from app.services.deck_archetypes import ArchetypeSelector, LAYOUT_ARCHETYPES
             arch_id = raw_slide.get("archetype_id") or raw_slide.get("archetype")
-            raw_hint = raw_slide.get("layoutHint") or raw_slide.get("layout_hint") or ""
-            if not arch_id and (not raw_hint or raw_hint in ("default", "standard")):
-                # Map chosen_layout or purpose to content type
-                if is_first:
+            raw_hint = (raw_slide.get("layoutHint") or raw_slide.get("layout_hint") or "").lower()
+
+            if arch_id and arch_id.upper() in LAYOUT_ARCHETYPES:
+                arch_id = arch_id.upper()
+            elif raw_hint.upper() in LAYOUT_ARCHETYPES:
+                arch_id = raw_hint.upper()
+            elif raw_hint in ("big_questions", "timeline_band", "council_eight", "two_highways", "forts_quote_emblem", "concept_definition_image", "stepped_value_chain"):
+                layout_to_arch = {
+                    "big_questions": "A29", "timeline_band": "A24", "council_eight": "A25",
+                    "two_highways": "A26", "forts_quote_emblem": "A27",
+                    "concept_definition_image": "A28", "stepped_value_chain": "A30",
+                }
+                arch_id = layout_to_arch[raw_hint]
+            elif raw_hint in ("hero", "roadmap", "bar_chart", "timeline", "quote") and not raw_slide.get("archetype_id") and not raw_slide.get("archetype"):
+                arch_id = None
+            elif raw_hint in ("comparison", "two_column") and not raw_slide.get("archetype_id") and not raw_slide.get("archetype"):
+                if is_consecutive_repeat:
+                    arch_id = "A26"
+                elif raw_hint == "two_column" and not img_id and bullets and len(bullets) <= 3 and all(len(str(b).split()) <= 10 for b in bullets):
+                    arch_id = "A6"
+                else:
+                    arch_id = None
+            elif is_last and count > 1 and (not raw_hint or raw_hint in ("closing", "takeaways")):
+                arch_id = "A17"
+
+
+            else:
+                # Vary with consulting archetype for unconstrained, editorial, hierarchy, or repeating layouts
+                if is_first and count > 1 and (not raw_hint or raw_hint in ("hero", "title")):
                     c_type = "title"
-                elif is_last:
+                elif is_last and count > 1 and (not raw_hint or raw_hint in ("closing", "takeaways")):
                     c_type = "closing"
                 elif chart_spec:
                     c_type = "chart"
                 elif table_spec:
                     c_type = "table"
+                elif raw_hint in ArchetypeSelector.CONTENT_TYPE_MAP:
+                    c_type = raw_hint
                 elif raw_slide.get("metrics") or chosen_layout == LayoutFamily.METRICS_GRID:
                     c_type = "stat_highlight"
-                elif chosen_layout == LayoutFamily.COMPARISON:
-                    c_type = "comparison"
-                elif chosen_layout == LayoutFamily.PROCESS_STEPS:
+                elif chosen_layout in (LayoutFamily.COMPARISON, LayoutFamily.TWO_COLUMN) or "comparison" in raw_hint:
+                    c_type = "two_highways" if recent_layouts and recent_layouts[-1] == chosen_layout else "comparison"
+                elif chosen_layout == LayoutFamily.PROCESS_STEPS or "process" in raw_hint:
                     c_type = "process"
-                elif "definition" in purpose.lower():
+                elif "definition" in raw_hint or "definition" in purpose.lower():
                     c_type = "definition"
+                elif "quote" in raw_hint or "quote" in purpose.lower():
+                    c_type = "quote"
+                elif "timeline" in raw_hint or "history" in purpose.lower():
+                    c_type = "timeline"
+                elif "hierarchy" in raw_hint or "council" in raw_hint or "command" in purpose.lower():
+                    c_type = "council_eight"
+                elif "questions" in raw_hint or "question" in purpose.lower():
+                    c_type = "big_questions"
+                elif "chain" in raw_hint or "value" in purpose.lower():
+                    c_type = "value_chain"
                 else:
                     c_type = "grid"
 
@@ -228,8 +289,13 @@ class StorylineAgent:
                     has_chart=bool(chart_spec),
                     has_table=bool(table_spec),
                 )
+
             if arch_id:
                 recent_archetypes.append(arch_id)
+                for lf in LayoutFamily:
+                    if lf.value == arch_id or lf.name.startswith(f"{arch_id}_"):
+                        chosen_layout = lf
+                        break
 
             spec = SlideSpec(
                 slide_id=slide_id,

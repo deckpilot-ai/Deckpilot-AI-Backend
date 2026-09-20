@@ -224,9 +224,14 @@ try {{
 
             # 2. Quadrant Density Analysis
             # Compare non-background pixels across quadrants (Top-Left, Top-Right, Bottom-Left, Bottom-Right)
-            # Find dominant background color by sampling the 4 outer corners
-            corners = np.array([arr[0, 0], arr[0, -1], arr[-1, 0], arr[-1, -1]])
-            bg_color = np.median(corners, axis=0)
+            # Find dominant background color by sampling inset margin points
+            iy = max(5, int(h * 0.05))
+            ix = max(5, int(w * 0.08))
+            sample_points = np.array([
+                arr[iy, ix], arr[iy, -ix], arr[-iy, ix], arr[-iy, -ix],
+                arr[h // 2, -ix], arr[iy, w // 2], arr[-iy, w // 2],
+            ])
+            bg_color = np.median(sample_points, axis=0)
 
             # Mask pixels that differ meaningfully from the background color
             diff = np.abs(arr.astype(np.int16) - bg_color.astype(np.int16))

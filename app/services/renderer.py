@@ -231,16 +231,18 @@ class PPTXRenderer:
         actual_h = (lines * size * 1.25 + spacing) / 72 + 0.46
         card_h = h if fixed_height else min(h, max(1.2, actual_h))
 
-        cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, card_h, fill)
+        cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, card_h, fill, "card")
         if number is not None:
             disc_y = y + (card_h - 0.4) / 2 if fixed_height else y + 0.25
             cls._shape(slide, MSO_SHAPE.OVAL, x + 0.2, disc_y, 0.4, 0.4, accent)
             cls._text(slide, str(number), x + 0.2, disc_y, 0.4, 0.4, RGBColor(255, 255, 255), font_name, 11, bold=True, center=True)
             text_x, text_w = x + 0.8, w - 1.05
-        text_y = y + 0.2 if not fixed_height else y + max(0.12, (card_h - actual_h) / 2)
-        text_shape = cls._text(slide, text, text_x, text_y, text_w, card_h - 0.3, foreground, font_name, size, bullet_list=bullet_list)
+        text_y = y + 0.2 if not fixed_height else y + max(0.15, min(0.35, (card_h - actual_h) / 2))
+        max_allowed_bottom = 6.35
+        avail_h = max(0.8, min(card_h - 0.35, max_allowed_bottom - text_y))
+        text_shape = cls._text(slide, text, text_x, text_y, text_w, avail_h, foreground, font_name, size, bullet_list=bullet_list)
         if fixed_height:
-            text_shape.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+            text_shape.text_frame.vertical_anchor = MSO_ANCHOR.TOP
 
     @staticmethod
     def _short_caption(value: str, max_words: int = 20) -> str:
@@ -295,8 +297,8 @@ class PPTXRenderer:
                 if cand[1:].isdigit():
                     arch_id = cand
 
-            is_standalone_cover = layout in (LayoutFamily.HERO, LayoutFamily.CLOSING) or arch_id in ("A1", "A2", "A3")
-            dark = slide_data.dark_background or (layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE) and design_system.subject_domain != "markets") or arch_id in ("A1", "A3")
+            is_standalone_cover = layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.A1_TITLE_BLOB, LayoutFamily.A2_TITLE_SPLIT, LayoutFamily.A3_DIVIDER_HERO, LayoutFamily.A17_CLOSING_TAKEAWAYS) or arch_id in ("A1", "A2", "A3", "A17")
+            dark = slide_data.dark_background or (layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE, LayoutFamily.A17_CLOSING_TAKEAWAYS) and design_system.subject_domain != "markets") or arch_id in ("A1", "A3", "A17")
 
             slide.background.fill.solid()
             bg_color = hex_to_rgb(slide_data.background_override) if getattr(slide_data, "background_override", None) else (ink if dark else paper)
@@ -313,7 +315,7 @@ class PPTXRenderer:
             bullets = [b for b in slide_data.bullets if isinstance(b, str) and b.strip()]
             image_bytes = images.get(slide_data.image_artifact_id or "")
 
-            from app.services.archetype_renderer import ArchetypeRenderer
+            from app.services.archetype_renderer import ArchetypeRenderer, _split_title_body
 
             # Eyebrow & Title & Accent Tick (Skip for custom cover/divider archetypes)
             if not is_standalone_cover:
@@ -341,16 +343,45 @@ class PPTXRenderer:
             # --- Consulting Archetype Dispatch ---
             if not arch_id:
                 layout_to_arch = {
-                    LayoutFamily.BIG_QUESTIONS: "A29",
+                    LayoutFamily.A1_TITLE_BLOB: "A1",
+                    LayoutFamily.A2_TITLE_SPLIT: "A2",
+                    LayoutFamily.A3_DIVIDER_HERO: "A3",
+                    LayoutFamily.A4_ROADMAP_AGENDA: "A4",
+                    LayoutFamily.A5_DEFINITION: "A5",
+                    LayoutFamily.A6_TWO_ENTITY_COMPARISON: "A6",
+                    LayoutFamily.A7_TWO_COLUMN_CONTRAST: "A7",
+                    LayoutFamily.A8_STAT_IMAGE_HIGHLIGHT: "A8",
+                    LayoutFamily.A10_NUMBERED_PROCESS: "A10",
+                    LayoutFamily.A11_STAGE_COLUMNS: "A11",
+                    LayoutFamily.A13_ICON_GRID: "A13",
+                    LayoutFamily.A14_CHART_INSIGHT: "A14",
+                    LayoutFamily.A15_DUAL_STAT_COMPARISON: "A15",
+                    LayoutFamily.A16_NATIVE_TABLE: "A16",
+                    LayoutFamily.A17_CLOSING_TAKEAWAYS: "A17",
+                    LayoutFamily.CLOSING: "A17",
+                    LayoutFamily.A18_RECAP_CHECKLIST: "A18",
+                    LayoutFamily.A21_KPI_CLUSTER: "A21",
+                    LayoutFamily.A24_TIMELINE_BAND: "A24",
                     LayoutFamily.TIMELINE_BAND: "A24",
+                    LayoutFamily.A25_COUNCIL_EIGHT: "A25",
                     LayoutFamily.COUNCIL_EIGHT: "A25",
+                    LayoutFamily.A26_TWO_HIGHWAYS: "A26",
                     LayoutFamily.TWO_HIGHWAYS: "A26",
+                    LayoutFamily.A27_FORTS_QUOTE_EMBLEM: "A27",
                     LayoutFamily.FORTS_QUOTE_EMBLEM: "A27",
+                    LayoutFamily.A28_CONCEPT_DEFINITION_IMAGE: "A28",
                     LayoutFamily.CONCEPT_DEFINITION_IMAGE: "A28",
+                    LayoutFamily.A29_BIG_QUESTIONS: "A29",
+                    LayoutFamily.BIG_QUESTIONS: "A29",
+                    LayoutFamily.A30_STEPPED_VALUE_CHAIN: "A30",
                     LayoutFamily.STEPPED_VALUE_CHAIN: "A30",
                 }
                 if layout in layout_to_arch:
                     arch_id = layout_to_arch[layout]
+                elif isinstance(layout, str) and layout.upper().startswith("A") and len(layout) >= 2:
+                    clean_a = layout.upper().split("_")[0]
+                    if clean_a in layout_to_arch.values():
+                        arch_id = clean_a
 
             if arch_id and ArchetypeRenderer.can_render(arch_id):
                 if ArchetypeRenderer.render(slide, arch_id, slide_data, design_system, image_bytes, cls):
@@ -472,14 +503,14 @@ class PPTXRenderer:
                     cls._text(slide, str(metric.get("label", "")), x + 0.2, 4.3, width - 0.4, 0.75, body_col, body_font, 13, center=True)
 
             elif layout in (LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE) and len(bullets) <= 1:
-                cls._text(slide, title, 0.6, 1.05, 12.1, 1.1, fg, title_font, 32, title=True)
+                cls._text(slide, title, 0.6, 0.85, 12.1, 0.95, fg, title_font, 30, title=True)
                 if slide_data.takeaway:
                     cls._text(slide, slide_data.takeaway, 0.6, 1.95, 12.1, 0.65, body_col, body_font, 14)
                 cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 2.55, 12.1, 3.75, tint(primary, 0.22), "card")
                 cls._text(slide, "\n".join(bullets), 1.0, 2.85, 11.3, 3.1, body_col, body_font, 22, center=True)
 
             elif layout in (LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE):
-                cls._text(slide, title, 0.6, 1.05, 12.1, 1.1, fg, title_font, 32, title=True)
+                cls._text(slide, title, 0.6, 0.85, 12.1, 0.95, fg, title_font, 30, title=True)
                 if slide_data.takeaway:
                     cls._text(slide, slide_data.takeaway, 0.6, 1.95, 12.1, 0.65, body_col, body_font, 14)
                 cls._text(slide, "\n".join(bullets), 0.6, 2.7, 7.0, 3.65, body_col, body_font, 14, bullet_list=True)
@@ -542,7 +573,7 @@ class PPTXRenderer:
                     elif "\n" in limb:
                         parts = limb.split("\n", 1)
                     else:
-                        parts = [limb[:30], limb[30:]]
+                        parts = list(_split_title_body(limb, max_title_chars=30))
                     l_t = parts[0].strip()
                     l_b = parts[1].strip() if len(parts) > 1 else ""
                     if len(l_t) > 30:

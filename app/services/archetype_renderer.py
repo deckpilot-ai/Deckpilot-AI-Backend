@@ -35,6 +35,27 @@ def tint(color: RGBColor, amount: float) -> RGBColor:
     return RGBColor(*(round(c + (255 - c) * amount) for c in color))
 
 
+def _split_title_body(text: str, max_title_chars: int = 35) -> tuple[str, str]:
+    """Splits a bullet or attribute into (title, remainder) on natural word boundaries without breaking words."""
+    cleaned = clean_text(text)
+    if not cleaned:
+        return ("", "")
+    if ":" in cleaned:
+        p = cleaned.split(":", 1)
+        return (p[0].strip(), p[1].strip())
+    for sep in (" — ", " - ", " – "):
+        if sep in cleaned:
+            p = cleaned.split(sep, 1)
+            return (p[0].strip(), p[1].strip())
+    words = cleaned.split()
+    if len(words) <= 3:
+        return (cleaned, "")
+    cut = min(3, max(2, len(words) // 2))
+    while cut > 1 and len(" ".join(words[:cut])) > max_title_chars:
+        cut -= 1
+    return (" ".join(words[:cut]), " ".join(words[cut:]))
+
+
 class ArchetypeRenderer:
     """Renders slides matching archetypes A1 through A23 with exact geometry."""
 
@@ -269,9 +290,7 @@ class ArchetypeRenderer:
             r_cls._text(slide, f"0{k+1}", 0.85, y + 0.14, 0.48, 0.44, white, body_font, 11, bold=True, center=True)
 
             # Label & Description
-            parts = item.split(":", 1) if ":" in item else [item[:40], item[40:]]
-            lbl = parts[0].strip()
-            desc = parts[1].strip() if len(parts) > 1 else ""
+            lbl, desc = _split_title_body(item, max_title_chars=40)
 
             r_cls._text(slide, lbl, 1.5, y + 0.08, 9.2, 0.32, primary, title_font, 14, bold=True)
             if desc:
@@ -306,10 +325,10 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.1, ay, 5.6, 1.15, tint_a, f"attr-{j+1}", corner_radius=0.04)
             r_cls._shape(slide, MSO_SHAPE.OVAL, 7.35, ay + 0.2, 0.45, 0.45, primary, f"attr-badge-{j+1}")
             r_cls._text(slide, f"0{j+1}", 7.35, ay + 0.22, 0.45, 0.4, white, body_font, 11, bold=True, center=True)
-            aparts = attr.split(":", 1) if ":" in attr else [attr[:35], attr[35:]]
-            r_cls._text(slide, aparts[0].strip(), 8.0, ay + 0.15, 4.5, 0.32, primary, title_font, 13, bold=True)
-            if len(aparts) > 1:
-                r_cls._text(slide, aparts[1].strip()[:100], 8.0, ay + 0.48, 4.5, 0.55, hex_to_rgb(ds.colors.text_secondary), body_font, 11)
+            a_head, a_body = _split_title_body(attr, max_title_chars=35)
+            r_cls._text(slide, a_head, 8.0, ay + 0.15, 4.5, 0.32, primary, title_font, 13, bold=True)
+            if a_body:
+                r_cls._text(slide, a_body[:100], 8.0, ay + 0.48, 4.5, 0.55, hex_to_rgb(ds.colors.text_secondary), body_font, 11)
 
         # Bottom Band: Why it Matters (3 columns)
         r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 4.75, 12.1, 2.0, tint_b, "why-band", corner_radius=0.04)
@@ -321,10 +340,10 @@ class ArchetypeRenderer:
             cx = 0.85 + m * (cw + 0.4)
             r_cls._shape(slide, MSO_SHAPE.OVAL, cx, 5.35, 0.4, 0.4, primary, f"why-disc-{m+1}")
             r_cls._text(slide, "✓", cx, 5.35, 0.4, 0.4, white, body_font, 12, bold=True, center=True)
-            wparts = item.split(":", 1) if ":" in item else [item[:30], item[30:]]
-            r_cls._text(slide, wparts[0].strip(), cx + 0.5, 5.3, cw - 0.5, 0.32, ink, title_font, 12.5, bold=True)
-            if len(wparts) > 1:
-                r_cls._text(slide, wparts[1].strip()[:90], cx + 0.5, 5.65, cw - 0.5, 0.95, hex_to_rgb(ds.colors.text_secondary), body_font, 10.5)
+            w_head, w_body = _split_title_body(item, max_title_chars=30)
+            r_cls._text(slide, w_head, cx + 0.5, 5.3, cw - 0.5, 0.32, ink, title_font, 12.5, bold=True)
+            if w_body:
+                r_cls._text(slide, w_body[:90], cx + 0.5, 5.65, cw - 0.5, 0.95, hex_to_rgb(ds.colors.text_secondary), body_font, 10.5)
 
     # ──────────────────────────────────────────────────────────────────────────
     # A6: Two-Entity Comparison Cards
@@ -505,9 +524,9 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, cw, 0.55, ink, f"hdr-{j+1}", corner_radius=0.03)
             r_cls._text(slide, f"STAGE {j+1}", x, y + 0.12, cw, 0.35, white, body_font, 11, bold=True, center=True)
 
-            parts = st.split(":", 1) if ":" in st else [st[:30], st[30:]]
+            parts = _split_title_body(st, max_title_chars=30)
             r_cls._text(slide, parts[0].strip(), x + 0.2, y + 0.75, cw - 0.4, 0.65, primary, title_font, 14, bold=True, center=True)
-            if len(parts) > 1:
+            if len(parts) > 1 and parts[1].strip():
                 r_cls._text(slide, parts[1].strip()[:180], x + 0.2, y + 1.45, cw - 0.4, h - 1.6, hex_to_rgb(ds.colors.text_secondary), body_font, 11.5)
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -542,9 +561,9 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.OVAL, x + 0.3, y + 0.25, 0.55, 0.55, ink, f"cell-badge-{k+1}")
             r_cls._text(slide, f"0{k+1}", x + 0.3, y + 0.28, 0.55, 0.5, white, body_font, 12, bold=True, center=True)
 
-            parts = item.split(":", 1) if ":" in item else [item[:40], item[40:]]
+            parts = _split_title_body(item, max_title_chars=40)
             r_cls._text(slide, parts[0].strip(), x + 1.05, y + 0.22, cw - 1.25, 0.4, primary, title_font, 14, bold=True)
-            if len(parts) > 1:
+            if len(parts) > 1 and parts[1].strip():
                 r_cls._text(slide, parts[1].strip()[:140], x + 1.05, y + 0.65, cw - 1.25, 1.35, hex_to_rgb(ds.colors.text_secondary), body_font, 11.5)
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -626,29 +645,39 @@ class ArchetypeRenderer:
     def _render_a17(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
         primary = hex_to_rgb(ds.colors.primary)
         secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
+        white = RGBColor(255, 255, 255)
+        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
+        dark = bool(data.dark_background)
+
         title_font = ds.typography.title_font.name
         body_font = ds.typography.body_font.name
+
+        title_fg = white if dark else ink
+        body_fg = tint(white, 0.2) if dark else hex_to_rgb(ds.colors.text_secondary)
+        eyebrow_fg = accent if dark else primary
 
         # Full-height vertical accent bar on left edge
         r_cls._shape(slide, MSO_SHAPE.RECTANGLE, 0, 0, 0.22, 7.5, secondary, "left-signature-bar")
 
         # Eyebrow & Title with left margin offset
         eyebrow = (data.eyebrow or "SYNTHESIS & CONCLUSION").upper()
-        r_cls._text(slide, eyebrow, 0.8, 0.5, 11.5, 0.35, primary, body_font, 12, bold=True)
+        r_cls._text(slide, eyebrow, 0.8, 0.5, 11.5, 0.35, eyebrow_fg, body_font, 12, bold=True)
 
         title = data.headline or "Strategic Horizons & Lasting Significance"
-        r_cls._text(slide, title, 0.8, 0.9, 11.5, 0.85, hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary)), title_font, 30, title=True)
+        r_cls._text(slide, title, 0.8, 0.9, 11.5, 0.85, title_fg, title_font, 30, title=True)
 
         # Bullets / Narrative body
         body_text = "\n".join(data.bullets) if data.bullets else data.takeaway
-        r_cls._text(slide, body_text, 0.8, 2.05, 11.5, 3.8, hex_to_rgb(ds.colors.text_secondary), body_font, 14, bullet_list=bool(data.bullets))
+        r_cls._text(slide, body_text, 0.8, 2.05, 11.5, 3.8, body_fg, body_font, 14, bullet_list=bool(data.bullets))
 
         # Accent Rule
         r_cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.8, 6.05, 1.8, 0.05, primary, "closing-rule")
 
         # Italic Closing Line
         closing_line = data.takeaway or "An enduring precedent in strategic governance and execution excellence."
-        r_cls._text(slide, closing_line[:140], 0.8, 6.2, 11.5, 0.6, primary, body_font, 13, italic=True)
+        closing_fg = accent if dark else primary
+        r_cls._text(slide, closing_line[:140], 0.8, 6.2, 11.5, 0.6, closing_fg, body_font, 13, italic=True)
 
     # ──────────────────────────────────────────────────────────────────────────
     # A18: Recap Checklist ("Before We Move On")
@@ -656,7 +685,9 @@ class ArchetypeRenderer:
     @classmethod
     def _render_a18(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
         primary = hex_to_rgb(ds.colors.primary)
-        body_col = hex_to_rgb(ds.colors.text_secondary)
+        white = RGBColor(255, 255, 255)
+        dark = bool(data.dark_background)
+        body_col = tint(white, 0.2) if dark else hex_to_rgb(ds.colors.text_secondary)
         body_font = ds.typography.body_font.name
 
         items = data.bullets[:5] if data.bullets else [
@@ -800,9 +831,7 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.OVAL, x + 0.2, y + 0.2, 0.45, 0.45, primary, f"council-badge-{k+1}")
             r_cls._text(slide, f"0{k+1}", x + 0.2, y + 0.22, 0.45, 0.4, white, body_font, 10.5, bold=True, center=True)
 
-            parts = item.split(":", 1) if ":" in item else [item[:28], item[28:]]
-            role_name = parts[0].strip()
-            role_desc = parts[1].strip() if len(parts) > 1 else ""
+            role_name, role_desc = _split_title_body(item, max_title_chars=28)
 
             r_cls._text(slide, role_name, x + 0.75, y + 0.18, cw - 0.85, 0.38, ink, title_font, 13, bold=True)
             if role_desc:
@@ -886,9 +915,9 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.OVAL, 0.85, py + 0.2, 0.45, 0.45, primary, f"pillar-disc-{k+1}")
             r_cls._text(slide, f"0{k+1}", 0.85, py + 0.22, 0.45, 0.4, white, body_font, 11, bold=True, center=True)
 
-            pparts = p.split(":", 1) if ":" in p else [p[:32], p[32:]]
+            pparts = _split_title_body(p, max_title_chars=32)
             r_cls._text(slide, pparts[0].strip(), 1.45, py + 0.18, left_w - 1.6, 0.38, ink, title_font, 13.5, bold=True)
-            if len(pparts) > 1:
+            if len(pparts) > 1 and pparts[1].strip():
                 r_cls._text(slide, clean_text(pparts[1].strip())[:140], 1.45, py + 0.58, left_w - 1.6, card_h - 0.7, hex_to_rgb(ds.colors.text_secondary), body_font, 11)
 
         # Right 46%: Tinted Quote Card with Emblem Disc
@@ -943,9 +972,9 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, ay, left_w, 1.05, tint_a, f"attr-row-{j+1}", corner_radius=0.04)
             r_cls._shape(slide, MSO_SHAPE.OVAL, 0.85, ay + 0.15, 0.35, 0.35, primary, f"attr-disc-{j+1}")
             r_cls._text(slide, str(j + 1), 0.85, ay + 0.16, 0.35, 0.32, white, body_font, 10, bold=True, center=True)
-            aparts = attr.split(":", 1) if ":" in attr else [attr[:35], attr[35:]]
+            aparts = _split_title_body(attr, max_title_chars=35)
             r_cls._text(slide, aparts[0].strip(), 1.35, ay + 0.12, left_w - 1.5, 0.35, primary, title_font, 13, bold=True)
-            if len(aparts) > 1:
+            if len(aparts) > 1 and aparts[1].strip():
                 r_cls._text(slide, clean_text(aparts[1].strip())[:110], 1.35, ay + 0.48, left_w - 1.5, 0.5, hex_to_rgb(ds.colors.text_secondary), body_font, 11)
 
         # Right 45%: Framed Photo Mat
@@ -1048,11 +1077,11 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, sx + 0.2, step_y + 0.2, step_w - 0.4, 0.42, ink, f"step-hdr-{k+1}", corner_radius=0.15)
             r_cls._text(slide, f"STEP 0{k+1}", sx + 0.2, step_y + 0.23, step_w - 0.4, 0.35, white, body_font, 11, bold=True, center=True)
 
-            parts = st.split(":", 1) if ":" in st else [st[:30], st[30:]]
+            parts = _split_title_body(st, max_title_chars=30)
             r_cls._text(slide, parts[0].strip(), sx + 0.15, step_y + 0.8, step_w - 0.3, 0.7, primary, title_font, 13.5, bold=True, center=True)
             r_cls._shape(slide, MSO_SHAPE.RECTANGLE, sx + (step_w - 0.8) / 2, step_y + 1.6, 0.8, 0.03, accent, f"step-rule-{k+1}")
 
-            if len(parts) > 1:
+            if len(parts) > 1 and parts[1].strip():
                 r_cls._text(slide, clean_text(parts[1].strip())[:140], sx + 0.15, step_y + 1.75, step_w - 0.3, step_h - 1.9, hex_to_rgb(ds.colors.text_secondary), body_font, 11, center=True)
 
             # Chevron Arrow between steps

@@ -114,7 +114,7 @@ class VisualQAEvaluator:
 
             # If slide has 1-3 short bullets where each bullet is <= 10 words, standard tall cards create huge empty boxes
             if bullets and len(bullets) <= 3 and all(len(str(b).split()) <= 10 for b in bullets):
-                if slide.layout_family in (LayoutFamily.TWO_COLUMN, LayoutFamily.CARD_GRID):
+                if not getattr(slide, "archetype_id", None) and slide.layout_family in (LayoutFamily.TWO_COLUMN, LayoutFamily.CARD_GRID):
                     issues.append(
                         ValidationIssue(
                             checkpoint_id=CHECKPOINT_ID_BY_SLUG.get("excessive_blank_space", "QA-049"),

@@ -107,7 +107,9 @@ class ImageProviderService:
         desc_words = set(re.findall(r"\w{4,}", desc_lower))
 
         overlap = len((topic_words | query_words) & desc_words)
-        score = min(1.0, 0.4 + (overlap * 0.2))
+        if overlap == 0:
+            return 0.15
+        score = min(1.0, 0.4 + (overlap * 0.15))
         return round(score, 2)
 
     @classmethod
@@ -432,11 +434,21 @@ class ImageProviderService:
             content_type = f"image/{img_format}" if img_format != "jpg" else "image/jpeg"
             await asyncio.to_thread(storage_service.put_bytes, storage_key, img_bytes, content_type)
 
-            caption = (
-                f"{candidate.description} (Photo by {candidate.photographer} on {candidate.provider.title()})"
-                if candidate.description
-                else f"Visual on {query} (via {candidate.provider.title()})"
-            )
+            clean_desc = (candidate.description or "").strip()
+            clean_desc = re.sub(
+                r"^(?:a\s+|an\s+)?(?:photo(?:graph)?|image|picture|close[- ]up|shot|view)\s+(?:of\s+)?",
+                "",
+                clean_desc,
+                flags=re.IGNORECASE,
+            ).strip()
+            if clean_desc and len(clean_desc) > 3:
+                clean_desc = clean_desc[0].upper() + clean_desc[1:]
+                if len(clean_desc) > 60:
+                    clean_desc = clean_desc[:57].rsplit(" ", 1)[0] + "..."
+                caption = f"{clean_desc} — Photo: {candidate.photographer} ({candidate.provider.title()})"
+            else:
+                clean_q = query.strip().title()
+                caption = f"{clean_q} Reference — Photo: {candidate.photographer} ({candidate.provider.title()})"
 
             meta = AssetMetadata(
                 asset_id=asset_id,
