@@ -590,6 +590,177 @@ class ProviderRouter:
             db.commit()
 
     @staticmethod
+    async def _execute_model_ping(
+        provider_id: str,
+        provider_name: str,
+        base_url: str,
+        secret_key: str,
+        model_id: str,
+        model_db_id: str | None = None,
+        display_name: str | None = None,
+    ) -> dict[str, Any]:
+        cleaned_url = base_url.rstrip("/")
+        if cleaned_url.endswith("/chat/completions"):
+            url = cleaned_url
+        else:
+            url = f"{cleaned_url}/chat/completions"
+
+        effective_model_id = (
+            model_id.replace("models/", "")
+            if provider_name == "gemini"
+            else model_id
+        )
+
+        headers = {
+            "Authorization": f"Bearer {secret_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "HTTP-Referer": "https://deckpilot.ai",
+            "X-Title": "deckpilotAI Diagnostic Test",
+        }
+
+        payload = {
+            "model": effective_model_id,
+            "messages": [{"role": "user", "content": "Respond with 'OK'"}],
+            "max_tokens": 20,
+            "temperature": 0.1,
+        }
+
+        t0 = time.time()
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=5.0)) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                elapsed_ms = round((time.time() - t0) * 1000, 1)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    content = ""
+                    if "choices" in data and len(data["choices"]) > 0:
+                        content = data["choices"][0].get("message", {}).get("content", "").strip()
+                    
+                    health_tracker.record_success(provider_name, model_id, elapsed_ms)
+                    return {
+                        "success": True,
+                        "provider_id": provider_id,
+                        "provider_name": provider_name,
+                        "model_id": model_id,
+                        "model_db_id": model_db_id,
+                        "display_name": display_name or model_id,
+                        "latency_ms": elapsed_ms,
+                        "status_code": 200,
+                        "response_text": content[:150],
+                        "usage": data.get("usage"),
+                    }
+                else:
+                    health_tracker.record_failure(provider_name, model_id)
+                    return {
+                        "success": False,
+                        "provider_id": provider_id,
+                        "provider_name": provider_name,
+                        "model_id": model_id,
+                        "model_db_id": model_db_id,
+                        "display_name": display_name or model_id,
+                        "latency_ms": elapsed_ms,
+                        "status_code": resp.status_code,
+                        "error": f"HTTP {resp.status_code}: {resp.text[:200]}",
+                    }
+        except Exception as exc:
+            elapsed_ms = round((time.time() - t0) * 1000, 1)
+            health_tracker.record_failure(provider_name, model_id)
+            return {
+                "success": False,
+                "provider_id": provider_id,
+                "provider_name": provider_name,
+                "model_id": model_id,
+                "model_db_id": model_db_id,
+                "display_name": display_name or model_id,
+                "latency_ms": elapsed_ms,
+                "error": str(exc),
+            }
+
+    @staticmethod
+    async def test_provider_model(
+        db: Session,
+        provider_id: str,
+        model_id: str,
+        model_db_id: str | None = None,
+        display_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Send a diagnostic ping prompt to test a specific model on a provider and measure latency/correctness."""
+        provider = db.scalar(select(AIProvider).where(AIProvider.id == provider_id))
+        if not provider:
+            raise ValueError("Provider not found")
+        
+        provider_base_url = validate_provider_base_url(provider.base_url)
+        active_key_tuple = ProviderRouter.select_active_key(db, provider.id)
+        if not active_key_tuple:
+            return {
+                "success": False,
+                "provider_id": provider_id,
+                "provider_name": provider.name,
+                "model_id": model_id,
+                "model_db_id": model_db_id,
+                "display_name": display_name or model_id,
+                "error": f"No active/valid API key found for provider '{provider.name}'",
+            }
+        
+        _, secret_key = active_key_tuple
+        return await ProviderRouter._execute_model_ping(
+            provider_id=provider.id,
+            provider_name=provider.name,
+            base_url=provider_base_url,
+            secret_key=secret_key,
+            model_id=model_id,
+            model_db_id=model_db_id,
+            display_name=display_name,
+        )
+
+    @staticmethod
+    async def test_provider_all_models(
+        db: Session,
+        provider_id: str,
+    ) -> list[dict[str, Any]]:
+        """Test all configured models for a provider concurrently."""
+        import asyncio
+        provider = db.scalar(select(AIProvider).where(AIProvider.id == provider_id))
+        if not provider:
+            raise ValueError("Provider not found")
+        
+        provider_base_url = validate_provider_base_url(provider.base_url)
+        active_key_tuple = ProviderRouter.select_active_key(db, provider.id)
+        if not active_key_tuple:
+            raise ValueError(f"No active/valid API key configured for provider '{provider.name}'")
+        
+        _, secret_key = active_key_tuple
+
+        models = db.scalars(
+            select(AIProviderModel)
+            .where(AIProviderModel.provider_id == provider_id)
+            .order_by(AIProviderModel.priority.desc())
+        ).all()
+
+        model_items: list[tuple[str, str | None, str | None]] = []
+        if not models:
+            fetched = await ProviderRouter.fetch_provider_models(provider_base_url, api_key=secret_key)
+            model_items = [(m["id"], None, m.get("name")) for m in fetched[:6]]
+        else:
+            model_items = [(m.model_id, m.id, m.display_name) for m in models]
+
+        tasks = [
+            ProviderRouter._execute_model_ping(
+                provider_id=provider.id,
+                provider_name=provider.name,
+                base_url=provider_base_url,
+                secret_key=secret_key,
+                model_id=mid,
+                model_db_id=mdbid,
+                display_name=dname,
+            )
+            for mid, mdbid, dname in model_items
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=False)
+        return list(results)
+
+    @staticmethod
     async def call_llm(
         db: Session,
         agent_type: str,

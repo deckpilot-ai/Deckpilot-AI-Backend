@@ -433,6 +433,89 @@ def delete_model_endpoint(
     ProviderRouter.delete_provider_model(db, model_db_id)
 
 
+class TestModelRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    model_id: str | None = None
+
+
+@router.post("/providers/{provider_id}/models/{model_db_id}/test")
+async def test_single_model_by_db_id(
+    provider_id: str,
+    model_db_id: str,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Test a specific configured model for a provider and measure latency and correctness."""
+    model = db.scalar(
+        select(AIProviderModel).where(
+            AIProviderModel.id == model_db_id,
+            AIProviderModel.provider_id == provider_id,
+        )
+    )
+    if not model:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model configuration not found")
+
+    try:
+        result = await ProviderRouter.test_provider_model(
+            db=db,
+            provider_id=provider_id,
+            model_id=model.model_id,
+            model_db_id=model.id,
+            display_name=model.display_name,
+        )
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Model test failed: {str(exc)}") from exc
+
+
+@router.post("/providers/{provider_id}/test-model")
+async def test_single_model_by_id(
+    provider_id: str,
+    req: TestModelRequest,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Test a model by its string model_id for a provider."""
+    if not req.model_id or not req.model_id.strip():
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="model_id is required")
+
+    try:
+        result = await ProviderRouter.test_provider_model(
+            db=db,
+            provider_id=provider_id,
+            model_id=req.model_id.strip(),
+        )
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Model test failed: {str(exc)}") from exc
+
+
+@router.post("/providers/{provider_id}/test-all")
+async def test_all_provider_models(
+    provider_id: str,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Test all configured models for a provider concurrently and return performance metrics."""
+    try:
+        results = await ProviderRouter.test_provider_all_models(db=db, provider_id=provider_id)
+        return {
+            "provider_id": provider_id,
+            "total_tested": len(results),
+            "results": results,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("test_all_provider_models failed: %s", exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Test all models failed: {str(exc)}") from exc
+
+
+
 @router.post("/providers/{provider_id}/keys", status_code=status.HTTP_201_CREATED)
 def add_provider_key(
     provider_id: str,
