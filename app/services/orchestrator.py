@@ -6,6 +6,7 @@ import logging
 import re
 import time
 import uuid
+from collections import defaultdict
 from typing import Any
 
 from sqlalchemy import select
@@ -1144,6 +1145,7 @@ class JobOrchestrator:
                                 "stage_progress": 0.22 + repair_iterations * 0.16,
                             },
                         )
+                        # 1. Deterministic corrections
                         slide_specs = RepairAgent.apply_corrections(
                             slide_specs=slide_specs,
                             qa_report=qa_report,
@@ -1152,6 +1154,28 @@ class JobOrchestrator:
                             available_assets=available_asset_metadata,
                             design_system=ds_obj,
                         )
+
+                        # 2. Slide-level LLM repairs for high-severity content/title issues
+                        high_issues_by_slide: dict[int, list[Any]] = defaultdict(list)
+                        for issue in qa_report.issues:
+                            if issue.severity in (ValidationSeverity.CRITICAL, ValidationSeverity.HIGH) and issue.slide_number:
+                                high_issues_by_slide[issue.slide_number].append(issue)
+
+                        if high_issues_by_slide and settings.app_env != "test":
+                            for s_num, s_issues in high_issues_by_slide.items():
+                                if 1 <= s_num <= len(slide_specs):
+                                    target_slide = slide_specs[s_num - 1]
+                                    try:
+                                        await RepairAgent.repair_slide_with_llm(
+                                            db=db,
+                                            slide=target_slide,
+                                            issues=s_issues,
+                                            user_id=context.get("user_id"),
+                                            job_id=job_id,
+                                        )
+                                    except Exception as llm_rep_err:
+                                        logger.warning("Slide-level LLM repair failed for Slide %s: %s", s_num, llm_rep_err)
+
                         # Re-render with corrections
                         _emit(
                             "visual_qa",
@@ -1205,6 +1229,18 @@ class JobOrchestrator:
                         )
 
                     context["deck_spec"]["qaReport"] = qa_report.model_dump()
+
+                    # Enforce hard quality gate: Critical and High defects block completion
+                    critical_high_issues = [
+                        issue for issue in qa_report.issues
+                        if issue.severity in (ValidationSeverity.CRITICAL, ValidationSeverity.HIGH)
+                    ]
+                    if critical_high_issues:
+                        summary_msg = "; ".join(f"[Slide {i.slide_number}] {i.message}" for i in critical_high_issues[:4])
+                        err_msg = f"Visual QA failed with {len(critical_high_issues)} blocking defect(s): {summary_msg}"
+                        logger.error("Final Completion Gate Blocked: %s", err_msg)
+                        _fail_step("visual_qa", RuntimeError(err_msg), "qa_gate_failed")
+
                     _update_task("visual_qa", "completed", completed=True)
                     qa_summary = "passed" if qa_report.status == "passed" else "completed with remaining non-blocking findings"
                     _emit(

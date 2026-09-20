@@ -157,6 +157,10 @@ _GROUPS: dict[str, list[tuple[str, str, str, str]]] = {
         ("118", "unsupported_font", "Embedded font choice may substitute unpredictably", "normalize_font_family"),
         ("119", "missing_alt_caption", "Meaningful image lacks descriptive metadata", "add_caption"),
         ("120", "unresolved_repair", "A high-severity issue remains after repair", "fallback_safe_layout", "deck"),
+        ("121", "title_paragraph", "Title is phrased as a narrative paragraph rather than a concise headline", "rewrite_title"),
+        ("122", "missing_timeline", "Chronological or historical sequence presented without a timeline layout", "route_to_timeline"),
+        ("123", "timeline_chronology_disorder", "Timeline milestones or dates appear out of chronological sequence", "reorder_timeline"),
+        ("124", "empty_image_placeholder", "Image container or frame rendered without an image", "insert_image_or_remove_frame"),
     ],
 }
 

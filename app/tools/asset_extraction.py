@@ -170,23 +170,32 @@ class DocumentAssetExtractor:
                     continue
 
                 rect = visible_info.get(xref)
-                if rect is None:
-                    continue
+                if rect is not None:
+                    page_area = page.rect.width * page.rect.height
+                    img_area = rect.width * rect.height
 
-                page_area = page.rect.width * page.rect.height
-                img_area = rect.width * rect.height
+                    # Reject full page background covers (> 88% of page area)
+                    if img_area > page_area * 0.88:
+                        continue
 
-                # Reject full page background covers (> 88% of page area)
-                if img_area > page_area * 0.88:
-                    continue
-
-                # Reject tiny icons / thin borders
-                if rect.width < 40 or rect.height < 40 or img_area < 2500:
-                    continue
+                    # Reject tiny icons / thin borders
+                    if rect.width < 40 or rect.height < 40 or img_area < 2500:
+                        continue
+                    rect_tuple = (rect.x0, rect.y0, rect.x1, rect.y1)
+                else:
+                    # Fallback when bbox is not returned in get_image_info (e.g. inline/transparency xrefs)
+                    try:
+                        probe_pix = pymupdf.Pixmap(doc, xref)
+                        if probe_pix.width < 80 or probe_pix.height < 80 or (probe_pix.width * probe_pix.height) < 10000:
+                            continue
+                        img_area = probe_pix.width * probe_pix.height
+                        rect_tuple = (0.0, 0.0, float(probe_pix.width), float(probe_pix.height))
+                    except Exception:
+                        continue
 
                 # Search surrounding blocks for captions
                 caption_text = ""
-                if page_blocks:
+                if page_blocks and rect is not None:
                     nearby_blocks = []
                     for b in page_blocks:
                         if len(b) > 4:
@@ -201,6 +210,14 @@ class DocumentAssetExtractor:
                     if nearby_blocks:
                         nearby_blocks.sort(key=lambda x: x[0])
                         caption_text = " ".join(nearby_blocks[0][1].split())[:300]
+                elif page_blocks:
+                    # Use first descriptive block from page as fallback caption
+                    for b in page_blocks:
+                        if len(b) > 4:
+                            bt = str(b[4]).strip()
+                            if len(bt) > 15:
+                                caption_text = " ".join(bt.split())[:300]
+                                break
 
                 extracted_candidates.append({
                     "xref": xref,
@@ -208,7 +225,7 @@ class DocumentAssetExtractor:
                     "page": page_idx + 1,
                     "img_idx": img_idx,
                     "caption": caption_text,
-                    "rect": (rect.x0, rect.y0, rect.x1, rect.y1),
+                    "rect": rect_tuple,
                     "area": img_area,
                 })
 

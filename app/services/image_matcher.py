@@ -18,7 +18,7 @@ from app.schemas.generation_state import (
 
 logger = logging.getLogger(__name__)
 
-MIN_SEMANTIC_RELEVANCE = 4.5
+MIN_SEMANTIC_RELEVANCE = 1.5
 
 STOPWORDS = {
     "the", "a", "an", "and", "or", "in", "of", "to", "for", "with", "on", "at",
@@ -26,8 +26,7 @@ STOPWORDS = {
     "were", "be", "been", "being", "have", "has", "had", "do", "does", "did",
     "fig", "figure", "photo", "plate", "image", "source", "reference", "study",
     "chapter", "section", "part", "detail", "notice", "that", "this", "these",
-    "ancient", "empire", "imperial", "india", "indian", "kingdom", "mauryan",
-    "region", "ruler", "state", "territory", "presentation", "deck", "slide",
+    "presentation", "deck", "slide",
 }
 
 
@@ -227,6 +226,38 @@ class ImageMatcher:
                 "Semantically matched Slide %s to asset '%s' (score=%.1f, caption='%s')",
                 s_idx + 1, asset['id'], raw_score, caption[:50]
             )
+
+        # 3. Fallback pass: ensure valid extracted images from source are distributed to text-heavy slides
+        if len(assigned_assets) < min(len(assets_list), target_visual_count):
+            for a_idx, asset in enumerate(assets_list):
+                if a_idx in assigned_assets:
+                    continue
+                for s_idx, slide in enumerate(slides):
+                    if s_idx in assigned_slides or s_idx == 0:
+                        continue
+                    if isinstance(slide, SlideSpec):
+                        if slide.table_spec or slide.chart_spec or slide.diagram_spec or slide.layout_family == LayoutFamily.TIMELINE:
+                            continue
+                        slide.image_artifact_id = asset["id"]
+                        slide.image_caption = asset["caption"] or asset["summary"] or "Source document visual reference"
+                        if slide.layout_family in (LayoutFamily.TWO_COLUMN, LayoutFamily.CARD_GRID, LayoutFamily.HERO, LayoutFamily.SECTION_DIVIDER):
+                            slide.layout_family = LayoutFamily.TEXT_IMAGE
+                            slide.layout_hint = "text_image"
+                    else:
+                        hint = str(slide.get("layoutHint") or slide.get("layout_hint") or "").lower()
+                        if hint in ("comparison", "table", "chart", "timeline", "roadmap"):
+                            continue
+                        slide["imageArtifactId"] = asset["id"]
+                        slide["imageCaption"] = asset["caption"] or asset["summary"] or "Source document visual reference"
+                        if hint in (None, "", "default", "standard", "two_column", "cards"):
+                            slide["layoutHint"] = "text_image"
+
+                    assigned_slides.add(s_idx)
+                    assigned_assets.add(a_idx)
+                    logger.info("Allocated source asset '%s' to slide %s to fulfill visual coverage", asset['id'], s_idx + 1)
+                    break
+                if len(assigned_assets) >= target_visual_count:
+                    break
 
     @classmethod
     def rematch_images_semantically(

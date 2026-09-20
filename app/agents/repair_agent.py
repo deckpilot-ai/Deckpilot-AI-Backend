@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from difflib import SequenceMatcher
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from app.schemas.generation_state import (
     AssetMetadata,
@@ -192,10 +195,105 @@ class RepairAgent:
                 slide.dark_background = False if slide.layout_family not in {LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE, LayoutFamily.A1_TITLE_BLOB, LayoutFamily.A3_DIVIDER_HERO} else slide.dark_background
             elif action == "restore_notes" and slide:
                 slide.speaker_notes = f"Presenter guidance: {slide.headline or slide.key_message or topic}"
+            elif action == "rewrite_title" and slide:
+                raw = _clean_text(slide.headline or slide.key_message or slide.objective or topic)
+                raw = re.sub(r"[.;:!\?]+$", "", raw).strip()
+                words = raw.split()
+                if len(words) > 8:
+                    words = words[:8]
+                slide.headline = " ".join(words).title()
+            elif action == "route_to_timeline" and slide:
+                slide.layout_family = LayoutFamily.TIMELINE
+                slide.archetype_id = "A24"
+                slide.layout_hint = "timeline"
+            elif action == "reorder_timeline" and slide:
+                def _get_year(text: str) -> int:
+                    m = re.search(r"\b(1\d{3}|20\d{2})\b", text)
+                    return int(m.group(1)) if m else 9999
+                slide.bullets = sorted(slide.bullets, key=_get_year)
+            elif action == "insert_image_or_remove_frame" and slide:
+                assigned_ids = {s.image_artifact_id for s in slides if s.image_artifact_id}
+                unused = [a for a in assets if a.asset_id not in assigned_ids]
+                if unused:
+                    slide.image_artifact_id = unused[0].asset_id
+                    slide.image_caption = unused[0].caption or f"Source document visual: {slide.headline}"
+                else:
+                    slide.image_artifact_id = None
+                    slide.layout_family = LayoutFamily.TWO_COLUMN
+                    slide.layout_hint = "two_column"
+                    slide.archetype_id = "A7"
+            elif action == "remove_empty_shape" and slide:
+                slide.bullets = [b for b in slide.bullets if b.strip()]
+                if not slide.bullets:
+                    slide.bullets = [f"Key Insight: Strategic drivers for {slide.headline}."]
 
         cls._remove_duplicate_images(slides, assets)
         cls._normalize_layout_rhythm(slides)
         return slides
+
+    @classmethod
+    async def repair_slide_with_llm(
+        cls,
+        db: Any,
+        slide: SlideSpec,
+        issues: list[Any],
+        user_id: str | None = None,
+        job_id: str | None = None,
+    ) -> SlideSpec:
+        """Call LLM provider router to rewrite and repair specific slide defects."""
+        from app.services.provider_router import ProviderRouter
+        
+        issue_descriptions = [f"- [{getattr(i, 'checkpoint_id', 'QA')}] {getattr(i, 'message', str(i))} (Action: {getattr(i, 'repair_action', 'repair')})" for i in issues]
+        issues_text = "\n".join(issue_descriptions)
+        
+        prompt = (
+            f"SLIDE TO REPAIR (Slide {slide.slide_number}):\n"
+            f"Headline: {slide.headline}\n"
+            f"Layout: {slide.layout_family.value if hasattr(slide.layout_family, 'value') else slide.layout_family}\n"
+            f"Takeaway: {slide.takeaway}\n"
+            f"Bullets:\n" + "\n".join(f"  * {b}" for b in slide.bullets) + "\n\n"
+            f"QUALITY DEFECTS DETECTED:\n{issues_text}\n\n"
+            "REQUIREMENTS:\n"
+            "1. Fix every detected issue.\n"
+            "2. Ensure headline is concise (< 8 words), punchy, and executive-ready without trailing periods.\n"
+            "3. Ensure all bullets are complete, grammatically correct sentences or structured key insights.\n"
+            "4. Never output empty boxes, placeholders, or broken fragments.\n"
+            "5. Return JSON object with keys: headline, bullets (list of strings), takeaway, layoutHint."
+        )
+        
+        try:
+            res = await ProviderRouter.call_llm(
+                db=db,
+                agent_type="repair_agent",
+                system_prompt="You are an expert presentation repair agent. Fix quality defects in PowerPoint slides and return strict JSON.",
+                user_prompt=prompt,
+                response_schema={"type": "object"},
+                user_id=user_id,
+                job_id=job_id,
+            )
+            if isinstance(res, dict):
+                cand = res.get("slide") or res
+                if isinstance(cand, dict):
+                    if cand.get("headline"):
+                        new_head = str(cand["headline"]).strip()
+                        new_words = new_head.split()
+                        if len(new_words) <= 10:
+                            slide.headline = new_head
+                    if isinstance(cand.get("bullets"), list) and cand["bullets"]:
+                        cleaned = [str(b).strip() for b in cand["bullets"] if str(b).strip()]
+                        if cleaned:
+                            slide.bullets = cleaned
+                    if cand.get("takeaway"):
+                        slide.takeaway = str(cand["takeaway"]).strip()
+                    if cand.get("layoutHint"):
+                        hint = str(cand["layoutHint"]).lower()
+                        for lf in LayoutFamily:
+                            if lf.value.lower() == hint:
+                                slide.layout_family = lf
+                                break
+        except Exception as err:
+            logger.warning("LLM slide repair advisory for Slide %s: %s", slide.slide_number, err)
+        return slide
 
     @staticmethod
     def _legacy_action(message: str) -> str:

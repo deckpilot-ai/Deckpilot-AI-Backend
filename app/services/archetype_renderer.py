@@ -77,6 +77,9 @@ class ArchetypeRenderer:
         method_name = f"_render_{arch.lower()}"
         method = getattr(cls, method_name, None)
         if method:
+            if renderer_cls is None:
+                from app.services.renderer import PPTXRenderer
+                renderer_cls = PPTXRenderer
             try:
                 method(slide, slide_data, design_system, image_bytes, renderer_cls)
                 return True
@@ -314,27 +317,28 @@ class ArchetypeRenderer:
 
         # Left 52%: Definition Card in Ink
         r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 2.05, 6.2, 2.45, ink, "def-card", corner_radius=0.04)
-        def_text = data.takeaway or (data.bullets[0] if data.bullets else "Core conceptual framework.")
-        r_cls._text(slide, "DEFINITION & DOCTRINE", 0.9, 2.25, 5.6, 0.3, tint(primary, 0.6), body_font, 11, bold=True)
-        r_cls._text(slide, def_text[:240], 0.9, 2.65, 5.6, 1.7, white, title_font, 17)
+        def_text = data.takeaway or data.key_message or (data.bullets[0] if data.bullets else data.headline)
+        r_cls._text(slide, "DEFINITION & CORE CONCEPT", 0.9, 2.25, 5.6, 0.3, tint(primary, 0.6), body_font, 11, bold=True)
+        r_cls._text(slide, clean_text(def_text)[:240], 0.9, 2.65, 5.6, 1.7, white, title_font, 17)
 
         # Right 45%: Two Stacked Attribute Rows
-        attrs = data.bullets[1:3] if len(data.bullets) > 2 else (data.bullets[:2] if data.bullets else ["Institutional scope", "Administrative function"])
+        clean_bullets = [b for b in data.bullets if clean_text(b)]
+        attrs = clean_bullets[1:3] if len(clean_bullets) > 2 else (clean_bullets[:2] if clean_bullets else [data.key_message or "Key Attribute"])
         for j, attr in enumerate(attrs[:2]):
             ay = 2.05 + j * 1.3
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.1, ay, 5.6, 1.15, tint_a, f"attr-{j+1}", corner_radius=0.04)
             r_cls._shape(slide, MSO_SHAPE.OVAL, 7.35, ay + 0.2, 0.45, 0.45, primary, f"attr-badge-{j+1}")
-            r_cls._text(slide, f"0{j+1}", 7.35, ay + 0.22, 0.45, 0.4, white, body_font, 11, bold=True, center=True)
+            r_cls._text(slide, f"0{j+1}", 7.35, ay + 0.22, 0.45, 0.4, white, body_font, 10.5, bold=True, center=True)
             a_head, a_body = _split_title_body(attr, max_title_chars=35)
             r_cls._text(slide, a_head, 8.0, ay + 0.15, 4.5, 0.32, primary, title_font, 13, bold=True)
             if a_body:
-                r_cls._text(slide, a_body[:100], 8.0, ay + 0.48, 4.5, 0.55, hex_to_rgb(ds.colors.text_secondary), body_font, 11)
+                r_cls._text(slide, clean_text(a_body)[:100], 8.0, ay + 0.48, 4.5, 0.55, hex_to_rgb(ds.colors.text_secondary), body_font, 11)
 
-        # Bottom Band: Why it Matters (3 columns)
+        # Bottom Band: Why it Matters
         r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 4.75, 12.1, 2.0, tint_b, "why-band", corner_radius=0.04)
         r_cls._text(slide, "STRATEGIC IMPLICATIONS & OUTCOMES", 0.85, 4.9, 11.0, 0.3, primary, body_font, 11, bold=True)
 
-        why_items = data.bullets[3:6] if len(data.bullets) >= 6 else (data.bullets[:3] if data.bullets else ["Autonomy", "Scale", "Stability"])
+        why_items = clean_bullets[3:6] if len(clean_bullets) >= 6 else (clean_bullets[:3] if clean_bullets else [data.takeaway or "Impact"])
         cw = 3.65
         for m, item in enumerate(why_items[:3]):
             cx = 0.85 + m * (cw + 0.4)
@@ -733,12 +737,10 @@ class ArchetypeRenderer:
             card_y = 2.55
             card_h = 4.15
 
-        milestones = data.bullets[:5] if len(data.bullets) >= 4 else (data.bullets if data.bullets else [
-            "1630: Foundation & Early Sovereignty",
-            "1657: Naval Power & Coastal Fortresses",
-            "1674: Grand Coronation & State Consolidation",
-            "1707: Pan-Indian Expansion & Peshwa Era",
-        ])
+        clean_bullets = [b for b in data.bullets if clean_text(b)]
+        if not clean_bullets:
+            clean_bullets = [data.key_message or data.objective or "Chronological Milestone"]
+        milestones = clean_bullets[:6]
         count = max(1, len(milestones))
         cw = (12.1 - 0.28 * (count - 1)) / count
 
@@ -751,8 +753,14 @@ class ArchetypeRenderer:
             bg_col = tint_a if k % 2 == 0 else tint_b
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, cx, card_y, cw, card_h, bg_col, f"timeline-card-{k+1}", corner_radius=0.04)
 
-            # Parse year / era & description
-            if ":" in m:
+            # Parse year / era & description dynamically
+            year_match = re.search(r"\b(1\d{3}|20\d{2}|[1-9]\d{0,1}(?:st|nd|rd|th)\s+century|\b\d{1,4}\s*(?:bce|ce|bc|ad)\b|\b\d{4}\b)\b", m, re.I)
+            if year_match:
+                year_tag = year_match.group(0).strip()
+                desc_text = m.replace(year_tag, "", 1).lstrip(" :-·–—").strip()
+                if not desc_text:
+                    desc_text = m
+            elif ":" in m:
                 parts = m.split(":", 1)
                 year_tag = parts[0].strip()
                 desc_text = parts[1].strip()
@@ -802,16 +810,9 @@ class ArchetypeRenderer:
         title_font = ds.typography.title_font.name
         body_font = ds.typography.body_font.name
 
-        items = data.bullets[:8] if len(data.bullets) >= 6 else (data.bullets if data.bullets else [
-            "Peshwa: Prime Minister and head of civil and military administration.",
-            "Amatya: Finance Minister overseeing state treasury and accounts.",
-            "Sachiv: Secretary responsible for royal correspondence and decrees.",
-            "Mantri: Chronicler keeping daily court records and intelligence.",
-            "Senapati: Commander-in-Chief leading military expeditions.",
-            "Sumant: Foreign Minister managing diplomacy and external relations.",
-            "Nyayadhish: Chief Justice administering judicial rulings.",
-            "Panditrao: High Priest managing religious grants and moral welfare.",
-        ])
+        items = [b for b in data.bullets if clean_text(b)][:8]
+        if not items:
+            items = [data.key_message or data.objective or "Key Governance Attribute"]
 
         count = len(items)
         cols = 4 if count >= 7 else (3 if count == 6 else (2 if count <= 4 else 4))
@@ -852,13 +853,25 @@ class ArchetypeRenderer:
         body_font = ds.typography.body_font.name
 
         left_w = 6.2
-        mid = max(1, math.ceil(len(data.bullets) / 2))
-        grp1 = data.bullets[:mid] or ["Independent units pool sovereignty together to form a larger union."]
-        grp2 = data.bullets[mid:] or ["A large central power divides authority between national and state tiers."]
+        bullets = [b for b in data.bullets if clean_text(b)]
+        mid = max(1, math.ceil(len(bullets) / 2))
+        grp1 = bullets[:mid] if bullets else ["Core Model Component"]
+        grp2 = bullets[mid:] if len(bullets) > 1 else (bullets or ["Comparative Component"])
+
+        hdr1 = "PERSPECTIVE 01"
+        hdr2 = "PERSPECTIVE 02"
+        if grp1 and ":" in grp1[0]:
+            h_cand = grp1[0].split(":", 1)[0].strip()
+            if len(h_cand) <= 25:
+                hdr1 = h_cand.upper()
+        if grp2 and ":" in grp2[0]:
+            h_cand = grp2[0].split(":", 1)[0].strip()
+            if len(h_cand) <= 25:
+                hdr2 = h_cand.upper()
 
         routes = [
-            ("ROUTE 01: COMING TOGETHER", grp1, tint_a),
-            ("ROUTE 02: HOLDING TOGETHER", grp2, tint_b),
+            (hdr1, grp1, tint_a),
+            (hdr2, grp2, tint_b),
         ]
 
         # Left 52%: 2 Stacked Route Cards
@@ -879,12 +892,12 @@ class ArchetypeRenderer:
         if img:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.25, 2.2, 5.3, 3.9, tint_a, "photo-mat", corner_radius=0.02)
             r_cls._render_picture(slide, img, 7.35, 2.3, 5.1, 3.7)
-            caption = data.image_caption or "Comparative territorial and constitutional map"
+            caption = data.image_caption or "Comparative reference visual"
             r_cls._text(slide, clean_text(caption)[:90], 7.25, 6.25, 5.3, 0.38, primary, body_font, 10.5, italic=True, center=True)
         else:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.25, 2.2, 5.3, 4.35, tint_a, "synthesis-box", corner_radius=0.03)
-            r_cls._text(slide, "STRATEGIC COMPARISON", 7.55, 2.45, 4.7, 0.35, primary, body_font, 12, bold=True)
-            takeaway = data.takeaway or "Constitutional balance requires continuous institutional calibration."
+            r_cls._text(slide, "STRATEGIC SYNTHESIS", 7.55, 2.45, 4.7, 0.35, primary, body_font, 12, bold=True)
+            takeaway = data.takeaway or data.key_message or "Key comparative findings across core operational frameworks."
             r_cls._text(slide, clean_text(takeaway)[:200], 7.55, 2.95, 4.7, 3.2, hex_to_rgb(ds.colors.text_primary), title_font, 14)
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -901,11 +914,9 @@ class ArchetypeRenderer:
         body_font = ds.typography.body_font.name
 
         # Left 50%: Structured Operational Bullet Cards
-        pillars = data.bullets[:3] if data.bullets else [
-            "Strategic Strongholds: Forts served as permanent military garrisons and treasury centers.",
-            "Territorial Defence: Rugged hill geography neutralized overwhelming enemy numbers.",
-            "Administrative Hubs: Local revenue, justice, and governance radiated from the fortress.",
-        ]
+        pillars = [b for b in data.bullets if clean_text(b)][:4]
+        if not pillars:
+            pillars = [data.key_message or data.objective or "Core Operational Principle"]
         left_w = 5.8
         card_h = (4.75 - 0.2 * (len(pillars) - 1)) / max(1, len(pillars))
 
@@ -932,13 +943,14 @@ class ArchetypeRenderer:
 
         quote_txt = (
             data.takeaway or
-            "Forts are the core of the state. What is a kingdom without forts? It is like a house without walls, exposed to every storm."
+            data.key_message or
+            (data.bullets[0] if data.bullets else data.headline)
         )
         r_cls._text(slide, f'"{clean_text(quote_txt)}"', qx + 0.5, 3.65, qw - 1.0, 2.0, white, title_font, 16, italic=True, center=True)
 
         # Author / Provenance line
         r_cls._shape(slide, MSO_SHAPE.RECTANGLE, qx + (qw - 1.8) / 2, 5.75, 1.8, 0.04, accent, "author-tick")
-        author_txt = "Historical Doctrine & Strategic Precedent"
+        author_txt = "Strategic Directive & Key Finding"
         if data.speaker_notes and ":" in data.speaker_notes:
             author_txt = data.speaker_notes.split(":")[0].strip()[:50]
         r_cls._text(slide, author_txt, qx + 0.5, 5.95, qw - 1.0, 0.45, tint(white, 0.35), body_font, 11, bold=True, center=True)
@@ -962,11 +974,12 @@ class ArchetypeRenderer:
         r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.85, 2.25, 2.2, 0.34, accent, "concept-pill", corner_radius=0.15)
         r_cls._text(slide, "KEY CONCEPT", 0.85, 2.27, 2.2, 0.28, white, body_font, 10, bold=True, center=True)
 
-        def_text = data.takeaway or (data.bullets[0] if data.bullets else "Core structural definition of the institutional framework.")
+        def_text = data.takeaway or data.key_message or (data.bullets[0] if data.bullets else data.headline)
         r_cls._text(slide, clean_text(def_text)[:220], 0.85, 2.7, left_w - 0.5, 1.45, white, title_font, 15)
 
         # Bottom 2 Characteristic Cards in Tint
-        attr_bullets = data.bullets[1:3] if len(data.bullets) > 2 else (data.bullets[:2] if data.bullets else ["Institutional Scope", "Operational Delivery"])
+        clean_bullets = [b for b in data.bullets if clean_text(b)]
+        attr_bullets = clean_bullets[1:3] if len(clean_bullets) > 2 else (clean_bullets[:2] if clean_bullets else [data.key_message or "Key Attribute"])
         for j, attr in enumerate(attr_bullets[:2]):
             ay = 4.5 + j * 1.15
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, ay, left_w, 1.05, tint_a, f"attr-row-{j+1}", corner_radius=0.04)
@@ -982,7 +995,7 @@ class ArchetypeRenderer:
         if img:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.25, 2.2, 5.3, 3.9, tint_a, "photo-mat", corner_radius=0.02)
             r_cls._render_picture(slide, img, 7.35, 2.3, 5.1, 3.7)
-            caption = data.image_caption or "Documentary reference artifact"
+            caption = data.image_caption or "Documentary reference visual"
             r_cls._text(slide, clean_text(caption)[:90], 7.25, 6.25, 5.3, 0.38, primary, body_font, 10.5, italic=True, center=True)
         else:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.25, 2.2, 5.3, 4.35, tint_a, "narrative-fill", corner_radius=0.03)
@@ -1002,12 +1015,9 @@ class ArchetypeRenderer:
         title_font = ds.typography.title_font.name
         body_font = ds.typography.body_font.name
 
-        questions = data.bullets[:4] if len(data.bullets) >= 4 else (data.bullets if data.bullets else [
-            "Who were the key actors and what drove their mobilization?",
-            "What administrative institutions enabled durable statecraft?",
-            "How did fiscal and military policies sustain expansion?",
-            "What enduring legacy shaped subsequent constitutional design?",
-        ])
+        questions = [b for b in data.bullets if clean_text(b)][:4]
+        if not questions:
+            questions = [data.key_message or data.objective or "Key Strategic Focus Area"]
         count = max(1, len(questions))
         cw = (12.1 - 0.3 * (count - 1)) / count
         card_h = 4.65
@@ -1057,12 +1067,9 @@ class ArchetypeRenderer:
         title_font = ds.typography.title_font.name
         body_font = ds.typography.body_font.name
 
-        steps = data.bullets[:5] if len(data.bullets) >= 4 else (data.bullets if data.bullets else [
-            "Primary Production: Cultivation, harvesting, and raw commodity aggregation.",
-            "Wholesale Trading: Mandi auction, bulk sorting, and regional price discovery.",
-            "Processing & Value-Add: Milling, packaging, quality standard compliance.",
-            "Retail Distribution: Neighborhood shops, hypermarkets, and digital fulfilment.",
-        ])
+        steps = [b for b in data.bullets if clean_text(b)][:5]
+        if not steps:
+            steps = [data.key_message or data.objective or "Primary Process Step"]
 
         count = max(1, len(steps))
         step_w = (12.1 - 0.35 * (count - 1)) / count
@@ -1092,7 +1099,7 @@ class ArchetypeRenderer:
 
         # Summary / Value-Add Band at Bottom
         r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 5.9, 12.1, 0.85, tint_b, "value-band", corner_radius=0.04)
-        band_text = data.takeaway or "Value increments at each exchange tier, reflecting logistical transport, risk, and margin."
-        r_cls._text(slide, "CHAIN DYNAMICS & VALUE MARGIN", 0.85, 5.98, 4.0, 0.28, primary, body_font, 10, bold=True)
+        band_text = data.takeaway or data.key_message or "Strategic progression and execution alignment across all key phases."
+        r_cls._text(slide, "STRATEGIC EXECUTION PROGRESSION", 0.85, 5.98, 4.0, 0.28, primary, body_font, 10, bold=True)
         r_cls._text(slide, clean_text(band_text)[:200], 0.85, 6.28, 11.5, 0.42, hex_to_rgb(ds.colors.text_primary), body_font, 11.5)
 

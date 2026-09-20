@@ -344,25 +344,47 @@ class PPTXRenderer:
             if not arch_id:
                 layout_to_arch = {
                     LayoutFamily.A1_TITLE_BLOB: "A1",
+                    LayoutFamily.HERO: "A1",
                     LayoutFamily.A2_TITLE_SPLIT: "A2",
+                    LayoutFamily.TITLE_SUBTITLE: "A2",
                     LayoutFamily.A3_DIVIDER_HERO: "A3",
+                    LayoutFamily.SECTION_DIVIDER: "A3",
                     LayoutFamily.A4_ROADMAP_AGENDA: "A4",
                     LayoutFamily.A5_DEFINITION: "A5",
                     LayoutFamily.A6_TWO_ENTITY_COMPARISON: "A6",
+                    LayoutFamily.COMPARISON: "A6",
                     LayoutFamily.A7_TWO_COLUMN_CONTRAST: "A7",
+                    LayoutFamily.TWO_COLUMN: "A7",
                     LayoutFamily.A8_STAT_IMAGE_HIGHLIGHT: "A8",
+                    LayoutFamily.BIG_NUMBERS: "A8",
+                    LayoutFamily.A9_PROCESS_CHAIN: "A9",
                     LayoutFamily.A10_NUMBERED_PROCESS: "A10",
+                    LayoutFamily.PROCESS_STEPS: "A10",
+                    LayoutFamily.ROADMAP: "A10",
                     LayoutFamily.A11_STAGE_COLUMNS: "A11",
+                    LayoutFamily.THREE_COLUMN: "A11",
+                    LayoutFamily.A12_BEFORE_AFTER: "A12",
+                    LayoutFamily.BEFORE_AFTER: "A12",
                     LayoutFamily.A13_ICON_GRID: "A13",
+                    LayoutFamily.CARD_GRID: "A13",
                     LayoutFamily.A14_CHART_INSIGHT: "A14",
+                    LayoutFamily.CHART_FOCUS: "A14",
                     LayoutFamily.A15_DUAL_STAT_COMPARISON: "A15",
                     LayoutFamily.A16_NATIVE_TABLE: "A16",
+                    LayoutFamily.TABLE_FOCUS: "A16",
                     LayoutFamily.A17_CLOSING_TAKEAWAYS: "A17",
                     LayoutFamily.CLOSING: "A17",
                     LayoutFamily.A18_RECAP_CHECKLIST: "A18",
+                    LayoutFamily.A19_GLOSSARY_GRID: "A19",
+                    LayoutFamily.A20_ORG_HIERARCHY: "A20",
                     LayoutFamily.A21_KPI_CLUSTER: "A21",
+                    LayoutFamily.METRICS_GRID: "A21",
+                    LayoutFamily.A22_HUB_SPOKE: "A22",
+                    LayoutFamily.ARCHITECTURE_DIAGRAM: "A22",
+                    LayoutFamily.A23_VERTICAL_PIPELINE: "A23",
                     LayoutFamily.A24_TIMELINE_BAND: "A24",
                     LayoutFamily.TIMELINE_BAND: "A24",
+                    LayoutFamily.TIMELINE: "A24",
                     LayoutFamily.A25_COUNCIL_EIGHT: "A25",
                     LayoutFamily.COUNCIL_EIGHT: "A25",
                     LayoutFamily.A26_TWO_HIGHWAYS: "A26",
@@ -371,6 +393,8 @@ class PPTXRenderer:
                     LayoutFamily.FORTS_QUOTE_EMBLEM: "A27",
                     LayoutFamily.A28_CONCEPT_DEFINITION_IMAGE: "A28",
                     LayoutFamily.CONCEPT_DEFINITION_IMAGE: "A28",
+                    LayoutFamily.IMAGE_FOCUS: "A28",
+                    LayoutFamily.TEXT_IMAGE: "A28",
                     LayoutFamily.A29_BIG_QUESTIONS: "A29",
                     LayoutFamily.BIG_QUESTIONS: "A29",
                     LayoutFamily.A30_STEPPED_VALUE_CHAIN: "A30",
@@ -556,10 +580,17 @@ class PPTXRenderer:
                 cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, cx, cy, cw, ch, primary, "center-hub", corner_radius=0.06)
                 cls._shape(slide, MSO_SHAPE.OVAL, cx + 0.925, cy + 0.3, 1.0, 1.0, accent, "hub-disc")
                 cls._text(slide, "★", cx + 0.925, cy + 0.3, 1.0, 1.0, white, body_font, 20, bold=True, center=True)
-                cls._text(slide, "Swāmi (The Sovereign)", cx + 0.15, cy + 1.45, cw - 0.3, 0.4, white, title_font, 14.5, bold=True, center=True)
-                cls._text(slide, "The supreme authority guiding state welfare, justice, defence, and moral righteousness.", cx + 0.15, cy + 1.9, cw - 0.3, 0.9, tint(white, 0.15), body_font, 10.5, center=True)
+                hub_title = slide_data.key_message or slide_data.headline or "Core Focus"
+                if len(hub_title) > 40:
+                    hub_title = hub_title[:37].rsplit(" ", 1)[0] + "..."
+                cls._text(slide, hub_title, cx + 0.15, cy + 1.45, cw - 0.3, 0.4, white, title_font, 13, bold=True, center=True)
+                hub_desc = slide_data.takeaway or (bullets[0] if bullets else "")
+                if len(hub_desc) > 130:
+                    hub_desc = hub_desc[:125].rsplit(" ", 1)[0] + "..."
+                if hub_desc:
+                    cls._text(slide, hub_desc, cx + 0.15, cy + 1.9, cw - 0.3, 0.9, tint(white, 0.15), body_font, 10.5, center=True)
 
-                limbs = bullets if len(bullets) >= 6 else (bullets + [f"Limb {k}: Administrative function" for k in range(len(bullets), 6)])
+                limbs = bullets if bullets else []
                 for k, limb in enumerate(limbs[:6]):
                     is_right = k >= 3
                     row = k % 3
@@ -590,11 +621,11 @@ class PPTXRenderer:
                 cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 5.05, 6.4, 1.65, tint(accent, 0.92), "vocab-card", corner_radius=0.04)
                 cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.85, 5.2, 2.2, 0.3, accent, "vocab-pill", corner_radius=0.15)
                 cls._text(slide, "KEY CONCEPT", 0.85, 5.22, 2.2, 0.26, white, body_font, 10.5, bold=True, center=True)
-                def_text = slide_data.takeaway or (bullets[3] if len(bullets) > 3 else "Universal moral conduct and ethical statecraft.")
+                def_text = slide_data.takeaway or (bullets[3] if len(bullets) > 3 else (bullets[0] if bullets else "Core Concept Overview"))
                 cls._text(slide, def_text, 0.85, 5.6, 5.9, 0.95, body_col, body_font, 12)
                 cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.3, 1.75, 5.4, 4.95, white, "artifact-frame", corner_radius=0.03)
                 cls._render_picture(slide, image_bytes, 7.45, 1.9, 5.1, 4.1)
-                caption = slide_data.image_caption or "Source document illustration"
+                caption = slide_data.image_caption or "Source document visual"
                 cls._text(slide, cls._short_caption(caption), 7.45, 6.2, 5.1, 0.4, primary, body_font, 10.5, italic=True, center=True)
 
             elif slide_data.layout_hint in ("stacked_comparison", "legacy", "two_highways") and image_bytes:

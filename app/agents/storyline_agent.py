@@ -351,6 +351,9 @@ class StorylineAgent:
             return LayoutFamily.CLOSING
 
         purpose_lower = f"{raw_slide.get('purpose', '')} {raw_slide.get('headline', '')} {raw_slide.get('message', '')}".lower()
+        bullets = raw_slide.get("bullets") or raw_slide.get("key_points") or []
+        bullets_text = " ".join(str(b) for b in bullets)
+        full_slide_text = f"{purpose_lower} {bullets_text}".lower()
 
         # Content-based layout selection
         if raw_slide.get("chart") or (goal.required_charts and index in (2, 5)):
@@ -359,6 +362,13 @@ class StorylineAgent:
             return LayoutFamily.TABLE_FOCUS
         if raw_slide.get("imageArtifactId") or raw_slide.get("image_artifact_id"):
             return LayoutFamily.IMAGE_FOCUS
+
+        # History / Chronological Timeline Detection
+        year_matches = re.findall(r"\b(?:1[0-9]{3}|20[0-9]{2}|[1-9][0-9]{0,2}\s*(?:bce|ce|bc|ad))\b", full_slide_text)
+        has_timeline_kw = bool(re.search(r"\b(timeline|chronolog\w*|milestones?|evolution|historical\s+progression|centur\w*|eras?|reign|dynast\w*|sequences?)\b", full_slide_text))
+        if len(year_matches) >= 2 or (has_timeline_kw and len(year_matches) >= 1) or "timeline" in purpose_lower or "chronology" in purpose_lower:
+            return LayoutFamily.TIMELINE
+
         if "divider" in purpose_lower or "part " in purpose_lower or "chapter " in purpose_lower:
             return LayoutFamily.SECTION_DIVIDER
         if "quote" in purpose_lower or "perspective" in purpose_lower or "voice of" in purpose_lower:
@@ -367,7 +377,7 @@ class StorylineAgent:
             return LayoutFamily.COMPARISON
         if "process" in purpose_lower or "step" in purpose_lower or "workflow" in purpose_lower:
             return LayoutFamily.PROCESS_STEPS
-        if "timeline" in purpose_lower or "chronology" in purpose_lower or "milestone" in purpose_lower or "roadmap" in purpose_lower:
+        if "roadmap" in purpose_lower:
             return LayoutFamily.TIMELINE
         if "matrix" in purpose_lower or "quadrant" in purpose_lower:
             return LayoutFamily.MATRIX_QUADRANT

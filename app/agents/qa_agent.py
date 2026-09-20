@@ -184,12 +184,34 @@ class PresentationQAAgent:
                 issues.append(cls._issue("duplicate_title", ValidationSeverity.HIGH, ValidationCategory.CONTENT, idx, f"Title duplicates Slide {seen_titles[_normalized(title)]}", sid))
             else:
                 seen_titles[_normalized(title)] = idx
-            if len(title) > 100 or len(title.split()) > 16:
-                issues.append(cls._issue("title_too_long", ValidationSeverity.MEDIUM, ValidationCategory.CONTENT, idx, f"Title contains {len(title.split())} words", sid))
+            title_word_count = len(title.split())
+            if len(title) > 100 or title_word_count > 16:
+                sev = ValidationSeverity.HIGH if (len(title) > 115 or title_word_count > 18) else ValidationSeverity.MEDIUM
+                issues.append(cls._issue("title_too_long", sev, ValidationCategory.CONTENT, idx, f"Title contains {title_word_count} words ({len(title)} chars): '{title[:55]}…'", sid))
+            if title_word_count > 8 and title.endswith((".", ";")):
+                issues.append(cls._issue("title_paragraph", ValidationSeverity.HIGH, ValidationCategory.CONTENT, idx, f"Title phrased like narrative sentence: '{title[:55]}…'", sid))
+            elif re.search(r"\b(?:which took place|and their various|during the period)\b", title, re.I):
+                issues.append(cls._issue("title_paragraph", ValidationSeverity.HIGH, ValidationCategory.CONTENT, idx, f"Title contains unnecessary narrative clauses: '{title[:55]}…'", sid))
             if title and len(title.split()) == 1 and len(title) < 6 and idx > 1:
                 issues.append(cls._issue("title_too_short", ValidationSeverity.LOW, ValidationCategory.CONTENT, idx, f"Title '{title}' is too vague", sid))
             if any(marker in title.lower() for marker in _PLACEHOLDERS):
                 issues.append(cls._issue("title_placeholder", ValidationSeverity.HIGH, ValidationCategory.CONTENT, idx, "Title contains placeholder copy", sid))
+
+            # Timeline and chronology validation
+            is_timeline = layout in (LayoutFamily.TIMELINE, LayoutFamily.TIMELINE_BAND, LayoutFamily.ROADMAP) or getattr(slide, "archetype_id", "") == "A24"
+            timeline_years: list[int] = []
+            for b in body_parts:
+                ym = re.search(r"\b(1\d{3}|20\d{2})\b", b)
+                if ym:
+                    timeline_years.append(int(ym.group(1)))
+
+            if is_timeline and len(timeline_years) >= 2:
+                is_increasing = all(timeline_years[i] <= timeline_years[i+1] for i in range(len(timeline_years)-1))
+                is_decreasing = all(timeline_years[i] >= timeline_years[i+1] for i in range(len(timeline_years)-1))
+                if not (is_increasing or is_decreasing):
+                    issues.append(cls._issue("timeline_chronology_disorder", ValidationSeverity.HIGH, ValidationCategory.CONTENT, idx, f"Timeline dates are out of chronological sequence: {timeline_years}", sid))
+            elif not is_timeline and len(timeline_years) >= 3 and idx > 1:
+                issues.append(cls._issue("missing_timeline", ValidationSeverity.HIGH, ValidationCategory.CONTENT, idx, f"Slide presents {len(timeline_years)} chronological milestones without a timeline layout", sid))
 
             has_structured_content = bool(
                 body_parts or _clean(slide.takeaway) or slide.metrics or slide.chart_spec
@@ -471,6 +493,11 @@ class PresentationQAAgent:
                     text = _clean(shape.text)
                     if text == str(idx):
                         has_page = True
+                    if not text and not intentional_bleed:
+                        is_content_container = any(tag in name for tag in ("card", "body", "content", "textbox", "limb", "evidence", "node", "desc", "label"))
+                        is_substantial = shape.width > int(slide_w * 0.08) and shape.height > int(slide_h * 0.04)
+                        if is_content_container or (is_substantial and not any(tag in name for tag in ("backdrop", "background", "frame", "mat", "accent", "page-pill"))):
+                            issues.append(cls._issue("empty_shape", ValidationSeverity.HIGH if is_content_container else ValidationSeverity.MEDIUM, ValidationCategory.TECHNICAL, idx, f"Empty shape or text container detected: '{shape.name}'", spec.slide_id if spec else ""))
                     if text and shape.top < int(slide_h * 0.91) and not decorative:
                         meaningful_boxes.append((shape.left, shape.top, shape.width, shape.height))
                         text_boxes.append((shape.left, shape.top, shape.width, shape.height, text))
@@ -554,6 +581,15 @@ class PresentationQAAgent:
                     if cls._overlap_ratio(a[:4], picture) > 0.12:
                         issues.append(cls._issue("text_image_overlap", ValidationSeverity.HIGH, ValidationCategory.GEOMETRY, idx, f"Text overlaps an image: '{a[4][:35]}'", spec.slide_id if spec else ""))
                         break
+
+            # Check for empty image frames / placeholders
+            for shape in slide.shapes:
+                s_name = (shape.name or "").lower()
+                if any(tag in s_name for tag in ("image-frame", "photo-mat", "photo-container", "artifact-frame", "map-frame")):
+                    frame_box = (shape.left, shape.top, shape.width, shape.height)
+                    has_matching_picture = any(cls._overlap_ratio(frame_box, pb) > 0.20 for pb in picture_boxes)
+                    if not has_matching_picture:
+                        issues.append(cls._issue("empty_image_placeholder", ValidationSeverity.HIGH, ValidationCategory.TECHNICAL, idx, f"Image container '{shape.name}' rendered without an image", spec.slide_id if spec else ""))
 
             if spec and spec.layout_family not in _INTENTIONAL_SPARSE and meaningful_boxes:
                 left = min(x for x, _y, _w, _h in meaningful_boxes)
