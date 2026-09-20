@@ -37,6 +37,10 @@ def _parse_llm_response(content: str, response_schema: Any | None) -> dict[str, 
         return {"text": content.strip()}
 
     cleaned = content.strip()
+    # Strip reasoning tags (e.g. <think>...</think>, <thought>...</thought>) from reasoning models
+    cleaned = re.sub(r"<think>[\s\S]*?</think>", "", cleaned).strip()
+    cleaned = re.sub(r"<thought>[\s\S]*?</thought>", "", cleaned).strip()
+
     # Try direct parse first
     try:
         return json.loads(cleaned)
@@ -44,7 +48,7 @@ def _parse_llm_response(content: str, response_schema: Any | None) -> dict[str, 
         pass
 
     # Extract JSON inside ```json ... ``` or ``` ... ```
-    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", content)
+    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
     if match:
         try:
             return json.loads(match.group(1).strip())
@@ -182,10 +186,37 @@ class ProviderRouter:
     @staticmethod
     def sync_environment_providers(db: Session) -> None:
         """Auto-synchronize system AI providers and API keys from settings / environment into database."""
+
+        def _sync_key(provider_id: str, provider_name: str, key_secret: str, label: str) -> None:
+            """Upsert a single API key for a provider, skipping duplicates."""
+            if not key_secret or not key_secret.strip():
+                return
+            secret = key_secret.strip()
+            existing_keys = db.scalars(select(AIKey).where(AIKey.provider_id == provider_id)).all()
+            for k in existing_keys:
+                try:
+                    if decrypt_secret(k.encrypted_secret) == secret:
+                        if is_legacy_encrypted_secret(k.encrypted_secret):
+                            k.encrypted_secret = encrypt_secret(secret)
+                            db.commit()
+                        return  # Already exists — done
+                except Exception:
+                    logger.warning("Unable to decrypt stored key %s for provider %s", k.id, provider_name, exc_info=True)
+            # New key — add it
+            db.add(AIKey(
+                provider_id=provider_id,
+                label=label,
+                encrypted_secret=encrypt_secret(secret),
+                enabled=1,
+            ))
+            db.commit()
+            logger.info("Synced new API key '%s' for provider %s", label, provider_name)
+
         provider_configs = [
             ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 35),
             ("groq", "https://api.groq.com/openai/v1", settings.groq_api_key, 32),
             ("inceptionlabs", settings.inceptionlabs_base_url or "https://api.inceptionlabs.ai/v1", settings.inceptionlabs_api_key, 30),
+            ("dahl", settings.dahl_base_url or "https://inference.dahl.global/v1", settings.dahl_api_key, 29),
             ("apmix", settings.apmix_base_url or "https://api.apmix.ai/v1", settings.apmix_api_key, 28),
             ("bynara", settings.bynara_base_url or "https://router.bynara.id/v1", settings.bynara_api_key, 27),
             ("nvidia", settings.nvidia_base_url or "https://integrate.api.nvidia.com/v1", settings.nvidia_api_key, 25),
@@ -222,13 +253,11 @@ class ProviderRouter:
                 default_models = []
                 if name == "gemini":
                     default_models = [
-                        {"model_id": "gemini-2.5-flash", "display_name": "Gemini 2.5 Flash", "priority": 100, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gemini-3.6-flash", "display_name": "Gemini 3.6 Flash", "priority": 100, "enabled": 1, "context_length": 1000000},
                         {"model_id": "gemini-flash-latest", "display_name": "Gemini Flash Latest", "priority": 98, "enabled": 1, "context_length": 1000000},
-                        {"model_id": "gemini-2.5-flash-lite", "display_name": "Gemini 2.5 Flash Lite", "priority": 95, "enabled": 1, "context_length": 1000000},
-                        {"model_id": "gemini-2.5-pro", "display_name": "Gemini 2.5 Pro", "priority": 90, "enabled": 1, "context_length": 1000000},
-                        {"model_id": "gemini-3.8-flash", "display_name": "Gemini 3.8 Flash (Deprecated)", "priority": 1, "enabled": 0, "context_length": 1000000},
-                        {"model_id": "gemini-3.7-flash", "display_name": "Gemini 3.7 Flash (Deprecated)", "priority": 1, "enabled": 0, "context_length": 1000000},
-                        {"model_id": "gemini-3.5-flash", "display_name": "Gemini 3.5 Flash (Deprecated)", "priority": 1, "enabled": 0, "context_length": 1000000},
+                        {"model_id": "gemini-2.5-flash", "display_name": "Gemini 2.5 Flash", "priority": 95, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gemini-2.5-flash-lite", "display_name": "Gemini 2.5 Flash Lite", "priority": 90, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gemini-2.5-pro", "display_name": "Gemini 2.5 Pro", "priority": 85, "enabled": 1, "context_length": 1000000},
                     ]
                 elif name == "groq":
                     default_models = [
@@ -243,6 +272,12 @@ class ProviderRouter:
                     default_models = [
                         {"model_id": "mercury-2.5", "display_name": "Mercury 2.5 (Diffusion LLM • 316 TPS)", "priority": 100, "enabled": 1, "context_length": 260000},
                         {"model_id": "mercury-2", "display_name": "Mercury 2 (Discrete Diffusion • 255 TPS)", "priority": 95, "enabled": 1, "context_length": 128000},
+                    ]
+                elif name == "dahl":
+                    default_models = [
+                        {"model_id": "deepseek-ai/DeepSeek-V4-Flash-0731", "display_name": "DeepSeek V4 Flash 0731", "priority": 100, "enabled": 1, "context_length": 128000},
+                        {"model_id": "zai-org/GLM-5.3-Flash", "display_name": "GLM 5.3 Flash", "priority": 95, "enabled": 1, "context_length": 128000},
+                        {"model_id": "MiniMaxAI/MiniMax-M2.7", "display_name": "MiniMax M2.7 (Reasoning)", "priority": 85, "enabled": 1, "context_length": 128000},
                     ]
                 elif name == "nvidia":
                     default_models = [
@@ -319,35 +354,38 @@ class ProviderRouter:
                 if default_models:
                     ProviderRouter.save_provider_models(db, provider.id, default_models)
 
-                # Sync environment key if configured
-                if key_secret and key_secret.strip():
-                    existing_keys = db.scalars(select(AIKey).where(AIKey.provider_id == provider.id)).all()
-                    has_matching_key = False
-                    for k in existing_keys:
-                        try:
-                            if decrypt_secret(k.encrypted_secret) == key_secret.strip():
-                                if is_legacy_encrypted_secret(k.encrypted_secret):
-                                    k.encrypted_secret = encrypt_secret(key_secret.strip())
-                                    db.commit()
-                                has_matching_key = True
-                                break
-                        except Exception:
-                            logger.warning("Unable to decrypt stored key %s for provider %s", k.id, name, exc_info=True)
-                            continue
+                # Sync primary environment key for this provider
+                _sync_key(provider.id, name, key_secret, f"{name}-env-key")
 
-                    if not has_matching_key:
-                        encrypted = encrypt_secret(key_secret.strip())
-                        new_key = AIKey(
-                            provider_id=provider.id,
-                            label=f"{name}-env-key",
-                            encrypted_secret=encrypted,
-                            enabled=1,
-                        )
-                        db.add(new_key)
-                        db.commit()
             except Exception:
                 db.rollback()
                 logger.warning("Error synchronizing provider %s", name, exc_info=True)
+
+        # ── Sync additional API keys for providers that support multiple keys ──────
+        # These are added as secondary rotation keys; they share the same provider
+        # record but get individual AIKey rows so the router can failover between them.
+        extra_keys: list[tuple[str, str, str]] = []
+        for idx, extra_key in enumerate(settings.gemini_all_api_keys[1:], start=2):
+            extra_keys.append(("gemini", extra_key, f"gemini-env-key-{idx}"))
+        for idx, extra_key in enumerate(settings.dahl_all_api_keys[1:], start=2):
+            extra_keys.append(("dahl", extra_key, f"dahl-env-key-{idx}"))
+        for idx, extra_key in enumerate(settings.bynara_all_api_keys[1:], start=2):
+            extra_keys.append(("bynara", extra_key, f"bynara-env-key-{idx}"))
+        for idx, extra_key in enumerate(settings.inceptionlabs_all_api_keys[1:], start=2):
+            extra_keys.append(("inceptionlabs", extra_key, f"inceptionlabs-env-key-{idx}"))
+        for idx, extra_key in enumerate(settings.apmix_all_api_keys[1:], start=2):
+            extra_keys.append(("apmix", extra_key, f"apmix-env-key-{idx}"))
+        for idx, extra_key in enumerate(settings.openrouter_all_api_keys[1:], start=2):
+            extra_keys.append(("openrouter", extra_key, f"openrouter-env-key-{idx}"))
+
+        for provider_name, key_secret, label in extra_keys:
+            try:
+                provider = db.scalar(select(AIProvider).where(AIProvider.name == provider_name))
+                if provider:
+                    _sync_key(provider.id, provider_name, key_secret, label)
+            except Exception:
+                db.rollback()
+                logger.warning("Error syncing extra key for provider %s", provider_name, exc_info=True)
 
     @staticmethod
     def register_provider(
@@ -498,6 +536,38 @@ class ProviderRouter:
             key.encrypted_secret = encrypt_secret(decrypted)
             db.commit()
         return key, decrypted
+
+    @staticmethod
+    def select_next_key(
+        db: Session,
+        provider_id: str,
+        exclude_key_ids: set[str],
+    ) -> tuple[AIKey, str] | None:
+        """Return the next best active key for a provider, excluding already-tried key IDs.
+
+        Used by call_llm to rotate to a fresh API key when the current one is rate-limited
+        without abandoning the provider entirely.
+        """
+        now = int(time.time())
+        stmt = (
+            select(AIKey)
+            .where(
+                AIKey.provider_id == provider_id,
+                AIKey.enabled == 1,
+                AIKey.id.not_in(exclude_key_ids) if exclude_key_ids else True,
+                (AIKey.cooldown_until == None) | (AIKey.cooldown_until <= now),
+            )
+            .order_by(AIKey.failure_count.asc(), AIKey.last_used_at.asc())
+        )
+        key = db.scalar(stmt)
+        if not key:
+            return None
+        decrypted = decrypt_secret(key.encrypted_secret)
+        if is_legacy_encrypted_secret(key.encrypted_secret):
+            key.encrypted_secret = encrypt_secret(decrypted)
+            db.commit()
+        return key, decrypted
+
 
     @staticmethod
     async def fetch_provider_models(
@@ -1097,6 +1167,12 @@ class ProviderRouter:
                         ("mercury-2.5", 100),
                         ("mercury-2", 95),
                     ]
+                elif "dahl" in p_name:
+                    model_candidates = [
+                        ("deepseek-ai/DeepSeek-V4-Flash-0731", 100),
+                        ("zai-org/GLM-5.3-Flash", 95),
+                        ("MiniMaxAI/MiniMax-M2.7", 85),
+                    ]
                 elif "apmix" in p_name:
                     model_candidates = [
                         ("gemini-2.5-flash-free", 100),
@@ -1183,8 +1259,6 @@ class ProviderRouter:
                 continue
 
             provider_base_url = candidate["provider_base_url"]
-            key_record = candidate["key_record"]
-            secret_key = candidate["secret_key"]
             model_id = candidate["model_id"]
 
             # Skip if circuit breaker is open
@@ -1196,291 +1270,331 @@ class ProviderRouter:
                 )
                 continue
 
-            start_time = time.time()
-            logger.info(
-                "Trying Provider %s model %s for agent %s (score=%.1f)",
-                provider.name,
-                model_id,
-                agent_type,
-                candidate.get("composite_score", 0),
-            )
+            # ── Per-key retry loop ────────────────────────────────────────────
+            # When a key hits a rate limit (429 TPM/RPM), put it on cooldown and
+            # immediately try the next available key for the same provider+model
+            # before falling through to the next candidate.
+            tried_key_ids: set[str] = set()
+            key_record = candidate["key_record"]
+            secret_key = candidate["secret_key"]
 
-            try:
-                url = f"{provider_base_url}/chat/completions"
-                headers = {
-                    "Authorization": f"Bearer {secret_key}",
-                    "Content-Type": "application/json",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "HTTP-Referer": "https://deckpilot.ai",
-                    "X-Title": "deckpilotAI",
-                }
-                sys_prompt_final = system_prompt
-                if response_schema and "json" not in sys_prompt_final.lower():
-                    sys_prompt_final += "\n\nRespond with valid JSON matching the requested structure."
+            while True:
+                if key_record.id in tried_key_ids:
+                    # All keys exhausted for this provider+model — fall to next candidate
+                    break
+                tried_key_ids.add(key_record.id)
 
-                is_reasoning_model = any(m in model_id.lower() for m in ("o1", "o3", "reasoner", "r1"))
-                effective_model_id = (
-                    model_id.replace("models/", "")
-                    if provider.name == "gemini"
-                    else model_id
+                start_time = time.time()
+                logger.info(
+                    "Trying Provider %s model %s key=%s for agent %s (score=%.1f)",
+                    provider.name, model_id, key_record.label,
+                    agent_type, candidate.get("composite_score", 0),
                 )
-                payload: dict[str, Any] = {
-                    "model": effective_model_id,
-                    "messages": [
-                        {"role": "system", "content": sys_prompt_final},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    "stream": False,  # Explicitly disable streaming to prevent empty-choices responses
-                }
-                if not is_reasoning_model:
-                    payload["temperature"] = 0.2
 
-                if agent_type == "copilot_chat":
-                    timeout_val = 10.0
-                    conn_timeout = 3.5
-                elif agent_type in ("font_brand_detection", "title_intelligence"):
-                    timeout_val = 15.0
-                    conn_timeout = 4.0
-                elif agent_type == "slide_writer":
-                    # Slide writer handles batches of 5 slides with grounding context;
-                    # needs enough time for large reference document decks (25 slides).
-                    timeout_val = 50.0
-                    conn_timeout = 5.0
-                elif agent_type == "deck_planner":
-                    # Deck planner must generate 20-25 slide outlines from reference docs;
-                    # orchestrator outer timeout is 90s so we give 65s per provider attempt.
-                    timeout_val = 65.0
-                    conn_timeout = 5.0
-                else:
-                    timeout_val = float(min(settings.llm_read_timeout_seconds or 35.0, 35.0))
-                    conn_timeout = 4.0
-                req_timeout = httpx.Timeout(timeout_val, connect=conn_timeout)
-                async with httpx.AsyncClient(timeout=req_timeout) as client:
-                    resp = await client.post(url, headers=headers, json=payload)
-                    if resp.status_code == 400 and "temperature" in resp.text:
-                        payload.pop("temperature", None)
+                try:
+                    url = f"{provider_base_url}/chat/completions"
+                    headers = {
+                        "Authorization": f"Bearer {secret_key}",
+                        "Content-Type": "application/json",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        "HTTP-Referer": "https://deckpilot.ai",
+                        "X-Title": "deckpilotAI",
+                    }
+                    sys_prompt_final = system_prompt
+                    if response_schema and "json" not in sys_prompt_final.lower():
+                        sys_prompt_final += "\n\nRespond with valid JSON matching the requested structure."
+
+                    is_reasoning_model = any(m in model_id.lower() for m in ("o1", "o3", "reasoner", "r1", "minimax"))
+                    effective_model_id = (
+                        model_id.replace("models/", "")
+                        if provider.name == "gemini"
+                        else model_id
+                    )
+                    payload: dict[str, Any] = {
+                        "model": effective_model_id,
+                        "messages": [
+                            {"role": "system", "content": sys_prompt_final},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        "stream": False,  # Explicitly disable streaming to prevent empty-choices responses
+                    }
+                    if not is_reasoning_model:
+                        payload["temperature"] = 0.2
+
+                    if agent_type == "copilot_chat":
+                        timeout_val = 10.0
+                        conn_timeout = 3.5
+                    elif agent_type in ("font_brand_detection", "title_intelligence"):
+                        timeout_val = 15.0
+                        conn_timeout = 4.0
+                    elif agent_type == "slide_writer":
+                        # Slide writer handles batches of 3 slides with grounding context;
+                        # needs enough time for large reference document decks (25 slides).
+                        timeout_val = 50.0
+                        conn_timeout = 5.0
+                    elif agent_type == "deck_planner":
+                        # Deck planner must generate 20-25 slide outlines from reference docs;
+                        # orchestrator outer timeout is 90s so we give 65s per provider attempt.
+                        timeout_val = 65.0
+                        conn_timeout = 5.0
+                    else:
+                        timeout_val = float(min(settings.llm_read_timeout_seconds or 35.0, 35.0))
+                        conn_timeout = 4.0
+                    req_timeout = httpx.Timeout(timeout_val, connect=conn_timeout)
+                    async with httpx.AsyncClient(timeout=req_timeout) as client:
                         resp = await client.post(url, headers=headers, json=payload)
+                        if resp.status_code == 400 and "temperature" in resp.text:
+                            payload.pop("temperature", None)
+                            resp = await client.post(url, headers=headers, json=payload)
 
-                latency = int((time.time() - start_time) * 1000)
+                    latency = int((time.time() - start_time) * 1000)
 
-                if resp.status_code == 200:
-                    try:
-                        resp_data = resp.json()
-                    except Exception as json_err:
-                        logger.warning(
-                            "Provider %s model %s returned 200 OK but invalid JSON payload: %s",
-                            provider.name, model_id, json_err,
-                        )
-                        health_tracker.record_failure(provider.name, model_id)
-                        continue
-                    # Robust content extraction — handle missing/null content from providers
-                    choices = resp_data.get("choices") or []
-                    if not choices:
-                        logger.warning(
-                            "Provider %s model %s returned 200 but no choices — treating as failure",
-                            provider.name, model_id,
-                        )
-                        health_tracker.record_failure(provider.name, model_id)
-                        continue
-                    message = choices[0].get("message") or {}
-                    content = message.get("content")
-                    if content is None:
-                        # Some providers put content in delta or text fields
-                        content = (
-                            choices[0].get("text")
-                            or (choices[0].get("delta") or {}).get("content")
-                            or ""
-                        )
-                    if not content or not content.strip():
-                        logger.warning(
-                            "Provider %s model %s returned 200 but empty/null content — treating as failure",
-                            provider.name, model_id,
-                        )
-                        health_tracker.record_failure(provider.name, model_id)
-                        continue
-                    parsed = _parse_llm_response(content, response_schema)
-                    is_valid, fail_reason, normalized = _validate_agent_output(agent_type, parsed, response_schema)
-                    if not is_valid:
-                        logger.warning(
-                            "Provider %s model %s output failed contract validation for %s: %s — failing over to next model/provider",
-                            provider.name, model_id, agent_type, fail_reason,
-                        )
-                        health_tracker.record_schema_validation_failure(provider.name, model_id, agent_type, fail_reason)
-                        continue
-                    parsed = normalized
-
-                    # Record success in health tracker
-                    health_tracker.record_success(provider.name, model_id, float(latency))
-
-                    if provider.name == "openrouter":
-                        OpenRouterModelManager.mark_model_success(model_id)
-                    elif provider.name == "experientiallabs":
-                        ExperientialLabsModelManager.mark_model_success(model_id)
-
-                    key_record.last_used_at = now
-                    key_record.failure_count = 0
-                    db.commit()
-
-                    if user_id:
+                    if resp.status_code == 200:
                         try:
-                            usage = UsageEvent(
-                                user_id=user_id,
-                                job_id=job_id,
-                                provider_id=provider.id,
-                                key_id=key_record.id,
-                                model=model_id,
-                                event_type="generation",
-                                latency_ms=latency,
-                                success=1,
-                                created_at=now,
-                                input_units=resp_data.get("usage", {}).get("prompt_tokens", 0),
-                                output_units=resp_data.get("usage", {}).get("completion_tokens", 0),
-                            )
-                            db.add(usage)
-                            db.commit()
-                        except Exception:
-                            db.rollback()
-                            logger.warning("Failed to persist UsageEvent for %s", provider.name, exc_info=True)
-
-                    logger.info("Provider %s model %s completed in %sms", provider.name, model_id, latency)
-                    if latency > settings.slow_llm_threshold_ms:
-                        DiagnosticsService.log_slow_operation(
-                            component="llm",
-                            operation=f"chat_completions ({agent_type})",
-                            duration_ms=latency,
-                            threshold_ms=settings.slow_llm_threshold_ms,
-                            provider=provider.name,
-                            additional_context={"model": model_id, "user_id": user_id, "job_id": job_id},
-                        )
-                    return parsed
-
-                else:
-                    raw_text = resp.text if isinstance(getattr(resp, "text", None), str) else ""
-
-                    # ── Context-length retry strategy ─────────────────────────────────
-                    # When the input is too large, retry the SAME provider up to 3 times
-                    # with progressively compressed prompts before failing over.
-                    if _is_context_length_error(resp.status_code, raw_text) and agent_type not in ("copilot_chat",):
-                        from app.services.grounding_chunker import GroundingChunker
-                        compressed_prompt = user_prompt
-                        ctx_succeeded = False
-                        for compression_level in (1, 2, 3):
-                            compressed_prompt = GroundingChunker.compress_prompt_for_retry(
-                                compressed_prompt, compression_level
-                            )
+                            resp_data = resp.json()
+                        except Exception as json_err:
                             logger.warning(
-                                "Context-length error on %s/%s (HTTP %s) — retrying with compression level %d "
-                                "(prompt %d -> %d chars)",
-                                provider.name, model_id, resp.status_code,
-                                compression_level, len(user_prompt), len(compressed_prompt),
+                                "Provider %s model %s returned 200 OK but invalid JSON payload: %s",
+                                provider.name, model_id, json_err,
                             )
+                            health_tracker.record_failure(provider.name, model_id)
+                            break  # Try next candidate
+                        # Robust content extraction — handle missing/null content from providers
+                        choices = resp_data.get("choices") or []
+                        if not choices:
+                            logger.warning(
+                                "Provider %s model %s returned 200 but no choices — treating as failure",
+                                provider.name, model_id,
+                            )
+                            health_tracker.record_failure(provider.name, model_id)
+                            break  # Try next candidate
+                        message = choices[0].get("message") or {}
+                        content = message.get("content")
+                        if content is None:
+                            # Some providers put content in delta or text fields
+                            content = (
+                                choices[0].get("text")
+                                or (choices[0].get("delta") or {}).get("content")
+                                or ""
+                            )
+                        if not content or not content.strip():
+                            logger.warning(
+                                "Provider %s model %s returned 200 but empty/null content — treating as failure",
+                                provider.name, model_id,
+                            )
+                            health_tracker.record_failure(provider.name, model_id)
+                            break  # Try next candidate
+                        parsed = _parse_llm_response(content, response_schema)
+                        is_valid, fail_reason, normalized = _validate_agent_output(agent_type, parsed, response_schema)
+                        if not is_valid:
+                            logger.warning(
+                                "Provider %s model %s output failed contract validation for %s: %s — failing over to next model/provider",
+                                provider.name, model_id, agent_type, fail_reason,
+                            )
+                            health_tracker.record_schema_validation_failure(provider.name, model_id, agent_type, fail_reason)
+                            break  # Try next candidate
+                        parsed = normalized
+
+                        # Record success in health tracker
+                        health_tracker.record_success(provider.name, model_id, float(latency))
+
+                        if provider.name == "openrouter":
+                            OpenRouterModelManager.mark_model_success(model_id)
+                        elif provider.name == "experientiallabs":
+                            ExperientialLabsModelManager.mark_model_success(model_id)
+
+                        key_record.last_used_at = now
+                        key_record.failure_count = 0
+                        db.commit()
+
+                        if user_id:
                             try:
-                                compressed_payload = dict(payload)
-                                compressed_payload["messages"] = [
-                                    {"role": "system", "content": sys_prompt_final},
-                                    {"role": "user", "content": compressed_prompt},
-                                ]
-                                async with httpx.AsyncClient(timeout=req_timeout) as _ctx_client:
-                                    ctx_resp = await _ctx_client.post(url, headers=headers, json=compressed_payload)
-                                if ctx_resp.status_code == 200:
-                                    ctx_data = ctx_resp.json()
-                                    ctx_content = ctx_data["choices"][0]["message"]["content"]
-                                    ctx_parsed = _parse_llm_response(ctx_content, response_schema)
-                                    ctx_latency = int((time.time() - start_time) * 1000)
-                                    health_tracker.record_success(provider.name, model_id, float(ctx_latency))
-                                    logger.info(
-                                        "Context-compression retry succeeded at level %d for %s/%s",
-                                        compression_level, provider.name, model_id,
-                                    )
-                                    ctx_succeeded = True
-                                    return ctx_parsed
-                                elif not _is_context_length_error(ctx_resp.status_code, ctx_resp.text):
-                                    # Different error — stop compressing, fall through to normal failure
-                                    break
-                                # Still a context error — try next compression level
-                            except Exception as _ctx_err:
+                                usage = UsageEvent(
+                                    user_id=user_id,
+                                    job_id=job_id,
+                                    provider_id=provider.id,
+                                    key_id=key_record.id,
+                                    model=model_id,
+                                    event_type="generation",
+                                    latency_ms=latency,
+                                    success=1,
+                                    created_at=now,
+                                    input_units=resp_data.get("usage", {}).get("prompt_tokens", 0),
+                                    output_units=resp_data.get("usage", {}).get("completion_tokens", 0),
+                                )
+                                db.add(usage)
+                                db.commit()
+                            except Exception:
+                                db.rollback()
+                                logger.warning("Failed to persist UsageEvent for %s", provider.name, exc_info=True)
+
+                        logger.info("Provider %s model %s completed in %sms", provider.name, model_id, latency)
+                        if latency > settings.slow_llm_threshold_ms:
+                            DiagnosticsService.log_slow_operation(
+                                component="llm",
+                                operation=f"chat_completions ({agent_type})",
+                                duration_ms=latency,
+                                threshold_ms=settings.slow_llm_threshold_ms,
+                                provider=provider.name,
+                                additional_context={"model": model_id, "user_id": user_id, "job_id": job_id},
+                            )
+                        return parsed
+
+                    else:
+                        raw_text = resp.text if isinstance(getattr(resp, "text", None), str) else ""
+
+                        # ── Context-length retry strategy ─────────────────────────────────
+                        # When the input is too large, retry the SAME provider up to 3 times
+                        # with progressively compressed prompts before failing over.
+                        if _is_context_length_error(resp.status_code, raw_text) and agent_type not in ("copilot_chat",):
+                            from app.services.grounding_chunker import GroundingChunker
+                            compressed_prompt = user_prompt
+                            ctx_succeeded = False
+                            for compression_level in (1, 2, 3):
+                                compressed_prompt = GroundingChunker.compress_prompt_for_retry(
+                                    compressed_prompt, compression_level
+                                )
                                 logger.warning(
-                                    "Context-compression retry level %d failed for %s/%s: %s",
-                                    compression_level, provider.name, model_id, _ctx_err,
+                                    "Context-length error on %s/%s (HTTP %s) — retrying with compression level %d "
+                                    "(prompt %d -> %d chars)",
+                                    provider.name, model_id, resp.status_code,
+                                    compression_level, len(user_prompt), len(compressed_prompt),
+                                )
+                                try:
+                                    compressed_payload = dict(payload)
+                                    compressed_payload["messages"] = [
+                                        {"role": "system", "content": sys_prompt_final},
+                                        {"role": "user", "content": compressed_prompt},
+                                    ]
+                                    async with httpx.AsyncClient(timeout=req_timeout) as _ctx_client:
+                                        ctx_resp = await _ctx_client.post(url, headers=headers, json=compressed_payload)
+                                    if ctx_resp.status_code == 200:
+                                        ctx_data = ctx_resp.json()
+                                        ctx_content = ctx_data["choices"][0]["message"]["content"]
+                                        ctx_parsed = _parse_llm_response(ctx_content, response_schema)
+                                        ctx_latency = int((time.time() - start_time) * 1000)
+                                        health_tracker.record_success(provider.name, model_id, float(ctx_latency))
+                                        logger.info(
+                                            "Context-compression retry succeeded at level %d for %s/%s",
+                                            compression_level, provider.name, model_id,
+                                        )
+                                        ctx_succeeded = True
+                                        return ctx_parsed
+                                    elif not _is_context_length_error(ctx_resp.status_code, ctx_resp.text):
+                                        # Different error — stop compressing, fall through to normal failure
+                                        break
+                                    # Still a context error — try next compression level
+                                except Exception as _ctx_err:
+                                    logger.warning(
+                                        "Context-compression retry level %d failed for %s/%s: %s",
+                                        compression_level, provider.name, model_id, _ctx_err,
+                                    )
+                                    break
+
+                            if ctx_succeeded:
+                                break  # shouldn't reach here but guard anyway
+                            # All 3 compression levels failed — fall through to normal failure handling
+                        # ── End context-length retry ──────────────────────────────────────
+
+                        # Record failure in health tracker
+                        health_tracker.record_production_error(provider.name, model_id, resp.status_code, raw_text[:200])
+
+                        if provider.name == "codecraft":
+                            CodeCraftModelManager.mark_rate_limited(model_id, cooldown_seconds=60)
+                        elif provider.name == "openrouter":
+                            OpenRouterModelManager.mark_model_failure(model_id, status_code=resp.status_code)
+                        elif provider.name == "experientiallabs":
+                            is_unpayable = resp.status_code == 429 and ("model_requires_payment" in raw_text or "free credits" in raw_text)
+                            cooldown = 3600 if is_unpayable else 60
+                            ExperientialLabsModelManager.mark_model_failure(model_id, status_code=resp.status_code, cooldown_seconds=cooldown)
+
+                        DiagnosticsService.log_external_api_failure(
+                            provider=provider.name,
+                            operation=f"chat_completions ({agent_type})",
+                            error=f"HTTP {resp.status_code}: {raw_text[:300]}",
+                            model_name=model_id,
+                            provider_status_code=resp.status_code,
+                            duration_ms=latency,
+                            additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
+                        )
+                        raw_lower = raw_text.lower()
+                        # Only skip the entire provider account if it is truly unauthenticated or out of credits.
+                        is_account_outage = (
+                            resp.status_code in (401, 402)
+                            or any(phrase in raw_lower for phrase in (
+                                "insufficient funds", "insufficient credits", "out of credits", "no credits remaining",
+                                "requires_purchase", "card on file", "account suspended", "invalid_api_key",
+                            ))
+                        )
+                        if is_account_outage:
+                            logger.warning(
+                                "Provider %s experienced account-level failure (HTTP %s: %s). Skipping remaining models for this provider.",
+                                provider.name, resp.status_code, raw_text[:120],
+                            )
+                            skipped_providers.add(provider.name)
+                            break  # No point trying other keys — account is dead
+
+                        # ── Per-key rate-limit rotation ───────────────────────────────────
+                        # True 429 (TPM/RPM) or temporary 429 — put this key on cooldown
+                        # and immediately retry the same model with the next available key.
+                        is_key_rate_limited = (
+                            resp.status_code == 429
+                            and not is_account_outage
+                        )
+                        if is_key_rate_limited:
+                            cooldown_secs = 60
+                            key_record.cooldown_until = int(time.time()) + cooldown_secs
+                            key_record.failure_count = (key_record.failure_count or 0) + 1
+                            db.commit()
+                            logger.warning(
+                                "Key %s for %s/%s rate-limited (429) — cooling down %ds, rotating to next key",
+                                key_record.label, provider.name, model_id, cooldown_secs,
+                            )
+                            # Rotate to next available key for this provider
+                            next_key = ProviderRouter.select_next_key(db, provider.id, tried_key_ids)
+                            if next_key:
+                                key_record, secret_key = next_key
+                                continue  # Retry same model with new key
+                            else:
+                                logger.warning(
+                                    "No more keys available for %s after rate-limit — falling to next candidate",
+                                    provider.name,
                                 )
                                 break
+                        # ── End per-key rate-limit rotation ──────────────────────────────
 
-                        if ctx_succeeded:
-                            continue  # shouldn't reach here but guard anyway
-                        # All 3 compression levels failed — fall through to normal failure handling
-                    # ── End context-length retry ──────────────────────────────────────
+                        logger.warning("Provider %s model %s returned HTTP %s (failing over to next candidate)", provider.name, model_id, resp.status_code)
+                        break  # Non-rate-limit error — try next candidate
 
+                except Exception as model_err:
                     # Record failure in health tracker
-                    health_tracker.record_production_error(provider.name, model_id, resp.status_code, raw_text[:200])
+                    health_tracker.record_production_error(provider.name, model_id, None, str(model_err))
+
+                    # Only skip the entire provider if the network host cannot be reached at all
+                    if isinstance(model_err, httpx.ConnectError):
+                        logger.warning(
+                            "Provider %s host connection error (%s). Skipping provider.",
+                            provider.name, model_err,
+                        )
+                        skipped_providers.add(provider.name)
 
                     if provider.name == "codecraft":
-                        CodeCraftModelManager.mark_rate_limited(model_id, cooldown_seconds=60)
+                        CodeCraftModelManager.mark_rate_limited(model_id, cooldown_seconds=120)
                     elif provider.name == "openrouter":
-                        OpenRouterModelManager.mark_model_failure(model_id, status_code=resp.status_code)
+                        OpenRouterModelManager.mark_model_failure(model_id, status_code=500)
                     elif provider.name == "experientiallabs":
-                        is_unpayable = resp.status_code == 429 and ("model_requires_payment" in raw_text or "free credits" in raw_text)
-                        cooldown = 3600 if is_unpayable else 60
-                        ExperientialLabsModelManager.mark_model_failure(model_id, status_code=resp.status_code, cooldown_seconds=cooldown)
+                        ExperientialLabsModelManager.mark_model_failure(model_id, status_code=500, cooldown_seconds=300)
 
                     DiagnosticsService.log_external_api_failure(
                         provider=provider.name,
                         operation=f"chat_completions ({agent_type})",
-                        error=f"HTTP {resp.status_code}: {raw_text[:300]}",
+                        error=model_err,
                         model_name=model_id,
-                        provider_status_code=resp.status_code,
-                        duration_ms=latency,
+                        duration_ms=int((time.time() - start_time) * 1000),
                         additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
                     )
-                    raw_lower = raw_text.lower()
-                    # Only skip the entire provider account if it is truly unauthenticated or out of credits.
-                    # Individual model rate limits (429 TPM/RPM) or temporary 502/503/504 overloads should
-                    # failover to other configured models under the same provider before moving to the next provider.
-                    is_account_outage = (
-                        resp.status_code in (401, 402)
-                        or any(phrase in raw_lower for phrase in (
-                            "insufficient funds", "insufficient credits", "out of credits", "no credits remaining",
-                            "requires_purchase", "card on file", "account suspended", "invalid_api_key",
-                        ))
-                    )
-                    if is_account_outage:
-                        logger.warning(
-                            "Provider %s experienced account-level failure (HTTP %s: %s). Skipping remaining models for this provider.",
-                            provider.name, resp.status_code, raw_text[:120],
-                        )
-                        skipped_providers.add(provider.name)
-
-                    logger.warning("Provider %s model %s returned HTTP %s (failing over to next candidate)", provider.name, model_id, resp.status_code)
-                    continue
-
-            except Exception as model_err:
-                # Record failure in health tracker
-                health_tracker.record_production_error(provider.name, model_id, None, str(model_err))
-
-                # Only skip the entire provider if the network host cannot be reached at all (ConnectError / DNS failure)
-                if isinstance(model_err, httpx.ConnectError):
-                    logger.warning(
-                        "Provider %s host connection error (%s). Skipping provider.",
-                        provider.name, model_err,
-                    )
-                    skipped_providers.add(provider.name)
-
-                if provider.name == "codecraft":
-                    CodeCraftModelManager.mark_rate_limited(model_id, cooldown_seconds=120)
-                elif provider.name == "openrouter":
-                    OpenRouterModelManager.mark_model_failure(model_id, status_code=500)
-                elif provider.name == "experientiallabs":
-                    ExperientialLabsModelManager.mark_model_failure(model_id, status_code=500, cooldown_seconds=300)
-
-                DiagnosticsService.log_external_api_failure(
-                    provider=provider.name,
-                    operation=f"chat_completions ({agent_type})",
-                    error=model_err,
-                    model_name=model_id,
-                    duration_ms=int((time.time() - start_time) * 1000),
-                    additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
-                )
-                logger.warning("Provider %s model %s failed", provider.name, model_id, exc_info=True)
-                continue
+                    logger.warning("Provider %s model %s failed", provider.name, model_id, exc_info=True)
+                    break  # Exception — try next candidate
 
         # All providers and models exhausted — do NOT silently return hardcoded content.
         # Raise so the orchestrator can decide: retry with a simpler prompt, degrade gracefully,
@@ -1544,6 +1658,8 @@ class ProviderRouter:
                     model_candidates = [("openai/gpt-oss-120b", 100), ("qwen/qwen3.8-27b", 95)]
                 elif "inceptionlabs" in p_name:
                     model_candidates = [("mercury-2.5", 100), ("mercury-2", 95)]
+                elif "dahl" in p_name:
+                    model_candidates = [("deepseek-ai/DeepSeek-V4-Flash-0731", 100), ("zai-org/GLM-5.3-Flash", 95), ("MiniMaxAI/MiniMax-M2.7", 85)]
                 elif "apmix" in p_name:
                     model_candidates = [("gemini-2.5-flash-free", 100), ("gpt-5.6-luna-free", 95)]
                 elif "bynara" in p_name:

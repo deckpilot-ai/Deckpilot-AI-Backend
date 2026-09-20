@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     ai_provider_allowed_hosts: str = (
         "openrouter.ai,api.openai.com,generativelanguage.googleapis.com,"
         "api.groq.com,api.mistral.ai,api.anthropic.com,api.experientiallabs.ai,"
-        "codecraftapi.com,api.codecraftapi.com,integrate.api.nvidia.com,api.bazaarlink.ai,api.routeway.ai,api.apmix.ai,api.inceptionlabs.ai,router.bynara.id,"
+        "codecraftapi.com,api.codecraftapi.com,integrate.api.nvidia.com,api.bazaarlink.ai,api.routeway.ai,api.apmix.ai,api.inceptionlabs.ai,router.bynara.id,inference.dahl.global,"
         "api.unsplash.com,images.unsplash.com,api.pexels.com,images.pexels.com,pixabay.com,cdn.pixabay.com"
     )
 
@@ -62,10 +62,12 @@ class Settings(BaseSettings):
 
     # AI Providers & API Keys
     openrouter_api_key: str = ""
+    openrouter_api_key_2: str = ""
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3.8-flash"
+    gemini_api_key_2: str = ""  # Optional second Gemini API key for key-rotation failover
+    gemini_model: str = "gemini-3.6-flash"
     llm_read_timeout_seconds: int = Field(default=120, ge=10, le=300)
     groq_api_key: str = ""
     mistral_api_key: str = ""
@@ -81,10 +83,16 @@ class Settings(BaseSettings):
     routeway_api_key: str = "sk-pQ9EXqxpBIyYbrJZer7ez_2GYG_DY06GzAQdWwIIlGdL3oALdWF1RMav6sR9uiSmSSgkxw"
     routeway_base_url: str = "https://api.routeway.ai/v1"
     apmix_api_key: str = "apx_live_UXYEOHORQCieF7rAQPvDds9OgQOJ2LpmS0hiQfIw"
+    apmix_api_key_2: str = ""
     apmix_base_url: str = "https://api.apmix.ai/v1"
     bynara_api_key: str = "sk-nry-tUedwzBrphpauAQtbNkTfzT9Vz1NJc1yAlnaBjsE77U"
+    bynara_api_key_2: str = ""
     bynara_base_url: str = "https://router.bynara.id/v1"
+    dahl_api_key: str = "dahl_3Jj687BUWByhYF4Sb5qt3XVGAZnLQyE3V"
+    dahl_api_key_2: str = ""
+    dahl_base_url: str = "https://inference.dahl.global/v1"
     inceptionlabs_api_key: str = "sk_24a0ac3e50e8c1944d612f2f235a1f08"
+    inceptionlabs_api_key_2: str = ""
     inceptionlabs_base_url: str = "https://api.inceptionlabs.ai/v1"
     unsplash_access_key: str = "aA081iOoBrg6tzC5mLvsOH6Zpr8KyP9Rxcl0gUAuRQM"
     unsplash_secret_key: str = "Sre8TS9N9s6xfZahgQfjOiVV5BKqYfUf5l1HKIj8SiQ"
@@ -95,6 +103,36 @@ class Settings(BaseSettings):
     @property
     def effective_experientiallabs_api_key(self) -> str:
         return (self.experientiallabs_api_key or self.explabs_api_key or "").strip()
+
+    @property
+    def gemini_all_api_keys(self) -> list[str]:
+        """Return all configured non-empty Gemini API keys (primary + any extras)."""
+        return [k.strip() for k in (self.gemini_api_key, self.gemini_api_key_2) if k and k.strip()]
+
+    @property
+    def dahl_all_api_keys(self) -> list[str]:
+        """Return all configured non-empty Dahl API keys (primary + any extras)."""
+        return [k.strip() for k in (self.dahl_api_key, self.dahl_api_key_2) if k and k.strip()]
+
+    @property
+    def bynara_all_api_keys(self) -> list[str]:
+        """Return all configured non-empty Bynara API keys (primary + any extras)."""
+        return [k.strip() for k in (self.bynara_api_key, self.bynara_api_key_2) if k and k.strip()]
+
+    @property
+    def inceptionlabs_all_api_keys(self) -> list[str]:
+        """Return all configured non-empty InceptionLabs API keys (primary + any extras)."""
+        return [k.strip() for k in (self.inceptionlabs_api_key, self.inceptionlabs_api_key_2) if k and k.strip()]
+
+    @property
+    def apmix_all_api_keys(self) -> list[str]:
+        """Return all configured non-empty APMix API keys (primary + any extras)."""
+        return [k.strip() for k in (self.apmix_api_key, self.apmix_api_key_2) if k and k.strip()]
+
+    @property
+    def openrouter_all_api_keys(self) -> list[str]:
+        """Return all configured non-empty OpenRouter API keys (primary + any extras)."""
+        return [k.strip() for k in (self.openrouter_api_key, self.openrouter_api_key_2) if k and k.strip()]
 
     @property
     def database_url(self) -> str:

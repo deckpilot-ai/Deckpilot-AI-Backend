@@ -1,8 +1,8 @@
-"""Common Pydantic models for API responses and errors."""
-
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
+
+T = TypeVar("T")
 
 
 class APIErrorDetail(BaseModel):
@@ -16,6 +16,6 @@ class ErrorResponse(BaseModel):
     error: APIErrorDetail
 
 
-class SuccessResponse[T](BaseModel):
+class SuccessResponse(BaseModel, Generic[T]):
     data: T
     meta: dict[str, Any] = Field(default_factory=dict)

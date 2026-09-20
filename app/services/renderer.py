@@ -19,6 +19,7 @@ from app.schemas.generation_state import (
     LayoutFamily,
     SlideSpec,
 )
+from app.services.archetype_renderer import ArchetypeRenderer, _split_title_body
 from app.services.design_system import clean_text, default_brand, normalize_brand
 from app.tools.chart_engine import ChartEngine
 from app.tools.diagram_engine import DiagramEngine
