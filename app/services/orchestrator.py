@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import time
+import uuid
 from typing import Any
 
 from sqlalchemy import select
@@ -1035,10 +1036,16 @@ class JobOrchestrator:
                             slide_queries=slide_queries,
                             max_images=min(4, max(1, len(raw_slides) // 2)),
                         )
-                        for asset_id, img_bytes, meta in stock_assets:
-                            source_images[asset_id] = img_bytes
+                        seen_batch_hashes: set[str] = set()
+                        for _raw_id, img_bytes, meta in stock_assets:
+                            if meta.sha256 in seen_batch_hashes:
+                                continue
+                            seen_batch_hashes.add(meta.sha256)
+                            unique_art_id = f"stock_{uuid.uuid4().hex[:12]}"
+                            source_images[unique_art_id] = img_bytes
+                            meta.asset_id = unique_art_id
                             new_art = Artifact(
-                                id=asset_id,
+                                id=unique_art_id,
                                 project_id=project_id,
                                 job_id=job_id,
                                 type="image",
@@ -1056,7 +1063,8 @@ class JobOrchestrator:
                             existing_artifacts.append(new_art)
                         db.commit()
                     except Exception as stock_err:
-                        logger.warning("Stock image fetching advisory: %s", stock_err)
+                        db.rollback()
+                        logger.warning("Stock image fetching advisory: %s", stock_err, exc_info=True)
 
                 # Semantically match available documentary source_images to slides
                 if source_images:
