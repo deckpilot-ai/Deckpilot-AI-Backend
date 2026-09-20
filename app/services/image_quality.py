@@ -1,5 +1,6 @@
 """Reject non-illustrative QR assets without decoding or following their URLs."""
 import re
+from typing import Any
 
 try:
     import cv2

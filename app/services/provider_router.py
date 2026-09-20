@@ -1092,7 +1092,15 @@ class ProviderRouter:
                 latency = int((time.time() - start_time) * 1000)
 
                 if resp.status_code == 200:
-                    resp_data = resp.json()
+                    try:
+                        resp_data = resp.json()
+                    except Exception as json_err:
+                        logger.warning(
+                            "Provider %s model %s returned 200 OK but invalid JSON payload: %s",
+                            provider.name, model_id, json_err,
+                        )
+                        health_tracker.record_failure(provider.name, model_id)
+                        continue
                     # Robust content extraction — handle missing/null content from providers
                     choices = resp_data.get("choices") or []
                     if not choices:
