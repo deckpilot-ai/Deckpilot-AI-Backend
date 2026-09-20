@@ -1416,34 +1416,64 @@ class ProviderRouter:
                                     chunk = json.loads(data_str)
                                     choices = chunk.get("choices") or []
                                     if choices:
-                                        delta = choices[0].get("delta", {})
-                                        delta_content = delta.get("content") or ""
+                                        delta_content = ""
+                                        c0 = choices[0]
+                                        if isinstance(c0, dict):
+                                            if "delta" in c0:
+                                                d = c0["delta"]
+                                                if isinstance(d, dict):
+                                                    delta_content = d.get("content") or d.get("text") or ""
+                                                elif isinstance(d, str):
+                                                    delta_content = d
+                                            elif "text" in c0:
+                                                delta_content = c0["text"]
+                                            elif "message" in c0 and isinstance(c0["message"], dict):
+                                                delta_content = c0["message"].get("content") or ""
+
                                         if delta_content:
                                             has_yielded = True
-                                            yield delta_content
+                                            yield str(delta_content)
                                 except Exception:
                                     continue
 
-                        latency = int((time.time() - start_time) * 1000)
-                        health_tracker.record_success(provider.name, model_id, float(latency))
-                        key_record.last_used_at = now
-                        key_record.failure_count = 0
-                        db.commit()
-                        return
+                        if has_yielded:
+                            latency = int((time.time() - start_time) * 1000)
+                            health_tracker.record_success(provider.name, model_id, float(latency))
+                            key_record.last_used_at = now
+                            key_record.failure_count = 0
+                            db.commit()
+                            return
 
             except Exception as stream_err:
                 health_tracker.record_failure(provider.name, model_id)
                 logger.warning("Streaming error on %s/%s: %s", provider.name, model_id, stream_err)
                 last_error = str(stream_err)
                 if has_yielded:
-                    # If we already yielded partial tokens to the client, do not restart stream
                     return
                 continue
 
         if not has_yielded:
-            # Fallback static response if all streaming providers failed
+            # Fallback to standard robust call_llm
+            try:
+                user_msg_text = convo_messages[-1]["content"] if convo_messages else "Hello"
+                fallback_res = await ProviderRouter.call_llm(
+                    db=db,
+                    agent_type=agent_type,
+                    system_prompt=system_prompt,
+                    user_prompt=user_msg_text,
+                    user_id=user_id,
+                )
+                text = fallback_res.get("text") or fallback_res.get("content") or ""
+                if text:
+                    yield text
+                    return
+            except Exception as fb_err:
+                logger.warning("Fallback call_llm failed: %s", fb_err)
+
+            # Final static fallback
             fallback_text = (
-                "<thinking>\n1. Identify immediate intent and provide a reliable, structured response.\n</thinking>\n\n"
+                "<thinking>\n1. Process user request directly.\n</thinking>\n\n"
                 "<answer>\nI am your **deckpilotAI Copilot**. All stream services are currently busy, but I am standing by to help you research topics, design presentations, or analyze documents.\n</answer>"
             )
             yield fallback_text
+
