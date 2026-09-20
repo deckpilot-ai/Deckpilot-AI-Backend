@@ -1269,3 +1269,181 @@ class ProviderRouter:
             f"Tried providers: [{provider_names}]. "
             "Check provider keys, rate limits, and health tracker state."
         )
+
+    @staticmethod
+    async def stream_llm(
+        db: Session,
+        agent_type: str,
+        system_prompt: str,
+        messages: list[dict[str, str]] | None = None,
+        user_prompt: str | None = None,
+        user_id: str | None = None,
+        job_id: str | None = None,
+    ):
+        """
+        Asynchronously streams token deltas using adaptive health-aware routing.
+        Supports full chronological conversation history and automatic provider failover.
+        """
+        now = int(time.time())
+
+        # 1. Get enabled providers
+        providers = db.scalars(
+            select(AIProvider)
+            .where(AIProvider.enabled == 1)
+            .order_by(desc(AIProvider.priority))
+        ).all()
+
+        all_candidates: list[dict[str, Any]] = []
+        for provider in providers:
+            try:
+                provider_base_url = validate_provider_base_url(provider.base_url)
+            except ValueError:
+                continue
+
+            active_key_tuple = ProviderRouter.select_active_key(db, provider.id)
+            if not active_key_tuple:
+                continue
+            key_record, secret_key = active_key_tuple
+
+            configured_models = db.scalars(
+                select(AIProviderModel)
+                .where(AIProviderModel.provider_id == provider.id, AIProviderModel.enabled == 1)
+                .order_by(desc(AIProviderModel.priority))
+            ).all()
+
+            model_candidates: list[tuple[str, int]] = []
+            if configured_models:
+                model_candidates = [(m.model_id, m.priority) for m in configured_models]
+            else:
+                p_name = provider.name.lower()
+                if "gemini" in p_name:
+                    model_candidates = [("gemini-2.5-flash", 100), ("gemini-flash-latest", 98)]
+                elif "groq" in p_name:
+                    model_candidates = [("openai/gpt-oss-120b", 100), ("qwen/qwen3.8-27b", 95)]
+                elif "inceptionlabs" in p_name:
+                    model_candidates = [("mercury-2.5", 100), ("mercury-2", 95)]
+                elif "apmix" in p_name:
+                    model_candidates = [("gemini-2.5-flash-free", 100), ("gpt-5.6-luna-free", 95)]
+                elif "vyce" in p_name:
+                    model_candidates = [("claude-sonnet-4-6", 100), ("deepseek-v4-flash", 95)]
+                elif "openai" in p_name:
+                    model_candidates = [("gpt-4o-mini", 90), ("gpt-4o", 95)]
+                else:
+                    model_candidates = [("default", 50)]
+
+            for model_id, model_priority in model_candidates:
+                combined_priority = min((provider.priority + model_priority) // 2, 100)
+                all_candidates.append({
+                    "provider_name": provider.name,
+                    "provider": provider,
+                    "provider_base_url": provider_base_url,
+                    "key_record": key_record,
+                    "secret_key": secret_key,
+                    "model_id": model_id,
+                    "base_priority": combined_priority,
+                })
+
+        ranked = health_tracker.rank_candidates(all_candidates)
+        if not ranked:
+            raise RuntimeError("No available LLM providers configured for streaming.")
+
+        # Construct payload messages
+        convo_messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+        if messages and len(messages) > 0:
+            for m in messages:
+                if m.get("role") and m.get("content"):
+                    convo_messages.append({"role": m["role"], "content": m["content"]})
+        elif user_prompt:
+            convo_messages.append({"role": "user", "content": user_prompt})
+
+        has_yielded = False
+        last_error = None
+
+        for candidate in ranked[:5]:
+            provider = candidate["provider"]
+            provider_base_url = candidate["provider_base_url"]
+            key_record = candidate["key_record"]
+            secret_key = candidate["secret_key"]
+            model_id = candidate["model_id"]
+
+            if not health_tracker.is_available(provider.name, model_id):
+                continue
+
+            start_time = time.time()
+            effective_model_id = (
+                model_id.replace("models/", "")
+                if provider.name == "gemini"
+                else model_id
+            )
+            is_reasoning_model = any(m in model_id.lower() for m in ("o1", "o3", "reasoner", "r1"))
+
+            url = f"{provider_base_url}/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {secret_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "HTTP-Referer": "https://deckpilot.ai",
+                "X-Title": "deckpilotAI",
+            }
+            payload: dict[str, Any] = {
+                "model": effective_model_id,
+                "messages": convo_messages,
+                "stream": True,
+            }
+            if not is_reasoning_model:
+                payload["temperature"] = 0.3
+
+            try:
+                req_timeout = httpx.Timeout(30.0, connect=5.0)
+                async with httpx.AsyncClient(timeout=req_timeout) as client:
+                    async with client.stream("POST", url, headers=headers, json=payload) as resp:
+                        if resp.status_code != 200:
+                            body_text = await resp.aread()
+                            health_tracker.record_failure(provider.name, model_id)
+                            logger.warning("Stream provider %s/%s failed with HTTP %s: %s", provider.name, model_id, resp.status_code, body_text[:200])
+                            last_error = f"HTTP {resp.status_code}"
+                            continue
+
+                        async for line in resp.aiter_lines():
+                            line = line.strip()
+                            if not line:
+                                continue
+                            if line.startswith("data:"):
+                                data_str = line[5:].strip()
+                                if data_str == "[DONE]":
+                                    break
+                                try:
+                                    chunk = json.loads(data_str)
+                                    choices = chunk.get("choices") or []
+                                    if choices:
+                                        delta = choices[0].get("delta", {})
+                                        delta_content = delta.get("content") or ""
+                                        if delta_content:
+                                            has_yielded = True
+                                            yield delta_content
+                                except Exception:
+                                    continue
+
+                        latency = int((time.time() - start_time) * 1000)
+                        health_tracker.record_success(provider.name, model_id, float(latency))
+                        key_record.last_used_at = now
+                        key_record.failure_count = 0
+                        db.commit()
+                        return
+
+            except Exception as stream_err:
+                health_tracker.record_failure(provider.name, model_id)
+                logger.warning("Streaming error on %s/%s: %s", provider.name, model_id, stream_err)
+                last_error = str(stream_err)
+                if has_yielded:
+                    # If we already yielded partial tokens to the client, do not restart stream
+                    return
+                continue
+
+        if not has_yielded:
+            # Fallback static response if all streaming providers failed
+            fallback_text = (
+                "<thinking>\n1. Identify immediate intent and provide a reliable, structured response.\n</thinking>\n\n"
+                "<answer>\nI am your **deckpilotAI Copilot**. All stream services are currently busy, but I am standing by to help you research topics, design presentations, or analyze documents.\n</answer>"
+            )
+            yield fallback_text

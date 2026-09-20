@@ -270,3 +270,76 @@ async def handle_chat_turn_direct(
 ) -> ChatTurnResponse:
     return await _execute_chat_turn(project_id, req, current_user, db)
 
+
+async def _execute_stream_chat(
+    project_id: str,
+    req: ChatTurnRequest,
+    current_user: User,
+    db: Session,
+):
+    import json
+    from fastapi.responses import StreamingResponse
+    from app.services.chat_service import ChatService
+
+    project = ProjectService.get_project(db, project_id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    retry_after = action_rate_limiter.check(
+        f"chat:{current_user.id}",
+        limit=100,
+        window_seconds=60 * 60,
+    )
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Chat rate limit exceeded",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    async def sse_event_stream():
+        try:
+            async for event in ChatService.stream_chat_message(
+                db=db,
+                project_id=project_id,
+                user_id=current_user.id,
+                content=req.content,
+                has_attachments=req.has_attachments,
+                attachment_ids=req.attachment_ids,
+                mode=req.mode,
+            ):
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as err:
+            logger.error("Error in chat SSE stream: %s", err, exc_info=True)
+            yield f"data: {json.dumps({'type': 'error', 'error': str(err)})}\n\n"
+
+    return StreamingResponse(
+        sse_event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post("/stream", status_code=status.HTTP_200_OK)
+async def stream_chat_turn_messages(
+    project_id: str,
+    req: ChatTurnRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    return await _execute_stream_chat(project_id, req, current_user, db)
+
+
+@chat_router.post("/stream", status_code=status.HTTP_200_OK)
+async def stream_chat_turn_direct(
+    project_id: str,
+    req: ChatTurnRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    return await _execute_stream_chat(project_id, req, current_user, db)
+

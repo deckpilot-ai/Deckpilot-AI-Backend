@@ -458,3 +458,190 @@ class ChatService:
                 "output": output_guardrail.model_dump(),
             },
         }
+
+    @staticmethod
+    async def stream_chat_message(
+        db: Session,
+        project_id: str,
+        user_id: str,
+        content: str,
+        has_attachments: bool = False,
+        attachment_ids: list[str] | None = None,
+        mode: str = "autopilot",
+    ):
+        """
+        Asynchronously streams chat responses using Dual-Track Chain-of-Thought reasoning
+        and full conversation history context.
+        Yields JSON event dictionaries: {"type": "start"|"delta"|"done"|"generate", ...}
+        """
+        now = int(time.time())
+        mode = (mode or "autopilot").lower().strip()
+        if mode not in ("autopilot", "plan", "ask"):
+            mode = "autopilot"
+
+        # 0. Evaluate Input Guardrails
+        input_guardrail = InputGuardrailService.evaluate(
+            content=content,
+            has_attachments=has_attachments,
+            mode=mode,
+        )
+
+        # 1. Persist User Message
+        user_msg = Message(
+            id=str(uuid.uuid4()),
+            project_id=project_id,
+            user_id=user_id,
+            role="user",
+            content=input_guardrail.sanitized_content or content,
+            created_at=now,
+        )
+        db.add(user_msg)
+        db.flush()
+
+        if attachment_ids:
+            db.execute(
+                update(Attachment)
+                .where(Attachment.id.in_(attachment_ids), Attachment.project_id == project_id)
+                .values(message_id=user_msg.id)
+            )
+        elif has_attachments:
+            db.execute(
+                update(Attachment)
+                .where(Attachment.project_id == project_id, Attachment.message_id.is_(None))
+                .values(message_id=user_msg.id)
+            )
+
+        db.commit()
+        db.expire_all()
+        user_msg_dict = MessageOut.model_validate(user_msg).model_dump()
+
+        yield {"type": "start", "user_message": user_msg_dict}
+
+        # 2. Check presentation generation intent in autopilot mode
+        if mode == "autopilot":
+            from app.services.reasoning_engine import ReasoningEngine
+            reasoning = await ReasoningEngine.reason_and_route(
+                db=db,
+                project_id=project_id,
+                user_id=user_id,
+                content=input_guardrail.sanitized_content or content,
+                has_attachments=has_attachments,
+                attachment_ids=attachment_ids,
+                mode=mode,
+            )
+            if reasoning.get("should_generate"):
+                yield {
+                    "type": "generate",
+                    "intent": reasoning.get("intent", "generate"),
+                    "mode": "autopilot",
+                    "should_generate": True,
+                    "user_message": user_msg_dict,
+                    "decision_questions": reasoning.get("decision_questions"),
+                }
+                return
+
+        # 3. Handle Direct Guardrails / Policy Responses
+        if not input_guardrail.is_safe or input_guardrail.direct_response:
+            direct_reply = input_guardrail.direct_response or "Request could not be processed due to safety guidelines."
+            thinking_block = "<thinking>\n1. Identify immediate intent and provide a concise, direct response.\n</thinking>\n\n"
+            answer_block = f"<answer>\n{direct_reply}\n</answer>"
+            full_response = f"{thinking_block}{answer_block}"
+
+            # Stream out tokens
+            yield {"type": "delta", "delta": thinking_block}
+            yield {"type": "delta", "delta": answer_block}
+
+            assistant_msg = Message(
+                id=str(uuid.uuid4()),
+                project_id=project_id,
+                role="assistant",
+                content=full_response,
+                created_at=max(int(time.time()), user_msg.created_at + 1),
+            )
+            db.add(assistant_msg)
+            db.commit()
+            db.refresh(assistant_msg)
+
+            yield {
+                "type": "done",
+                "intent": "chat",
+                "mode": mode,
+                "should_generate": False,
+                "user_message": user_msg_dict,
+                "assistant_message": MessageOut.model_validate(assistant_msg).model_dump(),
+            }
+            return
+
+        # 4. Load full chronological conversation history for context
+        history_msgs = db.scalars(
+            select(Message)
+            .where(Message.project_id == project_id)
+            .order_by(Message.created_at.asc())
+        ).all()
+
+        conversation_context: list[dict[str, str]] = []
+        for m in history_msgs:
+            if m.id == user_msg.id:
+                continue
+            if m.role in ("user", "assistant", "system") and m.content:
+                conversation_context.append({"role": m.role, "content": m.content})
+        conversation_context.append({"role": "user", "content": input_guardrail.sanitized_content or content})
+
+        # Select System Prompt based on Mode
+        if mode == "ask":
+            sys_prompt = ASK_MODE_SYSTEM_PROMPT
+        elif mode == "plan":
+            sys_prompt = PLAN_MODE_SYSTEM_PROMPT
+        else:
+            sys_prompt = COPILOT_CHAT_SYSTEM_PROMPT
+
+        # 5. Stream LLM chunks
+        accumulated_text = ""
+        try:
+            async for delta in ProviderRouter.stream_llm(
+                db=db,
+                agent_type="copilot_chat",
+                system_prompt=sys_prompt,
+                messages=conversation_context,
+                user_id=user_id,
+            ):
+                accumulated_text += delta
+                yield {"type": "delta", "delta": delta}
+        except Exception as stream_err:
+            logger.warning("Error during chat stream: %s", stream_err, exc_info=True)
+            if not accumulated_text:
+                fallback_delta = (
+                    "<thinking>\n1. Identify immediate inquiry and provide an actionable response.\n</thinking>\n\n"
+                    f"<answer>\nI am your **deckpilotAI Copilot**. I am ready to help you research topics, design slides, or draft presentations.\n</answer>"
+                )
+                accumulated_text = fallback_delta
+                yield {"type": "delta", "delta": fallback_delta}
+
+        # 6. Ensure tag structure integrity if missing
+        final_persisted = accumulated_text.strip()
+        if "<answer>" not in final_persisted:
+            if "<thinking>" in final_persisted and "</thinking>" in final_persisted:
+                parts = final_persisted.split("</thinking>", 1)
+                final_persisted = f"{parts[0]}</thinking>\n\n<answer>\n{parts[1].strip()}\n</answer>"
+            else:
+                final_persisted = f"<thinking>\n1. Process user request directly.\n</thinking>\n\n<answer>\n{final_persisted}\n</answer>"
+
+        assistant_msg = Message(
+            id=str(uuid.uuid4()),
+            project_id=project_id,
+            role="assistant",
+            content=final_persisted,
+            created_at=max(int(time.time()), user_msg.created_at + 1),
+        )
+        db.add(assistant_msg)
+        db.commit()
+        db.refresh(assistant_msg)
+
+        yield {
+            "type": "done",
+            "intent": "chat",
+            "mode": mode,
+            "should_generate": False,
+            "user_message": user_msg_dict,
+            "assistant_message": MessageOut.model_validate(assistant_msg).model_dump(),
+        }
