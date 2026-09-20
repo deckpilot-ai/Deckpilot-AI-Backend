@@ -758,7 +758,7 @@ class JobOrchestrator:
                 slides_to_write = context["deck_spec"].get("slides", [])
                 _emit("slide_writer", "running", f"Writing executive proof points for {len(slides_to_write)} slides...")
 
-                batch_size = 5
+                batch_size = 3  # Smaller batches reduce per-request token load and improve failover granularity
                 written_slides_map: dict = {}
                 _raw_grounding = context.get("grounding", "")
                 _goal_directives = getattr(goal, "user_directives", "")

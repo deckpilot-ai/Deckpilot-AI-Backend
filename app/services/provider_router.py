@@ -282,12 +282,14 @@ class ProviderRouter:
                     ]
                 elif name == "bynara":
                     default_models = [
+                        {"model_id": "agnes-2.5-flash", "display_name": "Agnes 2.5 Flash (Free • Vision)", "priority": 102, "enabled": 1, "context_length": 512000},
                         {"model_id": "ling-3.0-flash-vl-free", "display_name": "Ling 3.0 Flash VL (Free • Vision)", "priority": 100, "enabled": 1, "context_length": 262144},
                         {"model_id": "ling-3.0-flash-fin-free", "display_name": "Ling 3.0 Flash Fin (Free • Text)", "priority": 98, "enabled": 1, "context_length": 262144},
                         {"model_id": "nemotron-3.5-lightning-free", "display_name": "Nemotron 3.5 Lightning (Free • 1M)", "priority": 95, "enabled": 1, "context_length": 1048576},
                         {"model_id": "nemotron-3-ultra-free", "display_name": "Nemotron 3 Ultra (Free • 1M)", "priority": 92, "enabled": 1, "context_length": 1048576},
                         {"model_id": "ling-3.0-flash-sante-free", "display_name": "Ling 3.0 Flash Sante (Free • Text)", "priority": 90, "enabled": 1, "context_length": 262144},
                         {"model_id": "nemotron-3-super-free", "display_name": "Nemotron 3 Super (Free • Text)", "priority": 88, "enabled": 1, "context_length": 262144},
+                        {"model_id": "stepfun-3.7-flash", "display_name": "StepFun 3.7 Flash (Free • Vision)", "priority": 60, "enabled": 1, "context_length": 262144},
                         {"model_id": "nex-n2.5-pro", "display_name": "Nex N2.5 Pro (Free • Vision)", "priority": 85, "enabled": 1, "context_length": 262144},
                         {"model_id": "laguna-s-2.1", "display_name": "Laguna S-2.1 (Free • Text)", "priority": 80, "enabled": 1, "context_length": 262144},
                     ]
@@ -565,12 +567,14 @@ class ProviderRouter:
                         if discovered:
                             if "bynara" in cleaned_url:
                                 free_model_ids = {
+                                    "agnes-2.5-flash",
                                     "ling-3.0-flash-vl-free",
                                     "ling-3.0-flash-fin-free",
                                     "nemotron-3.5-lightning-free",
                                     "nemotron-3-ultra-free",
                                     "ling-3.0-flash-sante-free",
                                     "nemotron-3-super-free",
+                                    "stepfun-3.7-flash",
                                     "nex-n2.5-pro",
                                     "laguna-s-2.1",
                                 }
@@ -620,12 +624,14 @@ class ProviderRouter:
             ]
         elif "bynara" in cleaned_url:
             bynara_curated = [
+                ("agnes-2.5-flash", "Agnes 2.5 Flash (Free • Vision)", 512000, "High-quality multimodal vision & text model (Free)", 102),
                 ("ling-3.0-flash-vl-free", "Ling 3.0 Flash VL (Free • Vision)", 262144, "Multimodal vision & text model (Free)", 100),
                 ("ling-3.0-flash-fin-free", "Ling 3.0 Flash Fin (Free • Text)", 262144, "Financial & analytical generation model (Free)", 98),
                 ("nemotron-3.5-lightning-free", "Nemotron 3.5 Lightning (Free • 1M)", 1048576, "1M context ultra-fast instruction model (Free)", 95),
                 ("nemotron-3-ultra-free", "Nemotron 3 Ultra (Free • 1M)", 1048576, "1M context flagship reasoning model (Free)", 92),
                 ("ling-3.0-flash-sante-free", "Ling 3.0 Flash Sante (Free • Text)", 262144, "Domain scientific & knowledge model (Free)", 90),
                 ("nemotron-3-super-free", "Nemotron 3 Super (Free • Text)", 262144, "High throughput reasoning model (Free)", 88),
+                ("stepfun-3.7-flash", "StepFun 3.7 Flash (Free • Vision)", 262144, "StepFun multimodal flash model (Free)", 86),
                 ("nex-n2.5-pro", "Nex N2.5 Pro (Free • Vision)", 262144, "Vision & multimodal presentation layout model (Free)", 85),
                 ("laguna-s-2.1", "Laguna S-2.1 (Free • Text)", 262144, "Low-latency text generation model (100% off)", 80),
             ]
@@ -1102,12 +1108,14 @@ class ProviderRouter:
                     ]
                 elif "bynara" in p_name:
                     model_candidates = [
+                        ("agnes-2.5-flash", 102),
                         ("ling-3.0-flash-vl-free", 100),
                         ("ling-3.0-flash-fin-free", 98),
                         ("nemotron-3.5-lightning-free", 95),
                         ("nemotron-3-ultra-free", 92),
                         ("ling-3.0-flash-sante-free", 90),
                         ("nemotron-3-super-free", 88),
+                        ("stepfun-3.7-flash", 60),  # Lower priority — slow response times observed
                         ("nex-n2.5-pro", 85),
                         ("laguna-s-2.1", 80),
                     ]
@@ -1222,6 +1230,7 @@ class ProviderRouter:
                         {"role": "system", "content": sys_prompt_final},
                         {"role": "user", "content": user_prompt},
                     ],
+                    "stream": False,  # Explicitly disable streaming to prevent empty-choices responses
                 }
                 if not is_reasoning_model:
                     payload["temperature"] = 0.2
