@@ -518,27 +518,26 @@ class ChatService:
         yield {"type": "start", "user_message": user_msg_dict}
 
         # 2. Check presentation generation intent in autopilot mode
+        should_generate = False
+        intent = "chat"
+        decision_questions = None
         if mode == "autopilot":
-            from app.services.reasoning_engine import ReasoningEngine
-            reasoning = await ReasoningEngine.reason_and_route(
-                db=db,
-                project_id=project_id,
-                user_id=user_id,
-                content=input_guardrail.sanitized_content or content,
-                has_attachments=has_attachments,
-                attachment_ids=attachment_ids,
-                mode=mode,
-            )
-            if reasoning.get("should_generate"):
-                yield {
-                    "type": "generate",
-                    "intent": reasoning.get("intent", "generate"),
-                    "mode": "autopilot",
-                    "should_generate": True,
-                    "user_message": user_msg_dict,
-                    "decision_questions": reasoning.get("decision_questions"),
-                }
-                return
+            try:
+                from app.services.reasoning_engine import ReasoningEngine
+                reasoning = await ReasoningEngine.reason_and_route(
+                    db=db,
+                    project_id=project_id,
+                    user_id=user_id,
+                    content=input_guardrail.sanitized_content or content,
+                    has_attachments=has_attachments,
+                    attachment_ids=attachment_ids,
+                    mode=mode,
+                )
+                should_generate = bool(reasoning.get("should_generate"))
+                intent = str(reasoning.get("intent") or "generate")
+                decision_questions = reasoning.get("decision_questions")
+            except Exception as r_err:
+                logger.warning("Reasoning engine evaluation notice: %s", r_err)
 
         # 3. Handle Direct Guardrails / Policy Responses
         if not input_guardrail.is_safe or input_guardrail.direct_response:
@@ -595,7 +594,7 @@ class ChatService:
         else:
             sys_prompt = COPILOT_CHAT_SYSTEM_PROMPT
 
-        # 5. Stream LLM chunks
+        # 5. Stream LLM chunks with Dual-Track CoT
         accumulated_text = ""
         try:
             async for delta in ProviderRouter.stream_llm(
@@ -611,8 +610,8 @@ class ChatService:
             logger.warning("Error during chat stream: %s", stream_err, exc_info=True)
             if not accumulated_text:
                 fallback_delta = (
-                    "<thinking>\n1. Identify immediate inquiry and provide an actionable response.\n</thinking>\n\n"
-                    f"<answer>\nI am your **deckpilotAI Copilot**. I am ready to help you research topics, design slides, or draft presentations.\n</answer>"
+                    "<thinking>\n1. Deconstruct user presentation prompt, extract key chapters, and plan narrative progression.\n</thinking>\n\n"
+                    f"<answer>\nI am structuring your presentation on **\"{input_guardrail.sanitized_content[:60]}\"** using executive presentation architecture.\n</answer>"
                 )
                 accumulated_text = fallback_delta
                 yield {"type": "delta", "delta": fallback_delta}
@@ -624,7 +623,7 @@ class ChatService:
                 parts = final_persisted.split("</thinking>", 1)
                 final_persisted = f"{parts[0]}</thinking>\n\n<answer>\n{parts[1].strip()}\n</answer>"
             else:
-                final_persisted = f"<thinking>\n1. Process user request directly.\n</thinking>\n\n<answer>\n{final_persisted}\n</answer>"
+                final_persisted = f"<thinking>\n1. Process user request directly and synthesize narrative structure.\n</thinking>\n\n<answer>\n{final_persisted}\n</answer>"
 
         assistant_msg = Message(
             id=str(uuid.uuid4()),
@@ -639,9 +638,10 @@ class ChatService:
 
         yield {
             "type": "done",
-            "intent": "chat",
+            "intent": intent,
             "mode": mode,
-            "should_generate": False,
+            "should_generate": should_generate,
+            "decision_questions": decision_questions,
             "user_message": user_msg_dict,
             "assistant_message": MessageOut.model_validate(assistant_msg).model_dump(),
         }
