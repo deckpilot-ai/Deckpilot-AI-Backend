@@ -37,11 +37,18 @@ class Settings(BaseSettings):
     # Frontend
     frontend_origin: str = (
         "http://localhost:3000,"
+        "http://localhost:3001,"
+        "http://127.0.0.1:3000,"
+        "http://127.0.0.1:3001,"
         "https://deckpilot-ai-frontend.aideckpilot.workers.dev,"
         "https://deckpilot-ai-frontend.creatorpilot-ai.workers.dev,"
         "https://deckpilot-ai-frontend.pages.dev"
     )
-    allowed_hosts: str = "localhost,127.0.0.1,testserver"
+    allowed_hosts: str = (
+        "localhost,127.0.0.1,testserver,13.206.242.145,"
+        "deckpilot-ai.duckdns.org,*.duckdns.org,"
+        "deckpilot-ai-backend.onrender.com,deckpilotai-backend.onrender.com"
+    )
     ai_provider_allowed_hosts: str = (
         "openrouter.ai,api.openai.com,generativelanguage.googleapis.com,oauth2.googleapis.com,www.googleapis.com,"
         "api.groq.com,api.mistral.ai,api.anthropic.com,api.experientiallabs.ai,"
@@ -188,9 +195,12 @@ class Settings(BaseSettings):
                 raise ValueError("TURSO_DATABASE_URL is required in production")
             if not all(r2_values):
                 raise ValueError("Cloudflare R2 storage is required in production")
-            if any(not origin.startswith("https://") for origin in self.frontend_origins):
-                raise ValueError("Production frontend origins must use HTTPS")
-            if not self.allowed_host_list or "*" in self.allowed_host_list:
+            if any(
+                not (origin.startswith("https://") or origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1"))
+                for origin in self.frontend_origins
+            ):
+                raise ValueError("Production frontend origins must use HTTPS (except local development hosts)")
+            if not self.allowed_host_list or ("*" in self.allowed_host_list and len(self.allowed_host_list) == 1):
                 raise ValueError("Production ALLOWED_HOSTS must be explicit")
             if self.db_echo:
                 raise ValueError("DB_ECHO must be disabled in production")
