@@ -11,7 +11,15 @@ from app.core.rate_limit import auth_rate_limiter
 from app.core.security import AUTH_COOKIE_NAME
 from app.db.engine import get_db
 from app.models.user import User
-from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, UserOut
+from app.schemas.auth import (
+    AuthProvidersResponse,
+    AuthResponse,
+    GoogleAuthRequest,
+    GoogleProviderConfig,
+    LoginRequest,
+    RegisterRequest,
+    UserOut,
+)
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -102,3 +110,47 @@ def get_me(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> UserOut:
     return UserOut.model_validate(current_user)
+
+
+@router.post("/google", response_model=AuthResponse)
+def google_auth(
+    req: GoogleAuthRequest,
+    request: Request,
+    response: Response,
+    db: Annotated[Session, Depends(get_db)],
+) -> AuthResponse:
+    client_host = request.client.host if request.client else "unknown"
+    retry_after = auth_rate_limiter.check(f"google_auth:{client_host}", limit=20, window_seconds=300)
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many authentication attempts. Please try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+    try:
+        user, token = AuthService.authenticate_google(db, req.credential)
+        response.set_cookie(
+            key=AUTH_COOKIE_NAME,
+            value=token,
+            httponly=True,
+            samesite="none" if settings.is_secure_environment else "lax",
+            secure=settings.is_secure_environment,
+            max_age=settings.jwt_expire_minutes * 60,
+            path="/",
+        )
+        return AuthResponse(user=UserOut.model_validate(user), token=token)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+
+@router.get("/providers", response_model=AuthProvidersResponse)
+def get_auth_providers() -> AuthProvidersResponse:
+    return AuthProvidersResponse(
+        google=GoogleProviderConfig(
+            enabled=bool(settings.google_client_id),
+            client_id=settings.google_client_id if settings.google_client_id else None,
+        )
+    )

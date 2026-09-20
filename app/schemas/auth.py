@@ -34,3 +34,21 @@ class UserOut(BaseModel):
 class AuthResponse(BaseModel):
     user: UserOut
     token: str
+
+
+class GoogleAuthRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    credential: str = Field(
+        min_length=10,
+        description="Google ID Token (JWT) returned by Google Identity Services",
+    )
+
+
+class GoogleProviderConfig(BaseModel):
+    enabled: bool
+    client_id: str | None = None
+
+
+class AuthProvidersResponse(BaseModel):
+    google: GoogleProviderConfig

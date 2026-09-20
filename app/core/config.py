@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     jwt_audience: str = "deckpilotai"
     jwt_expire_minutes: int = Field(default=60 * 24, ge=5, le=60 * 24 * 30)
     key_encryption_secret: str = Field(min_length=32)
+    google_client_id: str = ""
+    google_client_secret: str = ""
 
     # Database — Turso / libSQL
     turso_database_url: str = ""
@@ -41,7 +43,7 @@ class Settings(BaseSettings):
     )
     allowed_hosts: str = "localhost,127.0.0.1,testserver"
     ai_provider_allowed_hosts: str = (
-        "openrouter.ai,api.openai.com,generativelanguage.googleapis.com,"
+        "openrouter.ai,api.openai.com,generativelanguage.googleapis.com,oauth2.googleapis.com,"
         "api.groq.com,api.mistral.ai,api.anthropic.com,api.experientiallabs.ai,"
         "codecraftapi.com,api.codecraftapi.com,integrate.api.nvidia.com,api.bazaarlink.ai,api.routeway.ai,api.apmix.ai,api.inceptionlabs.ai,router.bynara.id,inference.dahl.global,"
         "api.unsplash.com,images.unsplash.com,api.pexels.com,images.pexels.com,pixabay.com,cdn.pixabay.com"
