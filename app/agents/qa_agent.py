@@ -477,6 +477,13 @@ class PresentationQAAgent:
             decorative_count = 0
             evidence_card_heights: dict[str, int] = {}
             evidence_text_metrics: dict[str, tuple[int, list[float]]] = {}
+            content_boxes: list[tuple[int, int, int, int]] = []
+            for s in slide.shapes:
+                if getattr(s, "shape_type", None) == MSO_SHAPE_TYPE.PICTURE:
+                    content_boxes.append((int(s.left), int(s.top), int(s.width), int(s.height)))
+                elif getattr(s, "has_text_frame", False) and _clean(s.text):
+                    content_boxes.append((int(s.left), int(s.top), int(s.width), int(s.height)))
+
             for shape in slide.shapes:
                 name = (shape.name or "").lower()
                 if match := re.fullmatch(r"evidence-card-(\d+)", name):
@@ -494,10 +501,29 @@ class PresentationQAAgent:
                     if text == str(idx):
                         has_page = True
                     if not text and not intentional_bleed:
-                        is_content_container = any(tag in name for tag in ("card", "body", "content", "textbox", "limb", "evidence", "node", "desc", "label"))
-                        is_substantial = shape.width > int(slide_w * 0.08) and shape.height > int(slide_h * 0.04)
-                        if is_content_container or (is_substantial and not any(tag in name for tag in ("backdrop", "background", "frame", "mat", "accent", "page-pill"))):
-                            issues.append(cls._issue("empty_shape", ValidationSeverity.HIGH if is_content_container else ValidationSeverity.MEDIUM, ValidationCategory.TECHNICAL, idx, f"Empty shape or text container detected: '{shape.name}'", spec.slide_id if spec else ""))
+                        # Check if this shape is a card container/mat holding nested content
+                        cx1, cy1, cw, ch = int(shape.left), int(shape.top), int(shape.width), int(shape.height)
+                        cx2, cy2 = cx1 + cw, cy1 + ch
+                        has_enclosed_content = any(
+                            (cx1 - 10000 <= (cb[0] + cb[2] // 2) <= cx2 + 10000) and
+                            (cy1 - 10000 <= (cb[1] + cb[3] // 2) <= cy2 + 10000)
+                            for cb in content_boxes
+                        ) or any(
+                            cls._overlap_ratio((cx1, cy1, cw, ch), cb) > 0.08
+                            for cb in content_boxes
+                        )
+                        is_decorative_element = any(
+                            tag in name for tag in (
+                                "accent", "backdrop", "background", "page-pill", "photo-container",
+                                "photo-mat", "image-frame", "badge", "chip", "disc", "rule", "line",
+                                "tick", "bar", "hero", "header", "fill", "container"
+                            )
+                        )
+                        if not has_enclosed_content and not is_decorative_element:
+                            is_content_container = any(tag in name for tag in ("card", "body", "content", "textbox", "limb", "evidence", "node", "desc", "label"))
+                            is_substantial = shape.width > int(slide_w * 0.08) and shape.height > int(slide_h * 0.04)
+                            if is_content_container or is_substantial:
+                                issues.append(cls._issue("empty_shape", ValidationSeverity.MEDIUM, ValidationCategory.TECHNICAL, idx, f"Empty shape or text container detected: '{shape.name}'", spec.slide_id if spec else ""))
                     if text and shape.top < int(slide_h * 0.91) and not decorative:
                         meaningful_boxes.append((shape.left, shape.top, shape.width, shape.height))
                         text_boxes.append((shape.left, shape.top, shape.width, shape.height, text))

@@ -226,6 +226,11 @@ class RepairAgent:
                 slide.bullets = [b for b in slide.bullets if b.strip()]
                 if not slide.bullets:
                     slide.bullets = [f"Key Insight: Strategic drivers for {slide.headline}."]
+                slide.archetype_fields["qa_safe_geometry"] = True
+                if len(slide.bullets) <= 2 and slide.layout_family == LayoutFamily.CARD_GRID:
+                    slide.layout_family = LayoutFamily.TWO_COLUMN
+                    slide.layout_hint = "two_column"
+                    slide.archetype_id = None
 
         cls._remove_duplicate_images(slides, assets)
         cls._normalize_layout_rhythm(slides)
@@ -433,3 +438,16 @@ class RepairAgent:
                 current.layout_family = LayoutFamily.COMPARISON
                 current.layout_hint = LayoutFamily.COMPARISON.value
                 current.archetype_id = None
+
+        box_layouts = {LayoutFamily.TWO_COLUMN, LayoutFamily.CARD_GRID, LayoutFamily.THREE_COLUMN, LayoutFamily.COMPARISON}
+        for idx in range(1, len(slides)):
+            curr = slides[idx]
+            prev = slides[idx - 1]
+            if curr.layout_family in box_layouts and prev.layout_family == curr.layout_family:
+                alternatives = [LayoutFamily.A5_DEFINITION, LayoutFamily.A10_NUMBERED_PROCESS, LayoutFamily.COMPARISON, LayoutFamily.CARD_GRID, LayoutFamily.TWO_COLUMN]
+                for alt in alternatives:
+                    if alt != prev.layout_family:
+                        curr.layout_family = alt
+                        curr.layout_hint = alt.value
+                        curr.archetype_id = None
+                        break

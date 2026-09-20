@@ -212,6 +212,38 @@ def test_qa_agent_detects_empty_shape_in_rendered_pptx():
     assert len(empty_shape_issues) >= 1
 
 
+def test_archetype_container_cards_not_flagged_as_empty_shapes():
+    """Archetype cards and badges containing nested text must not be flagged as empty shapes."""
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+    spec = SlideSpec(
+        slide_number=2,
+        slide_id="s02",
+        headline="A $XX B addressable market for cloud workflow automation",
+        bullets=[
+            "TAM for SMB-to-Enterprise SaaS exceeds $XX B",
+            "CAGR of 30% for cloud workflow tools",
+            "Fragmented landscape: SMB tools lack enterprise security",
+        ],
+        layout_hint="big_questions",
+        archetype_id="A29",
+        layout_family=LayoutFamily.CARD_GRID,
+    )
+    ds = DesignSystem()
+    ArchetypeRenderer.render(slide, "A29", spec, ds)
+
+    bio = io.BytesIO()
+    prs.save(bio)
+    pptx_bytes = bio.getvalue()
+
+    report = PresentationQAAgent.evaluate_presentation([spec], ds, pptx_bytes=pptx_bytes)
+    empty_shapes = [i for i in report.issues if i.checkpoint_id == "QA-116"]
+    assert len(empty_shapes) == 0, f"Expected 0 empty shape issues on A29 cards, got: {[i.message for i in empty_shapes]}"
+
+
 def test_repair_agent_rewrites_bad_title():
     """Repair Agent must shorten and clean paragraph titles."""
     bad_spec = SlideSpec(

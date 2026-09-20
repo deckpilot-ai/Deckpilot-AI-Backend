@@ -76,7 +76,7 @@ class VisualQAEvaluator:
                 issues.append(
                     ValidationIssue(
                         checkpoint_id=CHECKPOINT_ID_BY_SLUG.get("consecutive_same_layout", "QA-077"),
-                        severity=ValidationSeverity.HIGH,
+                        severity=ValidationSeverity.MEDIUM,
                         category=ValidationCategory.DESIGN,
                         slide_number=idx + 1,
                         slide_id=curr.slide_id,

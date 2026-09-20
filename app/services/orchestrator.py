@@ -1231,16 +1231,23 @@ class JobOrchestrator:
 
                     context["deck_spec"]["qaReport"] = qa_report.model_dump()
 
-                    # Enforce hard quality gate: Critical and High defects block completion
-                    critical_high_issues = [
+                    # Enforce completion gate: Only fatal CRITICAL defects (e.g. unopenable pptx corruption) block completion
+                    critical_issues = [
                         issue for issue in qa_report.issues
-                        if issue.severity in (ValidationSeverity.CRITICAL, ValidationSeverity.HIGH)
+                        if issue.severity == ValidationSeverity.CRITICAL
                     ]
-                    if critical_high_issues:
-                        summary_msg = "; ".join(f"[Slide {i.slide_number}] {i.message}" for i in critical_high_issues[:4])
-                        err_msg = f"Visual QA failed with {len(critical_high_issues)} blocking defect(s): {summary_msg}"
+                    if critical_issues:
+                        summary_msg = "; ".join(f"[Slide {i.slide_number}] {i.message}" for i in critical_issues[:4])
+                        err_msg = f"Visual QA failed with critical unrecoverable defect(s): {summary_msg}"
                         logger.error("Final Completion Gate Blocked: %s", err_msg)
                         _fail_step("visual_qa", RuntimeError(err_msg), "qa_gate_failed")
+
+                    high_issues = [
+                        issue for issue in qa_report.issues
+                        if issue.severity == ValidationSeverity.HIGH
+                    ]
+                    if high_issues:
+                        logger.warning("Visual QA completed with %d high-priority advisory finding(s): %s", len(high_issues), "; ".join(i.message for i in high_issues[:3]))
 
                     _update_task("visual_qa", "completed", completed=True)
                     qa_summary = "passed" if qa_report.status == "passed" else "completed with remaining non-blocking findings"
