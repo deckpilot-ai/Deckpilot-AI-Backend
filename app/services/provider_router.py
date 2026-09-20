@@ -71,6 +71,7 @@ class ProviderRouter:
         provider_configs = [
             ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 35),
             ("groq", "https://api.groq.com/openai/v1", settings.groq_api_key, 32),
+            ("apmix", settings.apmix_base_url or "https://api.apmix.ai/v1", settings.apmix_api_key, 28),
             ("nvidia", settings.nvidia_base_url or "https://integrate.api.nvidia.com/v1", settings.nvidia_api_key, 25),
             ("bazaarlink", settings.bazaarlink_base_url or "https://api.bazaarlink.ai/v1", settings.bazaarlink_api_key, 20),
             ("routeway", settings.routeway_base_url or "https://api.routeway.ai/v1", settings.routeway_api_key, 18),
@@ -148,6 +149,15 @@ class ProviderRouter:
                         {"model_id": "deepseek-v4-flash", "display_name": "DeepSeek V4 Flash", "priority": 92, "enabled": 1, "context_length": 128000},
                         {"model_id": "qwen3.8-max", "display_name": "Qwen 3.8 Max", "priority": 90, "enabled": 1, "context_length": 1000000},
                         {"model_id": "claude-fable-5-1", "display_name": "Claude Fable 5.1", "priority": 88, "enabled": 1, "context_length": 200000},
+                    ]
+                elif name == "apmix":
+                    default_models = [
+                        {"model_id": "gemini-2.5-flash-free", "display_name": "Gemini 2.5 Flash Free (Rank #1)", "priority": 100, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gpt-5.6-luna-free", "display_name": "GPT-5.6 Luna Free (Rank #2)", "priority": 95, "enabled": 1, "context_length": 128000},
+                        {"model_id": "kimi-k3-free", "display_name": "Kimi K3 Free (Rank #3)", "priority": 90, "enabled": 1, "context_length": 128000},
+                        {"model_id": "grok-4.6-free", "display_name": "Grok 4.6 Free (Rank #4)", "priority": 85, "enabled": 1, "context_length": 128000},
+                        {"model_id": "deepseek-v4.1-flash-free", "display_name": "DeepSeek V4.1 Flash Free (Rank #5)", "priority": 80, "enabled": 1, "context_length": 1048576},
+                        {"model_id": "muse-spark-1.3-free", "display_name": "Muse Spark 1.3 Free (Rank #6)", "priority": 70, "enabled": 1, "context_length": 128000},
                     ]
                 elif name == "codecraft":
                     default_models = [
@@ -690,6 +700,15 @@ class ProviderRouter:
                         ("qwen3.8-max", 92),
                         ("claude-sonnet-4.6", 90),
                         ("glm-5", 88),
+                    ]
+                elif "apmix" in p_name:
+                    model_candidates = [
+                        ("gemini-2.5-flash-free", 100),
+                        ("gpt-5.6-luna-free", 95),
+                        ("kimi-k3-free", 90),
+                        ("grok-4.6-free", 85),
+                        ("deepseek-v4.1-flash-free", 80),
+                        ("muse-spark-1.3-free", 70),
                     ]
                 elif "openai" in p_name:
                     model_candidates = [("gpt-4o-mini", 90), ("gpt-4o", 95)]
