@@ -80,6 +80,89 @@ def _parse_llm_response(content: str, response_schema: Any | None) -> dict[str, 
     return {"text": cleaned}
 
 
+def _validate_agent_output(
+    agent_type: str,
+    parsed: Any,
+    response_schema: Any | None = None,
+) -> tuple[bool, str, dict[str, Any]]:
+    """Validate that the parsed output fulfills the agent's semantic contract.
+
+    Returns (is_valid, failure_reason, normalized_dict).
+    Rejects malformed, empty, or unparseable text payloads so the router can
+    failover to alternate models instead of propagating degraded data.
+    """
+    if not response_schema:
+        if isinstance(parsed, dict) and "text" in parsed and len(str(parsed["text"]).strip()) > 0:
+            return True, "", parsed
+        if isinstance(parsed, str) and parsed.strip():
+            return True, "", {"text": parsed.strip()}
+        return True, "", parsed if isinstance(parsed, dict) else {"text": str(parsed)}
+
+    # When response_schema is expected, raw text wrapper {"text": ...} indicates JSON parsing failed
+    if isinstance(parsed, dict) and list(parsed.keys()) == ["text"]:
+        raw_t = parsed["text"]
+        match = re.search(r'(\{[\s\S]*\})', raw_t)
+        if match:
+            try:
+                recovered = json.loads(match.group(1))
+                if isinstance(recovered, dict) and len(recovered) > 0:
+                    parsed = recovered
+            except Exception:
+                pass
+        if isinstance(parsed, dict) and list(parsed.keys()) == ["text"]:
+            return False, "Failed to parse structured JSON from LLM response", {}
+
+    if not isinstance(parsed, (dict, list)):
+        return False, f"Expected structured dict or list, got {type(parsed).__name__}", {}
+
+    # Normalize list wrapping
+    if isinstance(parsed, list):
+        parsed = {"slides": parsed} if agent_type in ("deck_planner", "slide_writer") else {"data": parsed}
+
+    # Unwrap common outer envelope keys: data, result, output, response, presentation, deck_spec, deck
+    for env_key in ("data", "result", "output", "response", "presentation", "deck_spec", "deck"):
+        if isinstance(parsed.get(env_key), dict) and ("slides" in parsed[env_key] or "brandStyle" in parsed[env_key]):
+            parsed = parsed[env_key]
+            break
+        elif isinstance(parsed.get(env_key), list) and agent_type in ("deck_planner", "slide_writer"):
+            parsed = {"slides": parsed[env_key]}
+            break
+
+    # Agent-specific contract verification
+    if agent_type == "deck_planner":
+        if "plan" in parsed and "slides" not in parsed:
+            return True, "", parsed
+        slides = parsed.get("slides")
+        if not isinstance(slides, list) or len(slides) == 0:
+            return False, "deck_planner output missing 'slides' array or array is empty", {}
+        valid_slides = 0
+        for s in slides:
+            if isinstance(s, dict) and any(s.get(k) for k in ("headline", "message", "purpose", "title")):
+                valid_slides += 1
+        if valid_slides < max(1, len(slides) // 2):
+            return False, f"deck_planner slides lack valid headlines ({valid_slides}/{len(slides)})", {}
+
+    elif agent_type == "slide_writer":
+        slides = parsed.get("slides") or parsed.get("data")
+        if isinstance(slides, dict):
+            slides = [slides]
+        if not isinstance(slides, list) or len(slides) == 0:
+            if any(parsed.get(k) for k in ("bullets", "headline", "message")):
+                slides = [parsed]
+                parsed = {"slides": slides}
+            else:
+                return False, "slide_writer output missing 'slides' list or slide items", {}
+        has_content = any(isinstance(s, dict) and (s.get("bullets") or s.get("headline") or s.get("message")) for s in slides)
+        if not has_content:
+            return False, "slide_writer returned slides with zero bullets or headlines", {}
+
+    elif agent_type == "font_brand_detection":
+        if not any(parsed.get(k) for k in ("colors", "brandStyle", "palette", "typography", "subject", "theme")):
+            return False, "font_brand_detection output missing style, colors, or typography keys", {}
+
+    return True, "", parsed
+
+
 class ProviderRouter:
     @staticmethod
     def sync_environment_providers(db: Session) -> None:
@@ -89,6 +172,7 @@ class ProviderRouter:
             ("groq", "https://api.groq.com/openai/v1", settings.groq_api_key, 32),
             ("inceptionlabs", settings.inceptionlabs_base_url or "https://api.inceptionlabs.ai/v1", settings.inceptionlabs_api_key, 30),
             ("apmix", settings.apmix_base_url or "https://api.apmix.ai/v1", settings.apmix_api_key, 28),
+            ("bynara", settings.bynara_base_url or "https://router.bynara.id/v1", settings.bynara_api_key, 27),
             ("nvidia", settings.nvidia_base_url or "https://integrate.api.nvidia.com/v1", settings.nvidia_api_key, 25),
             ("bazaarlink", settings.bazaarlink_base_url or "https://api.bazaarlink.ai/v1", settings.bazaarlink_api_key, 20),
             ("routeway", settings.routeway_base_url or "https://api.routeway.ai/v1", settings.routeway_api_key, 18),
@@ -180,6 +264,17 @@ class ProviderRouter:
                         {"model_id": "grok-4.6-free", "display_name": "Grok 4.6 Free (Rank #4)", "priority": 85, "enabled": 1, "context_length": 128000},
                         {"model_id": "deepseek-v4.1-flash-free", "display_name": "DeepSeek V4.1 Flash Free (Rank #5)", "priority": 80, "enabled": 1, "context_length": 1048576},
                         {"model_id": "muse-spark-1.3-free", "display_name": "Muse Spark 1.3 Free (Rank #6)", "priority": 70, "enabled": 1, "context_length": 128000},
+                    ]
+                elif name == "bynara":
+                    default_models = [
+                        {"model_id": "ling-3.0-flash-vl-free", "display_name": "Ling 3.0 Flash VL (Free • Vision)", "priority": 100, "enabled": 1, "context_length": 262144},
+                        {"model_id": "ling-3.0-flash-fin-free", "display_name": "Ling 3.0 Flash Fin (Free • Text)", "priority": 98, "enabled": 1, "context_length": 262144},
+                        {"model_id": "nemotron-3.5-lightning-free", "display_name": "Nemotron 3.5 Lightning (Free • 1M)", "priority": 95, "enabled": 1, "context_length": 1048576},
+                        {"model_id": "nemotron-3-ultra-free", "display_name": "Nemotron 3 Ultra (Free • 1M)", "priority": 92, "enabled": 1, "context_length": 1048576},
+                        {"model_id": "ling-3.0-flash-sante-free", "display_name": "Ling 3.0 Flash Sante (Free • Text)", "priority": 90, "enabled": 1, "context_length": 262144},
+                        {"model_id": "nemotron-3-super-free", "display_name": "Nemotron 3 Super (Free • Text)", "priority": 88, "enabled": 1, "context_length": 262144},
+                        {"model_id": "nex-n2.5-pro", "display_name": "Nex N2.5 Pro (Free • Vision)", "priority": 85, "enabled": 1, "context_length": 262144},
+                        {"model_id": "laguna-s-2.1", "display_name": "Laguna S-2.1 (Free • Text)", "priority": 80, "enabled": 1, "context_length": 262144},
                     ]
                 elif name == "codecraft":
                     default_models = [
@@ -453,6 +548,18 @@ class ProviderRouter:
                                     "default_priority": max(100 - (idx * 5), 1),
                                 })
                         if discovered:
+                            if "bynara" in cleaned_url:
+                                free_model_ids = {
+                                    "ling-3.0-flash-vl-free",
+                                    "ling-3.0-flash-fin-free",
+                                    "nemotron-3.5-lightning-free",
+                                    "nemotron-3-ultra-free",
+                                    "ling-3.0-flash-sante-free",
+                                    "nemotron-3-super-free",
+                                    "nex-n2.5-pro",
+                                    "laguna-s-2.1",
+                                }
+                                discovered = [m for m in discovered if m["id"] in free_model_ids]
                             return discovered
                     else:
                         last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
@@ -495,6 +602,27 @@ class ProviderRouter:
                     "default_priority": max(100 - (idx * 5), 1),
                 }
                 for idx, m in enumerate(CURATED_EXPERIENTIALLABS_FREE_MODELS)
+            ]
+        elif "bynara" in cleaned_url:
+            bynara_curated = [
+                ("ling-3.0-flash-vl-free", "Ling 3.0 Flash VL (Free • Vision)", 262144, "Multimodal vision & text model (Free)", 100),
+                ("ling-3.0-flash-fin-free", "Ling 3.0 Flash Fin (Free • Text)", 262144, "Financial & analytical generation model (Free)", 98),
+                ("nemotron-3.5-lightning-free", "Nemotron 3.5 Lightning (Free • 1M)", 1048576, "1M context ultra-fast instruction model (Free)", 95),
+                ("nemotron-3-ultra-free", "Nemotron 3 Ultra (Free • 1M)", 1048576, "1M context flagship reasoning model (Free)", 92),
+                ("ling-3.0-flash-sante-free", "Ling 3.0 Flash Sante (Free • Text)", 262144, "Domain scientific & knowledge model (Free)", 90),
+                ("nemotron-3-super-free", "Nemotron 3 Super (Free • Text)", 262144, "High throughput reasoning model (Free)", 88),
+                ("nex-n2.5-pro", "Nex N2.5 Pro (Free • Vision)", 262144, "Vision & multimodal presentation layout model (Free)", 85),
+                ("laguna-s-2.1", "Laguna S-2.1 (Free • Text)", 262144, "Low-latency text generation model (100% off)", 80),
+            ]
+            return [
+                {
+                    "id": mid,
+                    "name": mname,
+                    "context_length": ctx,
+                    "description": desc,
+                    "default_priority": prio,
+                }
+                for mid, mname, ctx, desc, prio in bynara_curated
             ]
         elif "anthropic" in cleaned_url:
             return [
@@ -957,6 +1085,17 @@ class ProviderRouter:
                         ("deepseek-v4.1-flash-free", 80),
                         ("muse-spark-1.3-free", 70),
                     ]
+                elif "bynara" in p_name:
+                    model_candidates = [
+                        ("ling-3.0-flash-vl-free", 100),
+                        ("ling-3.0-flash-fin-free", 98),
+                        ("nemotron-3.5-lightning-free", 95),
+                        ("nemotron-3-ultra-free", 92),
+                        ("ling-3.0-flash-sante-free", 90),
+                        ("nemotron-3-super-free", 88),
+                        ("nex-n2.5-pro", 85),
+                        ("laguna-s-2.1", 80),
+                    ]
                 elif "openai" in p_name:
                     model_candidates = [("gpt-4o-mini", 90), ("gpt-4o", 95)]
                 elif "mistral" in p_name:
@@ -1077,10 +1216,17 @@ class ProviderRouter:
                     timeout_val = 15.0
                     conn_timeout = 4.0
                 elif agent_type == "slide_writer":
-                    timeout_val = 30.0
+                    # Slide writer handles batches of 5 slides with grounding context;
+                    # needs enough time for large reference document decks (25 slides).
+                    timeout_val = 50.0
+                    conn_timeout = 5.0
+                elif agent_type == "deck_planner":
+                    # Deck planner must generate 20-25 slide outlines from reference docs;
+                    # orchestrator outer timeout is 90s so we give 65s per provider attempt.
+                    timeout_val = 65.0
                     conn_timeout = 5.0
                 else:
-                    timeout_val = float(min(settings.llm_read_timeout_seconds or 25.0, 25.0))
+                    timeout_val = float(min(settings.llm_read_timeout_seconds or 35.0, 35.0))
                     conn_timeout = 4.0
                 req_timeout = httpx.Timeout(timeout_val, connect=conn_timeout)
                 async with httpx.AsyncClient(timeout=req_timeout) as client:
@@ -1127,6 +1273,15 @@ class ProviderRouter:
                         health_tracker.record_failure(provider.name, model_id)
                         continue
                     parsed = _parse_llm_response(content, response_schema)
+                    is_valid, fail_reason, normalized = _validate_agent_output(agent_type, parsed, response_schema)
+                    if not is_valid:
+                        logger.warning(
+                            "Provider %s model %s output failed contract validation for %s: %s — failing over to next model/provider",
+                            provider.name, model_id, agent_type, fail_reason,
+                        )
+                        health_tracker.record_failure(provider.name, model_id)
+                        continue
+                    parsed = normalized
 
                     # Record success in health tracker
                     health_tracker.record_success(provider.name, model_id, float(latency))
@@ -1251,41 +1406,34 @@ class ProviderRouter:
                         additional_context={"agent_type": agent_type, "user_id": user_id, "job_id": job_id},
                     )
                     raw_lower = raw_text.lower()
-                    is_rate_or_quota_error = (
-                        resp.status_code in (402, 429, 502, 503, 504)
-                        and any(phrase in raw_lower for phrase in (
-                            "insufficient funds", "insufficient credits", "insufficient_quota",
-                            "free_global_rate_limited", "site-wide free-model capacity",
-                            "capacity is currently full", "per-minute rate limit", "rate limit exceeded",
-                            "out of credits", "no credits remaining", "requires_purchase", "card on file",
-                            "worker local total request limit reached", "all workers are busy",
-                            "service temporarily overloaded", "overloaded", "model_overloaded"
+                    # Only skip the entire provider account if it is truly unauthenticated or out of credits.
+                    # Individual model rate limits (429 TPM/RPM) or temporary 502/503/504 overloads should
+                    # failover to other configured models under the same provider before moving to the next provider.
+                    is_account_outage = (
+                        resp.status_code in (401, 402)
+                        or any(phrase in raw_lower for phrase in (
+                            "insufficient funds", "insufficient credits", "out of credits", "no credits remaining",
+                            "requires_purchase", "card on file", "account suspended", "invalid_api_key",
                         ))
                     )
-                    is_provider_outage = (
-                        resp.status_code == 402
-                        or (provider.name in ("bazaarlink", "routeway", "openai", "openrouter", "experientiallabs") and resp.status_code in (402, 429))
-                        or (provider.name == "nvidia" and resp.status_code in (503, 429))
-                        or (resp.status_code in (502, 503, 504, 403) and provider.name not in ("gemini", "groq"))
-                        or is_rate_or_quota_error
-                    )
-                    if is_provider_outage:
+                    if is_account_outage:
                         logger.warning(
-                            "Provider %s experienced provider-level failure (HTTP %s). Skipping remaining models for this provider.",
-                            provider.name, resp.status_code,
+                            "Provider %s experienced account-level failure (HTTP %s: %s). Skipping remaining models for this provider.",
+                            provider.name, resp.status_code, raw_text[:120],
                         )
                         skipped_providers.add(provider.name)
 
-                    logger.warning("Provider %s model %s returned HTTP %s", provider.name, model_id, resp.status_code)
+                    logger.warning("Provider %s model %s returned HTTP %s (failing over to next candidate)", provider.name, model_id, resp.status_code)
                     continue
 
             except Exception as model_err:
                 # Record failure in health tracker
                 health_tracker.record_failure(provider.name, model_id)
 
-                if isinstance(model_err, (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.TimeoutException)):
+                # Only skip the entire provider if the network host cannot be reached at all (ConnectError / DNS failure)
+                if isinstance(model_err, httpx.ConnectError):
                     logger.warning(
-                        "Provider %s timeout/connection error (%s). Skipping remaining models for this provider.",
+                        "Provider %s host connection error (%s). Skipping provider.",
                         provider.name, model_err,
                     )
                     skipped_providers.add(provider.name)
@@ -1372,6 +1520,8 @@ class ProviderRouter:
                     model_candidates = [("mercury-2.5", 100), ("mercury-2", 95)]
                 elif "apmix" in p_name:
                     model_candidates = [("gemini-2.5-flash-free", 100), ("gpt-5.6-luna-free", 95)]
+                elif "bynara" in p_name:
+                    model_candidates = [("ling-3.0-flash-vl-free", 100), ("ling-3.0-flash-fin-free", 98)]
                 elif "vyce" in p_name:
                     model_candidates = [("claude-sonnet-4-6", 100), ("deepseek-v4-flash", 95)]
                 elif "openai" in p_name:

@@ -391,7 +391,7 @@ class JobOrchestrator:
                             sample_text += txt + "\n"
                         except Exception:
                             pass
-                        if len(sample_text) > 4000:
+                        if len(sample_text) > 50000:
                             break
 
                 try:
@@ -436,7 +436,21 @@ class JobOrchestrator:
                     if grounded_parts:
                         grounding_content = "\n\n".join(grounded_parts)
                         context["grounding"] = grounding_content
-                        prompt_grounding = grounding_content if len(grounding_content) <= 15000 else grounding_content[:15000] + "\n\n[... Remaining reference sections indexed for grounding ...]"
+                        # For the enriched prompt: use intelligent compression so large documents
+                        # (textbooks, 50-page reports) don't overflow the planner's context window.
+                        # compress_for_planning() produces a TOC + first-sentence preview per chunk
+                        # (max 8000 chars) that captures document structure without raw truncation.
+                        if len(grounding_content) <= 8000:
+                            prompt_grounding = grounding_content
+                        else:
+                            prompt_grounding = GroundingChunker.compress_for_planning(
+                                grounding_content, max_chars=8000
+                            )
+                            if len(grounding_content) > 15000:
+                                prompt_grounding += (
+                                    f"\n\n[... Full document ({len(grounding_content)} chars) indexed — "
+                                    "complete evidence used for per-slide content generation ...]"
+                                )
                         enriched_prompt += f"\n\n[MANDATORY GROUNDING DATA FROM ATTACHED DOCUMENTS]:\n{prompt_grounding}"
                     else:
                         context["grounding"] = f"Grounded context with {len(existing_artifacts)} reference sources."
@@ -601,30 +615,31 @@ class JobOrchestrator:
                 _directives = getattr(goal, "user_directives", "")
                 _raw_grounding = context.get("grounding", "")
                 _planning_grounding = (
-                    GroundingChunker.compress_for_planning(_raw_grounding)
-                    if len(_raw_grounding) > 3000
+                    GroundingChunker.compress_for_planning(_raw_grounding, max_chars=8000)
+                    if len(_raw_grounding) > 5000
                     else _raw_grounding
                 )
 
-                planner_prompt = ""
+                planner_prompt = f"PRESENTATION TOPIC: {goal.topic}\n"
+                planner_prompt += f"TARGET AUDIENCE: {getattr(goal, 'target_audience', getattr(goal, 'audience', 'Executive Leadership'))}\n"
+                planner_prompt += f"PRESENTATION TYPE: {getattr(goal, 'presentation_type', 'Business Overview')}\n\n"
                 if _directives:
-                    planner_prompt += (
-                        f"[USER DIRECTIVES — YOU MUST HONOUR ALL OF THESE]:\n{_directives}\n\n"
-                    )
-                # Use user prompt (without the raw grounding) + compressed planning grounding
-                _base_prompt = user_prompt
+                    planner_prompt += f"[USER DIRECTIVES — YOU MUST HONOUR ALL OF THESE]:\n{_directives}\n\n"
+                planner_prompt += f"[USER BRIEF]:\n{user_prompt}\n"
                 if eff_ctx.get("context_prompt"):
-                    _base_prompt += f"\n\n[Active Session Memory & Constraints]:\n{eff_ctx['context_prompt']}"
-                planner_prompt += _base_prompt
+                    planner_prompt += f"\n[Active Session Memory & Constraints]:\n{eff_ctx['context_prompt']}\n"
                 if _planning_grounding:
                     planner_prompt += (
-                        f"\n\n[DOCUMENT STRUCTURE SUMMARY — use to plan slide topics and chapters]:\n"
-                        f"{_planning_grounding}"
+                        f"\n[DOCUMENT SOURCE DATA & SECTION HIERARCHY — SCRAPE AND COVER ALL KEY CHAPTERS/THEMES]:\n"
+                        f"{_planning_grounding}\n"
                     )
                 if target_slide_count:
                     planner_prompt += (
-                        f"\n\nCRITICAL REQUIREMENT: Output EXACTLY {target_slide_count} slides in the 'slides' array (s01 to s{target_slide_count:02d}) "
-                        f"with conclusive action headlines answering 'So What?' across logical chapters."
+                        f"\nCRITICAL REQUIREMENT: Output EXACTLY {target_slide_count} slides in the 'slides' array (s01 to s{target_slide_count:02d}).\n"
+                        f"- Thoroughly distribute the reference document's sections, empirical data, tables, and themes across all {target_slide_count} slides.\n"
+                        f"- Ensure every slide covers a distinct, specific topic or chapter from the source document without repetition.\n"
+                        f"- Each slide object MUST include: slideId (e.g. 's01'), chapter, purpose, headline (an informative, conclusive takeaway answering 'So What?'), layoutHint, bullets (array of key proof points), and speakerNotes.\n"
+                        f"- Respond with valid JSON matching structure: {{'deckTitle': '{goal.topic}', 'slides': [...]}}"
                     )
 
                 _emit("deck_planner", "running", f"Structuring storyline across {target_slide_count} slides...")
@@ -632,7 +647,7 @@ class JobOrchestrator:
                 deck_spec = None
                 _planner_error: str | None = None
 
-                # ── Attempt 1: Full LLM call with all available providers ────────────
+                # ── Robust LLM call with multi-provider failover (quality first, ample timeout) ──
                 try:
                     deck_spec = await asyncio.wait_for(
                         ProviderRouter.call_llm(
@@ -644,36 +659,34 @@ class JobOrchestrator:
                             user_id=user_id,
                             job_id=job_id,
                         ),
-                        timeout=90.0,
+                        timeout=240.0,
                     )
                 except Exception as e:
                     _planner_error = str(e)
-                    logger.warning("Deck planner attempt 1 failed (%s) — retrying with minimal prompt", _planner_error)
+                    logger.warning("Deck planner attempt 1 failed (%s) — retrying across healthy providers", _planner_error)
 
-                # ── Attempt 2: Simpler prompt, try again across all providers ─────────
+                # If candidate failed, retry preserving full topic and document grounding
                 if not isinstance(deck_spec, dict) or "slides" not in deck_spec:
-                    _minimal_prompt = (
-                        f"Return a JSON object with keys 'deckTitle' (string) and 'slides' (array of "
-                        f"{target_slide_count} objects, each with slideId, headline, layoutHint, bullets[]). "
-                        f"Topic: {goal.topic or user_prompt[:300]}"
-                    )
                     try:
                         deck_spec = await asyncio.wait_for(
                             ProviderRouter.call_llm(
                                 db=db,
                                 agent_type="deck_planner",
-                                system_prompt="You are a presentation planner. Respond with valid JSON only.",
-                                user_prompt=_minimal_prompt,
+                                system_prompt=(
+                                    "You are an executive presentation planner. Return a valid JSON object only with "
+                                    f"keys 'deckTitle' (string) and 'slides' (array of {target_slide_count} objects with slideId, headline, chapter, purpose, layoutHint, bullets)."
+                                ),
+                                user_prompt=planner_prompt,
                                 response_schema={"type": "object"},
                                 user_id=user_id,
                                 job_id=job_id,
                             ),
-                            timeout=60.0,
+                            timeout=180.0,
                         )
-                        logger.info("Deck planner attempt 2 succeeded with minimal prompt")
+                        logger.info("Deck planner attempt 2 succeeded with full document grounding")
                     except Exception as e2:
                         logger.warning(
-                            "Deck planner attempt 2 also failed (%s) — using dynamic grounding-based offline outline",
+                            "Deck planner attempt 2 also failed (%s) — using dynamic grounding-based outline",
                             e2,
                         )
                         deck_spec = None
@@ -759,7 +772,7 @@ class JobOrchestrator:
                         GroundingChunker.retrieve_for_slides(
                             _raw_grounding,
                             [t for t in batch_topics if t],
-                            max_chars_total=3500,
+                            max_chars_total=6000,
                         )
                         if _raw_grounding
                         else ""
@@ -784,7 +797,7 @@ class JobOrchestrator:
                             user_id=user_id,
                             job_id=job_id,
                         ),
-                        timeout=60.0,
+                        timeout=180.0,
                     )
 
                     ws_list = []
@@ -933,60 +946,11 @@ class JobOrchestrator:
 
                     if not slide.get("bullets"):
                         topic = slide.get("headline") or slide.get("purpose") or "Core Insights"
-                        formula_idx = idx % 4
-                        if (
-                            getattr(goal, "presentation_type", None) == PresentationType.RESEARCH_EDUCATION
-                            or bool(getattr(goal, "has_reference_docs", False))
-                        ):
-                            if formula_idx == 0:
-                                slide["bullets"] = [
-                                    f"Foundational Thesis: Comprehensive assessment of {str(topic).lower()}.",
-                                    "Empirical Evidence: Documented primary records, epigraphic testimony, and regional findings.",
-                                    "Civilizational Impact: Structural shifts reshaping political, economic, and cultural paradigms."
-                                ]
-                            elif formula_idx == 1:
-                                slide["bullets"] = [
-                                    f"Strategic Driver: Critical dynamics driving {str(topic).lower()}.",
-                                    "Operational Mechanism: Institutional systems, resource control, and statecraft enforcement.",
-                                    "Measurable Outcome: Concrete benchmarks and regional transformations established."
-                                ]
-                            elif formula_idx == 2:
-                                slide["bullets"] = [
-                                    f"Core Pillar: Structural consolidation underpinning {str(topic).lower()}.",
-                                    "Policy Execution: Administrative governance, logistical deployment, and legal frameworks.",
-                                    "Enduring Heritage: Long-term institutional legacy informing regional civilization."
-                                ]
-                            else:
-                                slide["bullets"] = [
-                                    f"Key Dimension: In-depth analysis of {str(topic).lower()} and its strategic imperatives.",
-                                    "Systemic Architecture: Integration of economic networks, societal welfare, and defense.",
-                                    "Strategic Takeaway: Essential historical lessons for governance and statecraft."
-                                ]
-                        else:
-                            if formula_idx == 0:
-                                slide["bullets"] = [
-                                    f"Executive Focus: Accelerate disciplined execution across {str(topic).lower()}.",
-                                    "Performance Driver: Leverage integrated cross-functional systems and modern toolchains.",
-                                    "Measurable Impact: Deliver high-confidence milestone outcomes with continuous alignment."
-                                ]
-                            elif formula_idx == 1:
-                                slide["bullets"] = [
-                                    f"Operational Enabler: Scalable architecture advancing {str(topic).lower()}.",
-                                    "Execution Rigor: Real-time telemetry, automated guardrails, and rapid feedback loops.",
-                                    "Strategic ROI: Unlock predictable velocity and sustainable margin expansion."
-                                ]
-                            elif formula_idx == 2:
-                                slide["bullets"] = [
-                                    f"Core Priority: Optimize capability delivery for {str(topic).lower()}.",
-                                    "Cross-Functional Lever: Align organizational incentives with clear accountability.",
-                                    "Target Benchmark: Consistently outperform industry baselines across core SLAs."
-                                ]
-                            else:
-                                slide["bullets"] = [
-                                    f"Strategic Pillar: Strengthen foundational resilience in {str(topic).lower()}.",
-                                    "Implementation Vector: Modernize workflows with targeted automation.",
-                                    "Long-Term Value: Institutionalize scalable operating advantage."
-                                ]
+                        slide["bullets"] = [
+                            f"Key Insight: Core structural dimensions and analytical drivers of {topic}.",
+                            f"Evidentiary Findings: Empirical benchmarks, distribution patterns, and documented metrics for {topic}.",
+                            f"Strategic Impact: Operational implications and long-term sustainable outcomes."
+                        ]
 
                     if not slide.get("speakerNotes"):
                         slide["speakerNotes"] = f"Presenter note for Slide {idx + 1}: Emphasize the core takeaways and operational milestones."

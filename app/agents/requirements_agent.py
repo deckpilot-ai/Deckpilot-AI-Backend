@@ -54,36 +54,82 @@ class RequirementsAgent:
     def extract_document_title(cls, sample_text: str, reference_files: list[str] | None = None) -> str:
         """Extract a meaningful title from document text or filename when prompt is generic."""
         if sample_text:
-            # 1. Look for repeated title patterns (e.g. Chapter heading printed above section title)
-            m_rep = re.search(r'([A-Z][A-Za-z0-9\s,\'’\-]{4,45})\s+\1', sample_text[:1500])
-            if m_rep:
-                cand = m_rep.group(1).strip()
-                if len(cand.split()) >= 2:
-                    return cand
+            # 1. Look for recurring uppercase running headers (common in textbooks, papers, reports)
+            raw_uc_headers = re.findall(r'^[A-Z][A-Z0-9\s,\'’\-]{4,55}$', sample_text, re.MULTILINE)
+            from collections import Counter
+            clean_headers = [
+                h.strip() for h in raw_uc_headers
+                if len(h.strip().split()) >= 2
+                and not re.search(r'\b(?:CONTEMPORARY|ALL RIGHTS|REPRINT|PREFACE|INDEX|CONTENTS|APPENDIX|DOWNLOADED|PAGE|CHAPTER)\b', h, re.I)
+            ]
+            if clean_headers:
+                counts = Counter(clean_headers)
+                top_header, top_count = counts.most_common(1)[0]
+                if top_count >= 2 or len(clean_headers) == 1:
+                    # Clean and title case with proper capitalization
+                    words = top_header.split()
+                    return " ".join([
+                        w.capitalize() if (i == 0 or w.lower() not in ("and", "of", "in", "to", "for", "the", "on", "a", "an", "with", "from", "at", "by")) else w.lower()
+                        for i, w in enumerate(words)
+                    ])
 
-            # 2. Look for chapter or numbered title e.g. "5 – The Rise of Empires" or "Chapter 12 - Understanding Markets"
+            # 2. Look for explicit chapter or numbered title e.g. "Chapter 5: Minerals and Energy Resources" or "5 – The Rise of Empires"
             m_chap = re.search(
-                r'(?:(?:chapter|ch\.)\s*\d+\s*[-–—:]*|\b\d+\s*[-–—]\s*)([A-Z][A-Za-z0-9\s,\'’\-]{3,50}?)(?:\n|\r|\.|\s{2,}|\bThere\b|\bReprint\b|$)',
-                sample_text[:1500],
+                r'(?:(?:chapter|ch\.|unit|section)\s*\d+\s*[-–—:]*|\b\d+\s*[-–—]\s*)([A-Z][A-Za-z0-9\s,\'’\-]{3,60}?)(?:\n|\r|\.|\s{2,}|\bThere\b|\bReprint\b|$)',
+                sample_text[:5000],
                 re.IGNORECASE,
             )
             if m_chap:
                 cand = m_chap.group(1).strip()
-                # Clean any duplicated trailing words
                 words = cand.split()
                 half = len(words) // 2
                 if half >= 2 and words[:half] == words[half:2*half]:
                     cand = " ".join(words[:half])
-                if len(cand) >= 4:
-                    return cand
+                if (
+                    len(cand) >= 4
+                    and not re.match(r'^(?:we|can|you|there|in|as|this|from|with|by|what|how|why)\b', cand, re.I)
+                    and not cand.endswith('?')
+                ):
+                    words = cand.split()
+                    return " ".join([
+                        w.capitalize() if (i == 0 or w.lower() not in ("and", "of", "in", "to", "for", "the", "on", "a", "an", "with", "from", "at", "by")) else w.lower()
+                        for i, w in enumerate(words)
+                    ])
 
-            # 3. Look for strong header line in first 5 lines
-            lines = [l.strip() for l in sample_text[:1000].splitlines() if l.strip()]
-            for line in lines[:5]:
+            # 3. Look for repeated title patterns (e.g. Chapter heading printed above section title)
+            m_rep = re.search(r'([A-Z][A-Za-z0-9\s,\'’\-]{4,45})\s+\1', sample_text[:3000])
+            if m_rep:
+                cand = m_rep.group(1).strip()
+                if (
+                    len(cand.split()) >= 2
+                    and not re.match(r'^(?:we|can|you|there|in|as|this|from|with|by|what|how|why)\b', cand, re.I)
+                    and not cand.endswith('?')
+                ):
+                    words = cand.split()
+                    return " ".join([
+                        w.capitalize() if (i == 0 or w.lower() not in ("and", "of", "in", "to", "for", "the", "on", "a", "an", "with", "from", "at", "by")) else w.lower()
+                        for i, w in enumerate(words)
+                    ])
+
+            # 4. Look for strong standalone header line in first 10 lines (NOT a prose sentence)
+            lines = [l.strip() for l in sample_text[:2500].splitlines() if l.strip()]
+            for line in lines[:10]:
                 clean_l = re.sub(r'^\d+\s+', '', line).strip()
-                if 4 <= len(clean_l) <= 50 and not re.search(r'\b(?:page|copyright|reprint|isbn|edition)\b', clean_l, re.I):
+                if (
+                    4 <= len(clean_l) <= 55
+                    and not re.search(r'\b(?:page|copyright|reprint|isbn|edition|contemporary|class|grade)\b', clean_l, re.I)
+                ):
+                    # Must NOT look like conversational sentence or question
+                    if re.match(r'^(?:we|can|you|there|in|as|this|if|when|it|they|from|with|by|what|how|why)\b', clean_l, re.I):
+                        continue
+                    if clean_l.endswith((",", ";", "?")):
+                        continue
                     if any(w[0].isupper() for w in clean_l.split() if w):
-                        return clean_l
+                        words = clean_l.split()
+                        return " ".join([
+                            w.capitalize() if (i == 0 or w.lower() not in ("and", "of", "in", "to", "for", "the", "on", "a", "an", "with", "from", "at", "by")) else w.lower()
+                            for i, w in enumerate(words)
+                        ])
 
         # Fallback to non-generic reference filename
         for f in (reference_files or []):
