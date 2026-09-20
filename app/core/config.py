@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     ai_provider_allowed_hosts: str = (
         "openrouter.ai,api.openai.com,generativelanguage.googleapis.com,"
         "api.groq.com,api.mistral.ai,api.anthropic.com,api.experientiallabs.ai,"
-        "codecraftapi.com,api.codecraftapi.com,integrate.api.nvidia.com,api.bazaarlink.ai,api.routeway.ai,api.apmix.ai,"
+        "codecraftapi.com,api.codecraftapi.com,integrate.api.nvidia.com,api.bazaarlink.ai,api.routeway.ai,api.apmix.ai,api.inceptionlabs.ai,"
         "api.unsplash.com,images.unsplash.com,api.pexels.com,images.pexels.com"
     )
 
@@ -82,6 +82,8 @@ class Settings(BaseSettings):
     routeway_base_url: str = "https://api.routeway.ai/v1"
     apmix_api_key: str = "apx_live_UXYEOHORQCieF7rAQPvDds9OgQOJ2LpmS0hiQfIw"
     apmix_base_url: str = "https://api.apmix.ai/v1"
+    inceptionlabs_api_key: str = "sk_24a0ac3e50e8c1944d612f2f235a1f08"
+    inceptionlabs_base_url: str = "https://api.inceptionlabs.ai/v1"
     unsplash_access_key: str = "aA081iOoBrg6tzC5mLvsOH6Zpr8KyP9Rxcl0gUAuRQM"
     unsplash_secret_key: str = "Sre8TS9N9s6xfZahgQfjOiVV5BKqYfUf5l1HKIj8SiQ"
     unsplash_app_id: str = "1063175"

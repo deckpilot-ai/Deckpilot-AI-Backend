@@ -71,6 +71,7 @@ class ProviderRouter:
         provider_configs = [
             ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 35),
             ("groq", "https://api.groq.com/openai/v1", settings.groq_api_key, 32),
+            ("inceptionlabs", settings.inceptionlabs_base_url or "https://api.inceptionlabs.ai/v1", settings.inceptionlabs_api_key, 30),
             ("apmix", settings.apmix_base_url or "https://api.apmix.ai/v1", settings.apmix_api_key, 28),
             ("nvidia", settings.nvidia_base_url or "https://integrate.api.nvidia.com/v1", settings.nvidia_api_key, 25),
             ("bazaarlink", settings.bazaarlink_base_url or "https://api.bazaarlink.ai/v1", settings.bazaarlink_api_key, 20),
@@ -122,6 +123,11 @@ class ProviderRouter:
                         {"model_id": "groq/compound-mini", "display_name": "Compound Mini", "priority": 85, "enabled": 1, "context_length": 131072},
                         {"model_id": "llama-3.3-70b-versatile", "display_name": "Llama 3.3 70B (Deprecated)", "priority": 1, "enabled": 0, "context_length": 128000},
                         {"model_id": "allam-2-7b", "display_name": "Allam 2 7B (Deprecated)", "priority": 1, "enabled": 0, "context_length": 4096},
+                    ]
+                elif name == "inceptionlabs":
+                    default_models = [
+                        {"model_id": "mercury-2.5", "display_name": "Mercury 2.5 (Diffusion LLM • 316 TPS)", "priority": 100, "enabled": 1, "context_length": 260000},
+                        {"model_id": "mercury-2", "display_name": "Mercury 2 (Discrete Diffusion • 255 TPS)", "priority": 95, "enabled": 1, "context_length": 128000},
                     ]
                 elif name == "nvidia":
                     default_models = [
@@ -635,7 +641,11 @@ class ProviderRouter:
                     data = resp.json()
                     content = ""
                     if "choices" in data and len(data["choices"]) > 0:
-                        content = data["choices"][0].get("message", {}).get("content", "").strip()
+                        choice = data["choices"][0]
+                        raw_content = choice.get("message", {}).get("content") if isinstance(choice.get("message"), dict) else choice.get("text")
+                        if raw_content is None:
+                            raw_content = ""
+                        content = str(raw_content).strip()
                     
                     health_tracker.record_success(provider_name, model_id, elapsed_ms)
                     return {
@@ -871,6 +881,11 @@ class ProviderRouter:
                         ("qwen3.8-max", 92),
                         ("claude-sonnet-4.6", 90),
                         ("glm-5", 88),
+                    ]
+                elif "inceptionlabs" in p_name:
+                    model_candidates = [
+                        ("mercury-2.5", 100),
+                        ("mercury-2", 95),
                     ]
                 elif "apmix" in p_name:
                     model_candidates = [
