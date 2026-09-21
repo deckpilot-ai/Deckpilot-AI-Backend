@@ -784,3 +784,59 @@ async def trigger_provider_health_scan(
         **health_tracker.get_status_overview(),
     }
 
+
+@router.post("/storage/cleaner/run")
+def run_storage_cleaner_policy(
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+    retention_days: int = Query(default=3, ge=1, le=365, description="Retention window in days (default 3)"),
+    dry_run: bool = Query(default=False, description="Simulate cleanup without deleting objects"),
+):
+    """Execute the DataCleaner policy to delete unused user document data and images from Cloudflare R2 / storage."""
+    from app.services.data_cleaner import DataCleanerService
+
+    report = DataCleanerService.run_cleanup_policy(
+        db=db,
+        retention_days=retention_days,
+        dry_run=dry_run,
+    )
+    return {
+        "success": True,
+        "report": report,
+    }
+
+
+@router.get("/storage/cleaner/status")
+def get_storage_cleaner_status(
+    admin: Annotated[User, Depends(require_admin)],
+):
+    """Get the current DataCleaner policy settings and last execution report."""
+    from app.services.data_cleaner import DataCleanerService
+
+    return {
+        "success": True,
+        "policy": {
+            "enabled": settings.storage_cleaner_enabled,
+            "retention_days": settings.storage_cleaner_retention_days,
+            "interval_hours": settings.storage_cleaner_interval_hours,
+            "r2_configured": bool(settings.r2_endpoint_url and settings.r2_access_key_id),
+            "r2_bucket": settings.r2_bucket,
+        },
+        "last_report": DataCleanerService.get_last_report(),
+    }
+
+
+@router.post("/storage/cleaner/r2-lifecycle")
+def apply_r2_bucket_lifecycle(
+    admin: Annotated[User, Depends(require_admin)],
+):
+    """Apply native Cloudflare R2 bucket lifecycle configuration for 3-day automatic scratch/staging expiration."""
+    from app.services.data_cleaner import DataCleanerService
+
+    res = DataCleanerService.apply_r2_bucket_lifecycle_configuration()
+    return {
+        "success": res.get("status") == "success",
+        **res,
+    }
+
+

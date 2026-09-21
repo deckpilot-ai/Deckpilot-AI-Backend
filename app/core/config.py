@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     r2_bucket: str = "deckpilotai"
     local_storage_dir: str = "./local_storage"
 
+    # Data Cleaner & Storage Optimization Policy
+    storage_cleaner_enabled: bool = True
+    storage_cleaner_retention_days: int = Field(default=3, ge=1, le=365)
+    storage_cleaner_interval_hours: int = Field(default=24, ge=1, le=168)
+
     # Frontend
     frontend_origin: str = (
         "http://localhost:3000,"
