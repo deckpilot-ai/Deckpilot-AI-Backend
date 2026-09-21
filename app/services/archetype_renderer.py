@@ -86,11 +86,11 @@ class ArchetypeRenderer:
         from app.presentation.themes.development_editorial.theme import DevelopmentEditorialTheme
         from app.presentation.themes.federalism_editorial.theme import FederalismEditorialTheme
 
-        raw_title = clean_text(slide_data.headline or slide_data.key_message or slide_data.objective or "")
-        raw_kicker = clean_text(slide_data.eyebrow or "")
-        raw_sub = clean_text(slide_data.takeaway or slide_data.subtitle or "")
-        raw_body = clean_text(slide_data.body or "\n".join(slide_data.paragraphs or []))
-        bullets = [clean_text(b) for b in slide_data.bullets if b]
+        raw_title = clean_text(slide_data.headline or getattr(slide_data, "key_message", "") or getattr(slide_data, "objective", "") or "")
+        raw_kicker = clean_text(getattr(slide_data, "eyebrow", "") or "")
+        raw_sub = clean_text(getattr(slide_data, "takeaway", "") or getattr(slide_data, "subtitle", "") or "")
+        raw_body = clean_text(getattr(slide_data, "body", "") or "\n".join(getattr(slide_data, "paragraphs", []) or []))
+        bullets = [clean_text(b) for b in (slide_data.bullets or []) if b]
         items = []
         for b in bullets:
             t, rem = _split_title_body(b)

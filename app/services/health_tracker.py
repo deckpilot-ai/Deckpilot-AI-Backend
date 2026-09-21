@@ -133,6 +133,7 @@ class _ModelHealth:
         "last_failure_at",
         "backoff_cycles_remaining",
         "_recent_results",
+        "circuit_open_duration",
     )
 
     FAILURE_THRESHOLD = 3  # consecutive failures to open circuit
@@ -147,6 +148,7 @@ class _ModelHealth:
         self.status: ModelHealthState = ModelHealthState.UNKNOWN
         self.circuit_state: CircuitState = CircuitState.CLOSED
         self.circuit_opened_at: float = 0.0
+        self.circuit_open_duration: float = self.CIRCUIT_OPEN_DURATION
         self.ewma_latency_ms: float = 0.0
         self.rolling_latencies: list[float] = []
         self.consecutive_failures: int = 0
@@ -339,7 +341,8 @@ class _ModelHealth:
         if self.circuit_state == CircuitState.HALF_OPEN:
             return True
         # OPEN — verify if circuit open duration (cooldown) has elapsed
-        if time.time() - self.circuit_opened_at >= self.CIRCUIT_OPEN_DURATION:
+        open_duration = getattr(self, "circuit_open_duration", self.CIRCUIT_OPEN_DURATION)
+        if time.time() - self.circuit_opened_at >= open_duration:
             self.circuit_state = CircuitState.HALF_OPEN
             logger.info("Circuit transitioned to HALF_OPEN for %s/%s", self.provider_name, self.model_id)
             return True
@@ -504,7 +507,8 @@ class HealthTracker:
                 if key.startswith(p_prefix):
                     health.circuit_state = CircuitState.OPEN
                     health.circuit_opened_at = now
-                    health.CIRCUIT_OPEN_DURATION = max(health.CIRCUIT_OPEN_DURATION, cooldown_seconds)
+                    curr_cooldown = getattr(health, "circuit_open_duration", health.CIRCUIT_OPEN_DURATION)
+                    health.circuit_open_duration = max(curr_cooldown, cooldown_seconds)
                     health.status = (
                         ModelHealthState.AUTH_ERROR if status_code in (401, 403)
                         else ModelHealthState.QUOTA_EXCEEDED

@@ -1,0 +1,18 @@
+{
+  "case_id": "case_048_geography_20s",
+  "domain": "geography",
+  "source_type": "data_heavy_kpi",
+  "target_slides": 20,
+  "prompt": "20 slides professional presentation covering strategic overview, key drivers, analytical frameworks, and execution roadmap for Geography.",
+  "sources": [],
+  "expected_rules": {
+    "min_slides": 19,
+    "max_slides": 22,
+    "requires_timeline": false,
+    "requires_source_images": false,
+    "minimum_source_utilization": 0.0,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

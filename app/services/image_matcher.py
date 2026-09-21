@@ -186,10 +186,37 @@ class ImageMatcher:
                 assigned_slides.add(s_idx)
                 assigned_assets.add(asset_index_by_id[existing_id])
 
+        NON_IMAGE_LAYOUTS = {
+            "comparison", "table", "chart", "timeline", "metrics", "metrics_grid",
+            "kpi", "matrix", "matrix_quadrant", "quote", "dark_quote", "closing"
+        }
+
+        def _is_ineligible(s: Any) -> bool:
+            if isinstance(s, SlideSpec):
+                fam = getattr(s.layout_family, "value", str(s.layout_family or "")).lower()
+                hint = str(s.layout_hint or "").lower()
+                if fam in ("comparison", "timeline", "table", "chart", "metrics_grid"):
+                    return True
+                if hint in NON_IMAGE_LAYOUTS:
+                    return True
+                if s.table_spec or s.chart_spec or s.diagram_spec:
+                    return True
+                return False
+            elif isinstance(s, dict):
+                hint = str(s.get("layoutHint") or s.get("layout_hint") or "").lower()
+                if hint in NON_IMAGE_LAYOUTS:
+                    return True
+                if s.get("table") or s.get("chart"):
+                    return True
+                return False
+            return False
+
         # 2. Score all candidate pairs (slide_idx, asset_idx)
         scored_pairs = []
         for s_idx, slide in enumerate(slides):
             if s_idx in assigned_slides:
+                continue
+            if _is_ineligible(slide):
                 continue
 
             # Check slide text and section
@@ -266,6 +293,8 @@ class ImageMatcher:
                     continue
                 for s_idx, slide in enumerate(slides):
                     if s_idx in assigned_slides or s_idx == 0:
+                        continue
+                    if _is_ineligible(slide):
                         continue
                     caption = asset["caption"] or asset["summary"] or "Source document visual reference"
                     if isinstance(slide, SlideSpec):

@@ -325,8 +325,8 @@ class PPTXRenderer:
 
             # Eyebrow & Title & Accent Tick (Skip for custom cover/divider archetypes and editorial layouts)
             if not is_standalone_cover and not is_editorial_layout:
-                cls._text(slide, eyebrow.upper(), 0.6, 0.45, 12.1, 0.32, primary if not dark else accent, body_font, 12, bold=True)
-                cls._text(slide, title, 0.6, 0.78, 12.1, 1.05, fg, title_font, 28, title=True)
+                cls._text(slide, eyebrow.upper(), 0.6, 0.45, 12.1, 0.28, primary if not dark else accent, body_font, 12, bold=True, name="slide-eyebrow")
+                cls._text(slide, title, 0.6, 0.78, 12.1, 1.05, fg, title_font, 28, title=True, name="slide-title")
                 cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.6, 1.88, 0.6, 0.06, accent if not dark else tint(primary, 0.6), "accent-tick")
 
             # Footer
@@ -334,14 +334,14 @@ class PPTXRenderer:
                 norm_deck = re.sub(r"\W+", "", deck_title).lower()
                 norm_eyebrow = re.sub(r"\W+", "", eyebrow).lower()
                 footer_text = deck_title.upper() if norm_deck == norm_eyebrow else f"{deck_title.upper()} / {eyebrow.upper()}"
-                cls._text(slide, footer_text[:140], 0.6, 7.05, 11.4, 0.28, body_col, body_font, 9.5)
+                cls._text(slide, footer_text[:140], 0.6, 7.05, 11.4, 0.28, body_col, body_font, 9.5, name="slide-footer")
 
-            # Persistent Page Number Pill
+            # Persistent Page Number Pill Colors
+            pill_bg = tint(ink, 0.28) if dark else tint(primary, 0.12)
+            pill_fg = white if dark else ink
             if not is_editorial_layout:
-                pill_bg = tint(ink, 0.28) if dark else tint(primary, 0.12)
-                pill_fg = white if dark else ink
                 cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
-                cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True)
+                cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True, name="page-number-text")
 
             # Speaker Notes
             notes = slide_data.speaker_notes or f"Presenter guidance for Slide {index + 1}: {title}"
@@ -417,8 +417,9 @@ class PPTXRenderer:
             if arch_id and ArchetypeRenderer.can_render(arch_id):
                 if ArchetypeRenderer.render(slide, arch_id, slide_data, design_system, image_bytes, cls):
                     # Redraw page pill on top to ensure never obscured
-                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
-                    cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True)
+                    if not is_editorial_layout:
+                        cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
+                        cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True)
                     continue
 
             # --- Layout Routing ---

@@ -1,0 +1,1 @@
+8 slides cloud cost optimization strategies covering spot instances, autoscaling, and egress reductions.

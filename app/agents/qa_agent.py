@@ -112,6 +112,8 @@ class PresentationQAAgent:
         cls._check_images_and_rhythm(slide_specs, assets, asset_by_id, source_images or {}, issues)
         from app.agents.visual_qa_evaluator import VisualQAEvaluator
         issues.extend(VisualQAEvaluator.evaluate_slide_visual_strategy(slide_specs, design_system, available_assets=assets))
+        from app.agents.presentation_level_qa import PresentationLevelQA
+        issues.extend(PresentationLevelQA.evaluate_deck(slide_specs, design_system, available_assets=assets))
         if pptx_bytes:
             cls._check_rendered_pptx(slide_specs, pptx_bytes, issues)
             try:

@@ -1,0 +1,18 @@
+{
+  "case_id": "case_017_economics",
+  "domain": "economics",
+  "source_type": "prompt_only",
+  "target_slides": 6,
+  "prompt": "6 slides comparative analysis of monetary policy vs fiscal stimulus during supply shocks.",
+  "sources": [],
+  "expected_rules": {
+    "min_slides": 5,
+    "max_slides": 8,
+    "requires_timeline": false,
+    "requires_source_images": false,
+    "minimum_source_utilization": 0.0,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

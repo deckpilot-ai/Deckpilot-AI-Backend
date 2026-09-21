@@ -1,0 +1,18 @@
+{
+  "case_id": "case_058_science_12s",
+  "domain": "science",
+  "source_type": "prompt_only",
+  "target_slides": 12,
+  "prompt": "12 slides professional presentation covering strategic overview, key drivers, analytical frameworks, and execution roadmap for Science.",
+  "sources": [],
+  "expected_rules": {
+    "min_slides": 11,
+    "max_slides": 14,
+    "requires_timeline": false,
+    "requires_source_images": false,
+    "minimum_source_utilization": 0.0,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

@@ -1,0 +1,1 @@
+8 slides benchmarking open-source LLM inference latency, token throughput, and GPU memory efficiency.

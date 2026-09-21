@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from difflib import SequenceMatcher
@@ -117,8 +118,8 @@ class RepairAgent:
                 clean_title, _ = normalize_title(raw, max_words=4)
                 slide.headline = clean_title
             elif action in {"trim_bullets", "shorten_bullets", "shorten_and_reflow"} and slide:
-                slide.bullets = [cls._shorten(b, 22) for b in slide.bullets[:5]]
-                slide.archetype_fields["qa_font_scale"] = max(1.08, float(slide.archetype_fields.get("qa_font_scale", 1.0)))
+                slide.bullets = [cls._shorten(b, 18) for b in slide.bullets[:5]]
+                slide.archetype_fields["qa_font_scale"] = min(0.94, float(slide.archetype_fields.get("qa_font_scale", 1.0)))
             elif action == "dedupe_text" and slide:
                 cls._dedupe_slide(slide)
             elif action in {"normalize_spacing", "normalize_punctuation", "repair_encoding"} and slide:
@@ -468,7 +469,16 @@ class RepairAgent:
     @staticmethod
     def _shorten(text: str, max_words: int) -> str:
         words = _clean_text(text).split()
-        return " ".join(words[:max_words]).rstrip(" ,:;-") + ("…" if len(words) > max_words else "")
+        if len(words) <= max_words:
+            return " ".join(words)
+        candidate = " ".join(words[:max_words]).rstrip(" ,:;-")
+        # If there's an earlier period within the candidate, end at that sentence
+        for punct in (". ", "; "):
+            if punct in candidate:
+                parts = candidate.rsplit(punct, 1)
+                if len(parts[0].split()) >= max(6, max_words // 2):
+                    return parts[0].strip() + "."
+        return candidate.rstrip(". ") + "."
 
     @staticmethod
     def _bad_placeholder(text: str) -> bool:

@@ -1,0 +1,18 @@
+{
+  "case_id": "case_014_finance",
+  "domain": "finance",
+  "source_type": "data_heavy_kpi",
+  "target_slides": 8,
+  "prompt": "8 slides Q3 financial performance review: ARR growth, net retention, EBITDA margins, and CAC payback.",
+  "sources": [],
+  "expected_rules": {
+    "min_slides": 7,
+    "max_slides": 10,
+    "requires_timeline": false,
+    "requires_source_images": false,
+    "minimum_source_utilization": 0.0,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

@@ -17,7 +17,16 @@ class PPTXValidator:
     @classmethod
     def validate_pptx_stream(cls, pptx_bytes: bytes, expected_slides: int | None = None) -> QAReport:
         issues: list[ValidationIssue] = []
-        checks = ["reopen_pptx", "slide_count", "canvas_bounds", "placeholder_text", "media_relationships"]
+        checks = [
+            "reopen_pptx",
+            "slide_count",
+            "canvas_bounds",
+            "shape_collisions",
+            "text_overflow",
+            "font_size_floor",
+            "placeholder_text",
+            "media_relationships",
+        ]
 
         try:
             prs = Presentation(io.BytesIO(pptx_bytes))
@@ -25,49 +34,128 @@ class PPTXValidator:
 
             if expected_slides and slide_count != expected_slides:
                 issues.append(ValidationIssue(
+                    checkpoint_id="QA-110",
                     severity=ValidationSeverity.HIGH,
                     category=ValidationCategory.TECHNICAL,
                     slide_number=0,
                     message=f"Slide count mismatch: expected {expected_slides}, rendered {slide_count}",
                     suggested_fix="Ensure all planned slides are rendered",
+                    repair_action="rerender_deck",
                 ))
 
-            w_pt = prs.slide_width
-            h_pt = prs.slide_height
+            w_in = prs.slide_width / 914400.0 if prs.slide_width else 13.333
+            h_in = prs.slide_height / 914400.0 if prs.slide_height else 7.500
+
+            from app.services.collision_engine import BoundingBox, CollisionDetectionEngine
 
             for idx, slide in enumerate(prs.slides):
-                for shape in slide.shapes:
-                    # Canvas bounds check (allow intentional decorative bleed accents like benchmark presentations)
-                    is_decorative_bleed = any(tag in (shape.name or "").lower() for tag in ("accent-circle", "corner-accent", "bleed", "backdrop"))
-                    if not is_decorative_bleed:
-                        if shape.left < 0 or shape.top < 0 or (shape.left + shape.width) > w_pt + 1000 or (shape.top + shape.height) > h_pt + 1000:
-                            issues.append(ValidationIssue(
-                                severity=ValidationSeverity.MEDIUM,
-                                category=ValidationCategory.GEOMETRY,
-                                slide_number=idx + 1,
-                                message=f"Shape '{shape.name}' overflows canvas limits",
-                                suggested_fix="Constrain coordinates to canvas dimensions",
-                            ))
+                slide_num = idx + 1
+                slide_boxes: list[BoundingBox] = []
+                cards: list[BoundingBox] = []
 
-                    # Placeholder check
+                for shape in slide.shapes:
+                    sh_x = shape.left / 914400.0
+                    sh_y = shape.top / 914400.0
+                    sh_w = shape.width / 914400.0
+                    sh_h = shape.height / 914400.0
+                    sh_name = shape.name or "shape"
+
+                    # Classify kind
+                    sh_lower = sh_name.lower()
+                    if any(tag in sh_lower for tag in ("accent", "bleed", "backdrop", "corner", "tick", "divider", "line")):
+                        kind = "background"
+                    elif any(tag in sh_lower for tag in ("card", "box", "panel", "container", "row-", "frame", "mat")):
+                        kind = "card"
+                    elif any(tag in sh_lower for tag in ("pill", "badge", "tag", "disc", "bubble")):
+                        kind = "badge"
+                    elif any(tag in sh_lower for tag in ("icon",)):
+                        kind = "icon"
+                    elif any(tag in sh_lower for tag in ("image", "photo", "picture")):
+                        kind = "image"
+                    elif getattr(shape, "has_chart", False):
+                        kind = "chart"
+                    elif getattr(shape, "has_table", False):
+                        kind = "table"
+                    elif any(tag in sh_lower for tag in ("footer", "page")):
+                        kind = "footer"
+                    elif any(tag in sh_lower for tag in ("title", "headline", "eyebrow", "header")):
+                        kind = "header"
+                    elif shape.has_text_frame and shape.text.strip():
+                        kind = "text"
+                    else:
+                        kind = "shape"
+
+                    box = BoundingBox(
+                        id=str(shape.shape_id),
+                        name=sh_name,
+                        kind=kind,
+                        x=sh_x,
+                        y=sh_y,
+                        w=sh_w,
+                        h=sh_h,
+                    )
+                    slide_boxes.append(box)
+                    if kind == "card":
+                        cards.append(box)
+
+                    # Inspect text frame properties (font size floor and placeholders)
                     if shape.has_text_frame:
-                        text = shape.text.lower()
-                        for marker in ("lorem ipsum", "[insert", "todo:", "placeholder"):
-                            if marker in text:
+                        text = shape.text.strip()
+                        lower_text = text.lower()
+                        for marker in ("lorem ipsum", "[insert", "todo:", "placeholder", "tbd"):
+                            if marker in lower_text:
                                 issues.append(ValidationIssue(
+                                    checkpoint_id="QA-013",
                                     severity=ValidationSeverity.HIGH,
                                     category=ValidationCategory.CONTENT,
-                                    slide_number=idx + 1,
-                                    message=f"Unresolved placeholder '{marker}' found in slide text",
+                                    slide_number=slide_num,
+                                    message=f"Unresolved placeholder '{marker}' found in shape '{sh_name}'",
                                     suggested_fix="Replace placeholder with substantive domain copy",
+                                    repair_action="remove_placeholder",
                                 ))
 
+                        # Check font sizes
+                        for p in shape.text_frame.paragraphs:
+                            for r in p.runs:
+                                if r.font.size is not None:
+                                    pt_size = r.font.size.pt
+                                    if pt_size < 10.5 and kind not in ("footer", "page_number") and len(r.text.strip()) > 3:
+                                        issues.append(ValidationIssue(
+                                            checkpoint_id="QA-025",
+                                            severity=ValidationSeverity.HIGH if pt_size < 9.0 else ValidationSeverity.MEDIUM,
+                                            category=ValidationCategory.TYPOGRAPHY,
+                                            slide_number=slide_num,
+                                            message=f"Tiny text detected in '{sh_name}': {pt_size:.1f}pt is below legible floor (min 11pt)",
+                                            suggested_fix="Increase font size to at least 11pt",
+                                            repair_action="increase_font",
+                                        ))
+
+                # Run collision engine on slide shapes
+                collision_issues = CollisionDetectionEngine.detect_collisions(
+                    slide_number=slide_num,
+                    boxes=slide_boxes,
+                    canvas_w=w_in,
+                    canvas_h=h_in,
+                )
+                issues.extend(collision_issues)
+
+                # Validate card alignment if multiple cards present
+                if len(cards) >= 2:
+                    align_issues = CollisionDetectionEngine.validate_card_alignment(
+                        slide_number=slide_num,
+                        cards=cards,
+                    )
+                    issues.extend(align_issues)
+
             status = "passed" if not any(i.severity in (ValidationSeverity.CRITICAL, ValidationSeverity.HIGH) for i in issues) else "issues_detected"
-            score = max(0.0, 100.0 - len(issues) * 10.0)
+            score = max(0.0, 100.0 - sum(
+                (12.0 if i.severity == ValidationSeverity.CRITICAL else (5.0 if i.severity == ValidationSeverity.HIGH else 2.0))
+                for i in issues
+            ))
 
             return QAReport(
                 status=status,
-                overall_quality_score=score,
+                overall_quality_score=round(score, 1),
                 issues=issues,
                 checks_performed=checks,
                 slide_count=slide_count,

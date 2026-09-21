@@ -30,6 +30,7 @@ from app.models.project import Project
 from app.schemas.generation_state import (
     AssetMetadata,
     DesignSystem,
+    LayoutFamily,
     PresentationGoal,
     PresentationType,
     QAReport,
@@ -1246,14 +1247,64 @@ class JobOrchestrator:
 
                     context["deck_spec"]["qaReport"] = qa_report.model_dump()
 
-                    # Enforce completion gate: Non-fatal QA findings are attached to the report without crashing presentation delivery
+                    # Enforce completion gate: if critical issues remain after 3 repair passes,
+                    # apply guaranteed-safe archetype fallback to prevent broken slides from shipping
                     critical_issues = [
                         issue for issue in qa_report.issues
                         if issue.severity == ValidationSeverity.CRITICAL
                     ]
                     if critical_issues:
                         summary_msg = "; ".join(f"[Slide {i.slide_number}] {i.message}" for i in critical_issues[:4])
-                        logger.warning("Visual QA finished with critical advisory finding(s) after %d repair passes: %s", repair_iterations, summary_msg)
+                        logger.warning("Applying guaranteed-safe layout fallback for critical finding(s): %s", summary_msg)
+                        crit_slides = {i.slide_number for i in critical_issues if i.slide_number}
+                        for s_num in crit_slides:
+                            if 1 <= s_num <= len(slide_specs):
+                                s = slide_specs[s_num - 1]
+                                if s_num == 1:
+                                    s.layout_family = LayoutFamily.HERO
+                                else:
+                                    s.layout_family = LayoutFamily.TWO_COLUMN if len(s.bullets) <= 4 else LayoutFamily.THREE_COLUMN
+                                s.layout_hint = s.layout_family.value
+                                s.archetype_id = None
+                                s.image_artifact_id = None
+                                s.archetype_fields["qa_safe_geometry"] = True
+                                s.archetype_fields["qa_font_scale"] = 0.94
+
+                        pptx_bytes = await run_in_threadpool(
+                            PPTXRenderer.render_presentation,
+                            slide_specs,
+                            ds_obj,
+                            source_images,
+                            context["deck_spec"].get("deckTitle", "Presentation"),
+                        )
+                        qa_report = await run_in_threadpool(
+                            PresentationQAAgent.evaluate_presentation,
+                            slide_specs,
+                            ds_obj,
+                            pptx_bytes,
+                            source_images,
+                            available_asset_metadata,
+                        )
+                        qa_report.repair_iterations = repair_iterations + 1
+
+                    context["deck_spec"]["qaReport"] = qa_report.model_dump()
+
+                    # Compute comprehensive presentation scorecard
+                    from app.services.quality_scorer import PresentationQualityScorer
+                    scorecard = PresentationQualityScorer.score_presentation(
+                        slides=slide_specs,
+                        qa_report=qa_report,
+                        repair_iterations=qa_report.repair_iterations,
+                    )
+                    context["deck_spec"]["scorecard"] = {
+                        "overall_quality_score": scorecard.overall_quality_score,
+                        "is_presentation_ready": scorecard.is_presentation_ready,
+                        "status": scorecard.status,
+                        "critical_issues_count": scorecard.critical_issues_count,
+                        "high_issues_count": scorecard.high_issues_count,
+                        "medium_issues_count": scorecard.medium_issues_count,
+                        "summary_findings": scorecard.summary_findings,
+                    }
 
                     high_issues = [
                         issue for issue in qa_report.issues
@@ -1267,7 +1318,7 @@ class JobOrchestrator:
                     _emit(
                         "visual_qa",
                         "completed",
-                        f"Quality checks {qa_summary} (Score: {qa_report.overall_quality_score}/100, {qa_report.checkpoints_passed}/{qa_report.checkpoints_total} passed, {qa_report.repair_iterations} repair passes).",
+                        f"Quality checks {qa_summary} (Score: {scorecard.overall_quality_score}/100, Ready: {scorecard.is_presentation_ready}, {qa_report.checkpoints_passed}/{qa_report.checkpoints_total} passed).",
                         {
                             "phase": "completed",
                             "qa_summary": _qa_snapshot(qa_report, qa_report.repair_iterations + 1),

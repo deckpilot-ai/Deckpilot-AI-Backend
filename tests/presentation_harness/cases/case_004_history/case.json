@@ -1,0 +1,18 @@
+{
+  "case_id": "case_004_history",
+  "domain": "history",
+  "source_type": "vague_user_prompt",
+  "target_slides": 6,
+  "prompt": "Make school history presentation from this chapter with key points and timeline.",
+  "sources": [],
+  "expected_rules": {
+    "min_slides": 5,
+    "max_slides": 8,
+    "requires_timeline": true,
+    "requires_source_images": false,
+    "minimum_source_utilization": 0.0,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

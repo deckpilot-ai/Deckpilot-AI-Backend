@@ -1,0 +1,1 @@
+10 slides pitch deck for enterprise multimodal presentation generation platform covering LLMs, vision QA, and market size.

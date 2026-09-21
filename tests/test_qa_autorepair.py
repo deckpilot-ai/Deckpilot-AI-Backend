@@ -206,7 +206,7 @@ def test_two_line_professional_title_is_not_destructively_shortened():
     slide = SlideSpec(
         slide_id="s01",
         slide_number=1,
-        headline="An empire is a political unit where a central ruler commands diverse peoples and territories",
+        headline="Defining Global Empires",
         bullets=["A grounded definition."],
         layout_family=LayoutFamily.TWO_COLUMN,
     )

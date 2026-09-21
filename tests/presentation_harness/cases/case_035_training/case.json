@@ -1,0 +1,18 @@
+{
+  "case_id": "case_035_training",
+  "domain": "training",
+  "source_type": "prompt_only",
+  "target_slides": 8,
+  "prompt": "8 slides manager onboarding training: feedback loops, active listening, conflict mediation, and OKR setting.",
+  "sources": [],
+  "expected_rules": {
+    "min_slides": 7,
+    "max_slides": 10,
+    "requires_timeline": false,
+    "requires_source_images": false,
+    "minimum_source_utilization": 0.0,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

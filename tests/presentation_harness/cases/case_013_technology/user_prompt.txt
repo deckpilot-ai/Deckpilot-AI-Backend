@@ -1,0 +1,1 @@
+7 slides devops CI/CD pipeline modernization and automated regression testing.

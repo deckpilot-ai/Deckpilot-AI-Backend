@@ -502,6 +502,8 @@ class ValidationCategory(str, Enum):
     DATA = "DATA"
     DESIGN = "DESIGN"
     TECHNICAL = "TECHNICAL"
+    TYPOGRAPHY = "TYPOGRAPHY"
+    IMAGES = "IMAGES"
 
 
 class ValidationIssue(BaseModel):
