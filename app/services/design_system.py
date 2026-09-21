@@ -40,6 +40,9 @@ excerpt. Unsupported special content is omitted by the application.
 Use concise, source-backed bullets; no fixed minimum count and no filler.
 The renderer owns typography, components and geometry. QA must not claim
 full visual inspection unless every slide was actually rendered and inspected.
+Every slide headline MUST be strictly 1 to 4 words (minimum 1, maximum 4 words)
+and must be impactful and concise, capturing the essence of the slide. Secondary
+context, questions, and evidence belong strictly in subtitle or body bullets.
 """
 
 PALETTES = {

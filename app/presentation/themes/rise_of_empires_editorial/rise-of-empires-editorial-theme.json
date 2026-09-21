@@ -1,0 +1,93 @@
+{
+  "theme_id": "rise-of-empires-editorial-v1",
+  "name": "Rise of Empires Editorial",
+  "category": "heritage-editorial",
+  "description": "Premium historical, educational, and museum-grade editorial presentation theme reverse-engineered from benchmark 'The Rise of Empires (3).pptx'. Features Cambria serif headings, Calibri body, burnt orange icon badges, antique gold kickers, warm parchment cards, and deep teal insight surfaces.",
+  "slide": {
+    "width_inches": 13.333,
+    "height_inches": 7.500,
+    "aspect_ratio": "16:9",
+    "margins": {
+      "left": 0.55,
+      "right": 0.55,
+      "top": 0.50,
+      "bottom": 0.44
+    },
+    "content_top": 1.65,
+    "content_bottom": 6.80,
+    "footer_top": 7.06
+  },
+  "fonts": {
+    "display": "Cambria",
+    "body": "Calibri",
+    "monospace": "Consolas"
+  },
+  "colors": {
+    "canvas": "#FFFFFF",
+    "canvas_dark": "#123B47",
+    "dark_secondary": "#1C505C",
+    "heading": "#123B47",
+    "body": "#26221E",
+    "muted": "#7C7267",
+    "accent": "#C05A38",
+    "kicker": "#B0791A",
+    "parchment": "#FAF6EF",
+    "cream": "#F4EEE4",
+    "border_warm": "#E1D6C6",
+    "text_on_dark": "#EDE3D6",
+    "white": "#FFFFFF"
+  },
+  "header_geometry": {
+    "badge": {
+      "left": 0.55,
+      "top": 0.52,
+      "diameter": 0.66,
+      "fill": "#C05A38"
+    },
+    "kicker": {
+      "left": 1.41,
+      "top": 0.50,
+      "color": "#B0791A",
+      "font": "Calibri",
+      "size_pt": 12.0,
+      "bold": true,
+      "uppercase": true
+    },
+    "title": {
+      "left": 1.41,
+      "top": 0.75,
+      "color": "#123B47",
+      "font": "Cambria",
+      "size_pt": 27.0,
+      "bold": true,
+      "max_lines": 2
+    },
+    "dark_badge_top": 0.60,
+    "dark_kicker_top": 0.62,
+    "dark_title_top": 0.86
+  },
+  "typography": {
+    "cover_title": { "preferred_pt": 56.0, "min_pt": 42.0, "max_pt": 60.0, "max_lines": 2 },
+    "slide_title": { "preferred_pt": 27.0, "min_pt": 23.0, "max_pt": 30.0, "max_lines": 2 },
+    "card_title": { "preferred_pt": 15.0, "min_pt": 13.0, "max_pt": 18.0, "max_lines": 2 },
+    "body": { "preferred_pt": 14.5, "min_pt": 11.5, "max_pt": 16.0 },
+    "compact_body": { "preferred_pt": 12.0, "min_pt": 10.5, "max_pt": 13.5 },
+    "kicker": { "preferred_pt": 12.0, "min_pt": 11.0, "max_pt": 13.0 },
+    "caption": { "preferred_pt": 10.5, "min_pt": 9.0, "max_pt": 11.0 },
+    "footer": { "preferred_pt": 9.0, "min_pt": 8.0, "max_pt": 9.5 }
+  },
+  "shadows": {
+    "card": {
+      "blur_rad_emu": 114300,
+      "dist_emu": 38100,
+      "dir_deg": 5400000,
+      "color_hex": "000000",
+      "alpha_val": 16000
+    }
+  },
+  "layouts": [
+    "E01", "E02", "E03", "E04", "E05", "E06", "E07", "E08", "E09", "E10",
+    "E11", "E12", "E13", "E14", "E15", "E16", "E17", "E18", "E19", "E20",
+    "E21", "E22", "E23"
+  ]
+}

@@ -185,15 +185,13 @@ class PresentationQAAgent:
             else:
                 seen_titles[_normalized(title)] = idx
             title_word_count = len(title.split())
-            if len(title) > 100 or title_word_count > 16:
-                sev = ValidationSeverity.HIGH if (len(title) > 115 or title_word_count > 18) else ValidationSeverity.MEDIUM
-                issues.append(cls._issue("title_too_long", sev, ValidationCategory.CONTENT, idx, f"Title contains {title_word_count} words ({len(title)} chars): '{title[:55]}…'", sid))
-            if title_word_count > 8 and title.endswith((".", ";")):
+            if title_word_count > 4 or len(title) > 55:
+                sev = ValidationSeverity.HIGH if title_word_count > 6 else ValidationSeverity.MEDIUM
+                issues.append(cls._issue("title_too_long", sev, ValidationCategory.CONTENT, idx, f"Title contains {title_word_count} words (max 4 words allowed): '{title[:55]}'", sid))
+            if title_word_count > 4 and title.endswith((".", ";")):
                 issues.append(cls._issue("title_paragraph", ValidationSeverity.HIGH, ValidationCategory.CONTENT, idx, f"Title phrased like narrative sentence: '{title[:55]}…'", sid))
             elif re.search(r"\b(?:which took place|and their various|during the period)\b", title, re.I):
                 issues.append(cls._issue("title_paragraph", ValidationSeverity.HIGH, ValidationCategory.CONTENT, idx, f"Title contains unnecessary narrative clauses: '{title[:55]}…'", sid))
-            if title and len(title.split()) == 1 and len(title) < 6 and idx > 1:
-                issues.append(cls._issue("title_too_short", ValidationSeverity.LOW, ValidationCategory.CONTENT, idx, f"Title '{title}' is too vague", sid))
             if any(marker in title.lower() for marker in _PLACEHOLDERS):
                 issues.append(cls._issue("title_placeholder", ValidationSeverity.HIGH, ValidationCategory.CONTENT, idx, "Title contains placeholder copy", sid))
 

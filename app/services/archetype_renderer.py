@@ -61,7 +61,16 @@ class ArchetypeRenderer:
 
     @classmethod
     def can_render(cls, archetype_id: str | None) -> bool:
-        return bool(archetype_id and archetype_id.upper() in LAYOUT_ARCHETYPES)
+        if not archetype_id:
+            return False
+        aid = archetype_id.upper()
+        if aid in LAYOUT_ARCHETYPES:
+            return True
+        from app.presentation.themes.development_editorial.theme import DevelopmentEditorialTheme
+        if DevelopmentEditorialTheme.supports_layout(aid):
+            return True
+        from app.presentation.themes.federalism_editorial.theme import FederalismEditorialTheme
+        return FederalismEditorialTheme.supports_layout(aid)
 
     @classmethod
     def render(
@@ -74,6 +83,44 @@ class ArchetypeRenderer:
         renderer_cls: Any = None,
     ) -> bool:
         arch = archetype_id.upper()
+        from app.presentation.themes.development_editorial.theme import DevelopmentEditorialTheme
+        from app.presentation.themes.federalism_editorial.theme import FederalismEditorialTheme
+
+        raw_title = clean_text(slide_data.headline or slide_data.key_message or slide_data.objective or "")
+        raw_kicker = clean_text(slide_data.eyebrow or "")
+        raw_sub = clean_text(slide_data.takeaway or slide_data.subtitle or "")
+        raw_body = clean_text(slide_data.body or "\n".join(slide_data.paragraphs or []))
+        bullets = [clean_text(b) for b in slide_data.bullets if b]
+        items = []
+        for b in bullets:
+            t, rem = _split_title_body(b)
+            items.append({"title": t, "body": rem})
+        data_dict = {
+            "title": raw_title,
+            "kicker": raw_kicker or "OVERVIEW",
+            "subtitle": raw_sub,
+            "lead": raw_sub or raw_body,
+            "body": raw_body,
+            "items": items,
+            "rows": items,
+            "steps": items,
+            "pillars": items,
+            "takeaways": items,
+            "events": items,
+            "image_id": slide_data.image_artifact_id,
+            "quote": clean_text(getattr(slide_data, "quote", "") or raw_sub),
+            "attribution": getattr(slide_data, "attribution", "Key Insight"),
+            "table_headers": getattr(slide_data, "table_headers", []),
+            "table_rows": getattr(slide_data, "table_rows", []),
+        }
+        images_map = {slide_data.image_artifact_id or "": image_bytes}
+
+        if arch.startswith("F") or (FederalismEditorialTheme.supports_layout(arch) and getattr(design_system, "theme_id", "") == "federalism-editorial-v1"):
+            return FederalismEditorialTheme.render_slide(slide, arch, data_dict, images_map)
+
+        if DevelopmentEditorialTheme.supports_layout(arch):
+            return DevelopmentEditorialTheme.render_slide(slide, arch, data_dict, images_map)
+
         method_name = f"_render_{arch.lower()}"
         method = getattr(cls, method_name, None)
         if method:

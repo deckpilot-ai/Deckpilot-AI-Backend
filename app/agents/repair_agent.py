@@ -112,11 +112,10 @@ class RepairAgent:
                 qualifier = _clean_text(slide.section or slide.objective)
                 slide.headline = f"{base}: {qualifier}"[:82] if qualifier and _norm(qualifier) not in _norm(base) else f"{base} ({slide.slide_number})"
             elif action == "shorten_title" and slide:
+                from app.presentation.themes.development_editorial.typography import normalize_title
                 raw = _clean_text(slide.headline or slide.key_message)
-                words = raw.split()[:10]
-                while len(" ".join(words)) > 82 and len(words) > 3:
-                    words.pop()
-                slide.headline = " ".join(words).rstrip(" ,:;-")
+                clean_title, _ = normalize_title(raw, max_words=4)
+                slide.headline = clean_title
             elif action in {"trim_bullets", "shorten_bullets", "shorten_and_reflow"} and slide:
                 slide.bullets = [cls._shorten(b, 22) for b in slide.bullets[:5]]
                 slide.archetype_fields["qa_font_scale"] = max(1.08, float(slide.archetype_fields.get("qa_font_scale", 1.0)))
@@ -399,7 +398,7 @@ class RepairAgent:
             f"QUALITY DEFECTS EVALUATED BY QA:\n{issues_text}\n\n"
             "REQUIREMENTS:\n"
             "1. Resolve every detected issue.\n"
-            "2. If title is long (> 8 words), narrative, or vague, produce a crisp executive headline (< 8 words) without trailing periods.\n"
+            "2. If title is long (> 4 words), narrative, or vague, use LLM reasoning to synthesize an impactful executive headline STRICTLY 1 TO 4 WORDS (min 1, max 4 words) capturing the core essence of the slide without trailing periods.\n"
             "3. Ensure all bullets are concise, informative, grammatically complete, and free of leaked citations or repetition.\n"
             "4. If layout was flagged, select the best layoutHint from: 'two_column', 'card_grid', 'a5_definition', 'comparison', 'process_steps', 'timeline', 'metrics_grid', 'text_image'.\n"
             "5. Provide a sharp, value-oriented strategic takeaway.\n"
@@ -422,8 +421,12 @@ class RepairAgent:
                     if cand.get("headline"):
                         new_head = str(cand["headline"]).strip()
                         new_words = new_head.split()
-                        if len(new_words) <= 10:
+                        if 1 <= len(new_words) <= 4:
                             slide.headline = new_head
+                        elif len(new_words) > 4:
+                            from app.presentation.themes.development_editorial.typography import normalize_title
+                            clean_head, _ = normalize_title(new_head, max_words=4)
+                            slide.headline = clean_head
                     if isinstance(cand.get("bullets"), list) and cand["bullets"]:
                         cleaned = [str(b).strip() for b in cand["bullets"] if str(b).strip()]
                         if cleaned:

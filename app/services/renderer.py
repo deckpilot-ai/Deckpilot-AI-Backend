@@ -291,14 +291,19 @@ class PPTXRenderer:
             slide = prs.slides.add_slide(prs.slide_layouts[6])
             layout = slide_data.layout_family
             arch_id = getattr(slide_data, "archetype_id", None)
-            if not arch_id and hasattr(layout, "value") and str(layout.value).startswith("A") and str(layout.value)[1:].isdigit():
+            from app.presentation.themes.development_editorial.theme import DevelopmentEditorialTheme
+            from app.presentation.themes.federalism_editorial.theme import FederalismEditorialTheme
+            if not arch_id and hasattr(layout, "value") and (str(layout.value).startswith("A") or str(layout.value).startswith("L") or str(layout.value).startswith("F")):
                 arch_id = str(layout.value)
-            if not arch_id and isinstance(slide_data.layout_hint, str) and slide_data.layout_hint.upper().startswith("A"):
+            if not arch_id and isinstance(slide_data.layout_hint, str):
                 cand = slide_data.layout_hint.upper()
-                if cand[1:].isdigit():
+                if cand.startswith("A") and cand[1:].isdigit():
+                    arch_id = cand
+                elif cand.startswith("L") or cand.startswith("F") or DevelopmentEditorialTheme.supports_layout(cand) or FederalismEditorialTheme.supports_layout(cand):
                     arch_id = cand
 
-            is_standalone_cover = layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.A1_TITLE_BLOB, LayoutFamily.A2_TITLE_SPLIT, LayoutFamily.A3_DIVIDER_HERO, LayoutFamily.A17_CLOSING_TAKEAWAYS) or arch_id in ("A1", "A2", "A3", "A17")
+            is_editorial_layout = bool(arch_id and (arch_id.startswith("L") or arch_id.startswith("F") or DevelopmentEditorialTheme.supports_layout(arch_id) or FederalismEditorialTheme.supports_layout(arch_id)))
+            is_standalone_cover = is_editorial_layout or layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.A1_TITLE_BLOB, LayoutFamily.A2_TITLE_SPLIT, LayoutFamily.A3_DIVIDER_HERO, LayoutFamily.A17_CLOSING_TAKEAWAYS) or arch_id in ("A1", "A2", "A3", "A17", "F01", "F13", "F24")
             dark = slide_data.dark_background or (layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE, LayoutFamily.A17_CLOSING_TAKEAWAYS) and design_system.subject_domain != "markets") or arch_id in ("A1", "A3", "A17")
 
             slide.background.fill.solid()
@@ -318,24 +323,25 @@ class PPTXRenderer:
 
             from app.services.archetype_renderer import ArchetypeRenderer, _split_title_body
 
-            # Eyebrow & Title & Accent Tick (Skip for custom cover/divider archetypes)
-            if not is_standalone_cover:
+            # Eyebrow & Title & Accent Tick (Skip for custom cover/divider archetypes and editorial layouts)
+            if not is_standalone_cover and not is_editorial_layout:
                 cls._text(slide, eyebrow.upper(), 0.6, 0.45, 12.1, 0.32, primary if not dark else accent, body_font, 12, bold=True)
                 cls._text(slide, title, 0.6, 0.78, 12.1, 1.05, fg, title_font, 28, title=True)
                 cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.6, 1.88, 0.6, 0.06, accent if not dark else tint(primary, 0.6), "accent-tick")
 
             # Footer
-            if not is_standalone_cover:
+            if not is_standalone_cover and not is_editorial_layout:
                 norm_deck = re.sub(r"\W+", "", deck_title).lower()
                 norm_eyebrow = re.sub(r"\W+", "", eyebrow).lower()
                 footer_text = deck_title.upper() if norm_deck == norm_eyebrow else f"{deck_title.upper()} / {eyebrow.upper()}"
                 cls._text(slide, footer_text[:140], 0.6, 7.05, 11.4, 0.28, body_col, body_font, 9.5)
 
             # Persistent Page Number Pill
-            pill_bg = tint(ink, 0.28) if dark else tint(primary, 0.12)
-            pill_fg = white if dark else ink
-            cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
-            cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True)
+            if not is_editorial_layout:
+                pill_bg = tint(ink, 0.28) if dark else tint(primary, 0.12)
+                pill_fg = white if dark else ink
+                cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
+                cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True)
 
             # Speaker Notes
             notes = slide_data.speaker_notes or f"Presenter guidance for Slide {index + 1}: {title}"
