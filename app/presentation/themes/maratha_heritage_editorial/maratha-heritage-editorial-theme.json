@@ -1,0 +1,95 @@
+{
+  "theme_id": "maratha-heritage-editorial-v1",
+  "name": "Maratha Heritage Editorial",
+  "category": "heritage-editorial",
+  "description": "Premium historical, civilizational, and museum-grade editorial presentation theme reverse-engineered from benchmark 'The Rise of the Marathas (4).pptx'. Features Cambria display headings, Calibri body, saffron orange icon badges, antique gold kickers, warm parchment cards, and deep maroon emphasis panels.",
+  "slide": {
+    "width_inches": 13.333,
+    "height_inches": 7.500,
+    "aspect_ratio": "16:9",
+    "margins": {
+      "left": 0.55,
+      "right": 0.55,
+      "top": 0.50,
+      "bottom": 0.44
+    },
+    "content_top": 1.65,
+    "content_bottom": 6.80,
+    "footer_top": 7.06
+  },
+  "fonts": {
+    "display": "Cambria",
+    "body": "Calibri",
+    "monospace": "Consolas"
+  },
+  "colors": {
+    "canvas": "#FFFFFF",
+    "maroon": "#6B221C",
+    "maroon_alt": "#7E2C22",
+    "heading": "#6B221C",
+    "body": "#2A211C",
+    "muted": "#8A7A6C",
+    "orange": "#E4791F",
+    "gold": "#B0771A",
+    "parchment": "#FBF6EF",
+    "cream": "#F7EEE3",
+    "border_warm": "#E9D8CB",
+    "text_on_dark": "#F5EAE0",
+    "white": "#FFFFFF"
+  },
+  "header_geometry": {
+    "badge": {
+      "left": 0.55,
+      "top": 0.52,
+      "diameter": 0.66,
+      "fill": "#E4791F"
+    },
+    "kicker": {
+      "left": 1.41,
+      "top": 0.50,
+      "color": "#B0771A",
+      "font": "Calibri",
+      "size_pt": 12.0,
+      "bold": true,
+      "uppercase": true
+    },
+    "title": {
+      "left": 1.41,
+      "top": 0.75,
+      "color": "#6B221C",
+      "font": "Cambria",
+      "size_pt": 27.0,
+      "bold": true,
+      "max_lines": 2
+    },
+    "dark_badge_top": 0.60,
+    "dark_kicker_top": 0.62,
+    "dark_title_top": 0.86
+  },
+  "typography": {
+    "cover_title": { "preferred_pt": 52.0, "min_pt": 40.0, "max_pt": 58.0, "max_lines": 2 },
+    "slide_title": { "preferred_pt": 27.0, "min_pt": 23.0, "max_pt": 30.0, "max_lines": 2 },
+    "card_title": { "preferred_pt": 16.0, "min_pt": 13.0, "max_pt": 18.0, "max_lines": 2 },
+    "lead_body": { "preferred_pt": 15.5, "min_pt": 12.5, "max_pt": 16.0 },
+    "body": { "preferred_pt": 13.5, "min_pt": 11.0, "max_pt": 15.5 },
+    "compact_body": { "preferred_pt": 12.0, "min_pt": 10.5, "max_pt": 13.0 },
+    "kicker": { "preferred_pt": 12.0, "min_pt": 11.0, "max_pt": 13.0 },
+    "caption": { "preferred_pt": 10.5, "min_pt": 9.0, "max_pt": 11.0 },
+    "footer": { "preferred_pt": 9.0, "min_pt": 8.0, "max_pt": 9.5 },
+    "metric": { "preferred_pt": 30.0, "min_pt": 24.0, "max_pt": 36.0 }
+  },
+  "shadows": {
+    "card": {
+      "blur_rad_emu": 114300,
+      "dist_emu": 38100,
+      "dir_deg": 5400000,
+      "color_hex": "000000",
+      "alpha_val": 16000
+    }
+  },
+  "layouts": [
+    "M01", "M02", "M03", "M04", "M05", "M06", "M07", "M08", "M09", "M10",
+    "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20",
+    "M21", "M22", "M23", "M24"
+  ]
+}
