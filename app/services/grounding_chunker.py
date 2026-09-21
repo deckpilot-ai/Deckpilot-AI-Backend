@@ -22,10 +22,10 @@ from collections.abc import Sequence
 # ---------------------------------------------------------------------------
 # Tuning constants
 # ---------------------------------------------------------------------------
-_CHUNK_SIZE_CHARS = 900          # target chars per chunk (before overlap)
-_CHUNK_OVERLAP_CHARS = 120       # chars of trailing context carried into next chunk
-_MAX_PLANNER_CHARS = 5000        # max chars for the compressed planning summary
-_MAX_SLIDE_CONTEXT_CHARS = 700   # max chars of grounding to attach per slide
+_CHUNK_SIZE_CHARS = 1400         # target chars per chunk (before overlap)
+_CHUNK_OVERLAP_CHARS = 200       # chars of trailing context carried into next chunk
+_MAX_PLANNER_CHARS = 8000        # max chars for the compressed planning summary
+_MAX_SLIDE_CONTEXT_CHARS = 2400  # max chars of grounding to attach per slide
 _MIN_CHUNK_SCORE = 0.0           # any lexical match is useful; scores are TF-normalised
 
 
@@ -40,6 +40,8 @@ _HEADING_RE = re.compile(
     r"(?:\n|\r|\.{2,}|$)",
     re.MULTILINE,
 )
+_SOURCE_LOCATOR_RE = re.compile(r"\[Source\s+([^#\]]+)(?:#page=(\d+))?[^\]]*\]", re.IGNORECASE)
+
 _STOP_WORDS = frozenset(
     "the a an and or but of in on at to for with by from that this is was are be been "
     "have has had will can could would should may might shall do does did not no its it "
@@ -92,7 +94,7 @@ class GroundingChunker:
         chunk_size: int = _CHUNK_SIZE_CHARS,
         overlap: int = _CHUNK_OVERLAP_CHARS,
     ) -> list[dict]:
-        """Split *text* into overlapping chunks on paragraph/heading boundaries."""
+        """Split *text* into overlapping chunks on paragraph/heading boundaries with source tracking."""
         if not text or not text.strip():
             return []
 
@@ -100,9 +102,21 @@ class GroundingChunker:
         chunks: list[dict] = []
         buffer = ""
         current_heading = ""
+        current_doc = ""
+        current_page = 1
         chunk_idx = 0
 
         for para in raw_paras:
+            # Check for source locator tags in the stream
+            source_match = _SOURCE_LOCATOR_RE.search(para)
+            if source_match:
+                current_doc = source_match.group(1).strip()
+                if source_match.group(2):
+                    try:
+                        current_page = int(source_match.group(2))
+                    except ValueError:
+                        pass
+
             heading_match = _HEADING_RE.match("\n" + para)
             if heading_match and len(para) < 120:
                 current_heading = heading_match.group(1).strip()
@@ -114,6 +128,8 @@ class GroundingChunker:
                         "text": buffer.strip(),
                         "index": chunk_idx,
                         "heading": current_heading,
+                        "source_doc": current_doc,
+                        "source_page": current_page,
                         "tokens": tokens,
                     })
                     chunk_idx += 1
@@ -127,6 +143,8 @@ class GroundingChunker:
                 "text": buffer.strip(),
                 "index": chunk_idx,
                 "heading": current_heading,
+                "source_doc": current_doc,
+                "source_page": current_page,
                 "tokens": _tokenise(buffer),
             })
 
@@ -164,8 +182,8 @@ class GroundingChunker:
                 if second:
                     preview += " " + remainder[: second.start() + 1].strip()
             else:
-                preview = body[:220].strip()
-            preview = preview[:300]
+                preview = body[:250].strip()
+            preview = preview[:320]
 
             entry_lines: list[str] = []
             if heading and heading not in seen_headings:
@@ -193,13 +211,13 @@ class GroundingChunker:
     def retrieve_for_slides(
         text: str,
         slide_topics: Sequence[str],
-        max_chars_total: int = _MAX_SLIDE_CONTEXT_CHARS * 5,
+        max_chars_total: int = 14000,
         max_chars_per_topic: int = _MAX_SLIDE_CONTEXT_CHARS,
     ) -> str:
-        """Return the document sections most relevant to *slide_topics*.
+        """Return multi-chunk document sections most relevant to *slide_topics*.
 
-        Used by the SLIDE WRITER to give each batch relevant evidence,
-        not the same first 2500 chars every time.
+        Retrieves multiple coherent evidence chunks per slide rather than starving
+        the slide generator with a single 700-character snippet.
         """
         if not text or not slide_topics:
             return text[:max_chars_total] if text else ""
@@ -212,8 +230,6 @@ class GroundingChunker:
         selected_indices: set[int] = set()
         running = 0
 
-        # Rank independently for each slide. Combining all batch terms diluted
-        # relevance scores below the old threshold and silently returned page 1.
         for topic in slide_topics:
             query_terms = set(_tokenise(topic))
             if not query_terms:
@@ -224,51 +240,113 @@ class GroundingChunker:
                 key=lambda item: item[1],
                 reverse=True,
             )
-            best = next(
-                (
-                    chunk
-                    for chunk, score in ranked
-                    if score > _MIN_CHUNK_SCORE and chunk["index"] not in selected_indices
-                ),
-                None,
-            )
-            if best is None:
-                continue
 
-            remaining = max_chars_total - running
-            if remaining <= 0:
-                break
-            excerpt_limit = min(max_chars_per_topic, remaining)
-            excerpt = best["text"]
-            if len(excerpt) > excerpt_limit:
-                excerpt = excerpt[: max(1, excerpt_limit - 1)].rstrip() + "\u2026"
-            heading = best["heading"]
-            if heading:
-                result_parts.append(f"[{heading}]\n{excerpt}")
-            else:
-                result_parts.append(excerpt)
-            selected_indices.add(best["index"])
-            running += len(result_parts[-1]) + 2
+            # Retrieve top 2-3 candidate chunks per topic to build deep substantive evidence
+            topic_chars = 0
+            for chunk, score in ranked:
+                if score <= _MIN_CHUNK_SCORE or chunk["index"] in selected_indices:
+                    continue
+                remaining_total = max_chars_total - running
+                remaining_topic = max_chars_per_topic - topic_chars
+                if remaining_total <= 100 or remaining_topic <= 100:
+                    break
+
+                excerpt_limit = min(remaining_topic, remaining_total)
+                excerpt = chunk["text"]
+                if len(excerpt) > excerpt_limit:
+                    excerpt = excerpt[: max(1, excerpt_limit - 1)].rstrip() + "\u2026"
+
+                heading = chunk["heading"]
+                source_tag = f" [p.{chunk.get('source_page', 1)}]" if chunk.get("source_page") else ""
+                if heading:
+                    result_parts.append(f"[{heading}{source_tag}]\n{excerpt}")
+                else:
+                    result_parts.append(f"[Evidence{source_tag}]\n{excerpt}")
+
+                selected_indices.add(chunk["index"])
+                chunk_len = len(result_parts[-1]) + 2
+                running += chunk_len
+                topic_chars += chunk_len
+
+                if topic_chars >= max_chars_per_topic or running >= max_chars_total:
+                    break
 
         if result_parts:
             return "\n\n".join(result_parts)
 
-        # An unsupported topic should not be paired with the first page and
-        # presented as if it were relevant evidence.
         return GroundingChunker.compress_for_planning(text, max_chars=max_chars_total)
+
+    @staticmethod
+    def retrieve_for_slide_detailed(
+        text: str,
+        topic: str,
+        max_chars: int = _MAX_SLIDE_CONTEXT_CHARS,
+    ) -> dict[str, Any]:
+        """Retrieve rich source evidence and source references for a single slide."""
+        if not text or not topic:
+            return {"context_text": "", "source_refs": []}
+
+        chunks = GroundingChunker.chunk_document(text)
+        if not chunks:
+            return {"context_text": text[:max_chars], "source_refs": []}
+
+        query_terms = set(_tokenise(topic))
+        ranked = sorted(
+            ((chunk, _score_relevance(chunk["tokens"], query_terms)) for chunk in chunks),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+
+        parts: list[str] = []
+        source_refs: list[dict[str, Any]] = []
+        total_len = 0
+
+        for chunk, score in ranked:
+            if score <= _MIN_CHUNK_SCORE:
+                continue
+            if total_len >= max_chars:
+                break
+            remaining = max_chars - total_len
+            snippet = chunk["text"]
+            if len(snippet) > remaining:
+                snippet = snippet[: max(1, remaining - 1)].rstrip() + "\u2026"
+
+            parts.append(snippet)
+            total_len += len(snippet) + 2
+            source_refs.append({
+                "document": chunk.get("source_doc") or "source",
+                "page": chunk.get("source_page", 1),
+                "chunk_id": f"chunk_{chunk['index']}",
+                "heading": chunk.get("heading", ""),
+            })
+            if len(source_refs) >= 3:
+                break
+
+        return {
+            "context_text": "\n\n".join(parts),
+            "source_refs": source_refs,
+        }
 
     @staticmethod
     def extract_evidence_points(
         text: str,
         topic: str,
-        max_points: int = 3,
+        max_points: int = 4,
     ) -> list[str]:
         """Turn a retrieved source excerpt into concise, grounded fallback bullets."""
         if not text or max_points <= 0:
             return []
 
+        # Remove bracketed source markers, markdown headers, and callouts
         cleaned = re.sub(r"\[Source[^\]]*\]:?", " ", text, flags=re.IGNORECASE)
         cleaned = re.sub(r"\[[A-Z][^\]]{2,80}\]", " ", cleaned)
+        cleaned = re.sub(r"#+\s*[A-Z0-9\s:,'’‘\"-]{2,60}", " ", cleaned)  # markdown headings
+        cleaned = re.sub(r"#+", " ", cleaned)
+        cleaned = re.sub(r">\s*\**CALLOUT[^*]*\**\s*:?", " ", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r">\s*", " ", cleaned)
+        cleaned = re.sub(r"\*+Caption:[^*]*\*+", " ", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\bCaption:[^\n.!?]+[.!?]", " ", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\*+", "", cleaned)  # strip markdown asterisks
         cleaned = cleaned.replace("\\n", " ").replace("\n", " ")
         cleaned = re.sub(r"\bReprint\s+\d{4}[-–]\d{2,4}\b", " ", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r"\s+", " ", cleaned).strip(' \"{}')
@@ -278,11 +356,12 @@ class GroundingChunker:
         ranked: list[tuple[float, int, str]] = []
         for index, sentence in enumerate(candidates):
             point = re.sub(r"^(?:Fig\.?\s*[\d.]+\.?\s*)", "", sentence, flags=re.IGNORECASE)
-            point = re.sub(r"^\d+\s+", "", point).strip(' \"{},')
+            point = re.sub(r"^[Æ\u00c6\u2022\u25cf\u25aa\u25b6\u25b8\u25c6\u00bb\u2013\u2014\-*#\s]+", "", point)
+            point = re.sub(r"^\d+\s+", "", point).strip(' \"{},-*#')
             if not 35 <= len(point) <= 260:
                 continue
             lowered = point.lower()
-            if "exploring society:" in lowered or lowered.startswith("source image"):
+            if any(k in lowered for k in ["exploring society:", "source image", "let's remember", "let’s remember", "caption:"]):
                 continue
             tokens = set(_tokenise(point))
             overlap = len(tokens & topic_terms)

@@ -263,6 +263,12 @@ class DocumentAssetExtractor:
                 storage_key = f"extracted/{Path(filename).stem}_p{cand['page']}_img{cand['img_idx']}.{ext}"
 
                 aspect_ratio = round(pix.width / max(1, pix.height), 3)
+                from app.services.image_quality import classify_image_type
+                img_type = classify_image_type(cand.get("caption", ""), cand.get("nearby_text", ""), aspect_ratio)
+                semantic_tags = [
+                    w.lower() for w in re.findall(r"[A-Za-z]{4,}", cand.get("caption", ""))
+                    if w.lower() not in {"this", "that", "with", "from", "figure", "image"}
+                ][:8]
                 meta = AssetMetadata(
                     asset_id=f"art_{sha256[:12]}",
                     source_file=filename,
@@ -272,8 +278,11 @@ class DocumentAssetExtractor:
                     aspect_ratio=aspect_ratio,
                     format=ext,
                     sha256=sha256,
+                    image_type=img_type,
+                    section=cand.get("section", ""),
+                    semantic_tags=semantic_tags,
                     caption=cand["caption"],
-                    nearby_text=f"Page {cand['page']} figure: {cand['caption']}",
+                    nearby_text=cand.get("nearby_text") or f"Page {cand['page']} figure: {cand['caption']}",
                     storage_key=storage_key,
                     quality_score=0.95,
                     is_valid_figure=True,

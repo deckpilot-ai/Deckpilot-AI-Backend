@@ -75,30 +75,40 @@ def render_m01_maroon_cover(
     pk.font.bold = True
     pk.font.color.rgb = COLORS.rgb_gold
 
-    # Title (Large White Cambria 52pt)
-    tb_t = add_text_box(slide, 0.55, 1.70, 7.00, 1.80)
+    # Title (Large White Cambria, font size and vertical layout dynamically responsive)
+    if len(title) > 55:
+        title_font_size = 38.0
+        line_offset = 4.05
+    elif len(title) > 35:
+        title_font_size = 42.0
+        line_offset = 3.85
+    else:
+        title_font_size = 50.0
+        line_offset = 3.65
+
+    tb_t = add_text_box(slide, 0.55, 1.65, 7.00, line_offset - 1.70)
     tf_t = tb_t.text_frame
     pt = tf_t.paragraphs[0]
     pt.text = title
     pt.font.name = FONTS.display
-    pt.font.size = Pt(52.0)
+    pt.font.size = Pt(title_font_size)
     pt.font.bold = True
     pt.font.color.rgb = COLORS.rgb_white
     pt.line_spacing = 1.05
 
     # Orange horizontal divider line
-    line = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.55), Inches(3.70), Inches(1.50), Inches(0.055))
+    line = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.55), Inches(line_offset), Inches(1.50), Inches(0.055))
     line.fill.solid()
     line.fill.fore_color.rgb = COLORS.rgb_orange
     line.line.fill.background()
 
     # Subtitle / Chapter metadata
     if subtitle:
-        tb_s = add_text_box(slide, 0.55, 4.00, 6.80, 1.20)
+        tb_s = add_text_box(slide, 0.55, line_offset + 0.20, 6.80, 1.20)
         ps = tb_s.text_frame.paragraphs[0]
         ps.text = subtitle
         ps.font.name = FONTS.body
-        ps.font.size = Pt(15.0)
+        ps.font.size = Pt(14.0)
         ps.font.italic = True
         ps.font.color.rgb = COLORS.rgb_text_on_dark
 

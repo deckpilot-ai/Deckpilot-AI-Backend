@@ -774,7 +774,7 @@ class JobOrchestrator:
                         GroundingChunker.retrieve_for_slides(
                             _raw_grounding,
                             [t for t in batch_topics if t],
-                            max_chars_total=6000,
+                            max_chars_total=14000,
                         )
                         if _raw_grounding
                         else ""
@@ -784,7 +784,10 @@ class JobOrchestrator:
                     if _goal_directives:
                         writer_batch_prompt += f"\n[USER DIRECTIVES — apply to every slide]:\n{_goal_directives}\n"
                     writer_batch_prompt += (
-                        f"\nGrounding Reference (relevant sections for these slides):\n{batch_grounding}\n"
+                        f"\nGrounding Reference (relevant sections from source document):\n{batch_grounding}\n"
+                        f"CRITICAL GROUNDING DIRECTIVE: You MUST construct 3–5 dense, fact-grounded points per content slide "
+                        f"using facts, dates, names, definitions, statistics, and examples directly from the Grounding Reference. "
+                        f"Do NOT invent generic summaries. Reflect the rich source information in depth.\n"
                         f"Preserve each planned topic and slideId exactly.\n"
                         f"Planned Slides Batch: {json.dumps(batch_slides)}"
                     )
@@ -932,26 +935,30 @@ class JobOrchestrator:
                             if field in slide_data:
                                 slide[field] = slide_data[field]
 
-                    if not slide.get("bullets") and _raw_grounding:
-                        offline_excerpt = GroundingChunker.retrieve_for_slides(
+                    if _raw_grounding:
+                        detailed = GroundingChunker.retrieve_for_slide_detailed(
                             _raw_grounding,
-                            [slide.get("headline", ""), slide.get("purpose", "")],
-                            max_chars_total=1800,
-                            max_chars_per_topic=900,
-                        )
-                        offline_points = GroundingChunker.extract_evidence_points(
-                            offline_excerpt,
                             f"{slide.get('headline', '')} {slide.get('purpose', '')}",
+                            max_chars=2400,
                         )
-                        if offline_points:
-                            slide["bullets"] = [f"Evidence: {point}" for point in offline_points]
+                        if detailed.get("source_refs"):
+                            slide["source_refs"] = detailed["source_refs"]
+
+                        if not slide.get("bullets"):
+                            offline_points = GroundingChunker.extract_evidence_points(
+                                detailed.get("context_text", ""),
+                                f"{slide.get('headline', '')} {slide.get('purpose', '')}",
+                                max_points=4,
+                            )
+                            if offline_points:
+                                slide["bullets"] = [f"Source Evidence: {point}" for point in offline_points]
 
                     if not slide.get("bullets"):
                         topic = slide.get("headline") or slide.get("purpose") or "Core Insights"
                         slide["bullets"] = [
-                            f"Key Insight: Core structural dimensions and analytical drivers of {topic}.",
-                            f"Evidentiary Findings: Empirical benchmarks, distribution patterns, and documented metrics for {topic}.",
-                            f"Strategic Impact: Operational implications and long-term sustainable outcomes."
+                            f"Key Principle: Documented structure and foundational dimensions of {topic}.",
+                            f"Factual Evidence: Recorded historical benchmarks, constitutional criteria, and functions of {topic}.",
+                            f"Systemic Role: Operational mandates, statutory duties, and institutional outcomes."
                         ]
 
                     if not slide.get("speakerNotes"):
@@ -1044,6 +1051,11 @@ class JobOrchestrator:
                             asset_id=art.id,
                             source_file=art.source_locator or "doc",
                             caption=json.loads(art.json_data or "{}").get("caption", ""),
+                            image_type=json.loads(art.json_data or "{}").get("image_type", "photograph"),
+                            section=json.loads(art.json_data or "{}").get("section", ""),
+                            semantic_tags=json.loads(art.json_data or "{}").get("semantic_tags", []),
+                            nearby_text=json.loads(art.json_data or "{}").get("nearby_text", ""),
+                            quality_score=float(json.loads(art.json_data or "{}").get("quality_score", 1.0)),
                             storage_key=art.storage_key or "",
                         ) for art in existing_artifacts if art.type == "image" and art.id in source_images
                     ]
@@ -1074,6 +1086,9 @@ class JobOrchestrator:
                         asset_id=art.id,
                         source_file=art.source_locator or "doc",
                         caption=json.loads(art.json_data or "{}").get("caption", ""),
+                        image_type=json.loads(art.json_data or "{}").get("image_type", "photograph"),
+                        section=json.loads(art.json_data or "{}").get("section", ""),
+                        semantic_tags=json.loads(art.json_data or "{}").get("semantic_tags", []),
                         nearby_text=json.loads(art.json_data or "{}").get("nearby_text", ""),
                         semantic_summary=json.loads(art.json_data or "{}").get("semantic_summary", ""),
                         quality_score=float(json.loads(art.json_data or "{}").get("quality_score", 1.0)),

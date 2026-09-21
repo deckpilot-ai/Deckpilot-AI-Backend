@@ -280,6 +280,10 @@ class SlideSpec(BaseModel):
     background_override: str | None = None
     layout_hint: str = ""
 
+    # Grounding & Traceability
+    source_refs: list[dict[str, Any]] = Field(default_factory=list)
+    image_refs: list[dict[str, Any]] = Field(default_factory=list)
+
     @field_validator("bullets", mode="before")
     @classmethod
     def normalize_bullets(cls, value: Any) -> list[str]:
@@ -473,6 +477,9 @@ class AssetMetadata(BaseModel):
     format: str = "png"
     sha256: str = ""
     perceptual_hash: str = ""
+    image_type: str = "photograph"  # map | portrait | diagram | chart | artefact | photograph | illustration
+    section: str = ""
+    semantic_tags: list[str] = Field(default_factory=list)
     caption: str = ""
     nearby_text: str = ""
     semantic_summary: str = ""
