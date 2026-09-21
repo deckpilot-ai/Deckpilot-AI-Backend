@@ -4,6 +4,7 @@ import csv
 import hashlib
 import io
 import logging
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -123,179 +124,41 @@ class DocumentAssetExtractor:
         filename: str,
         on_progress: Callable[[str], None] | None = None,
     ) -> ExtractionOutput:
+        from app.services.extraction import DocumentExtractor
+
+        extract_res = DocumentExtractor.extract_pdf(file_bytes, filename, on_progress=on_progress)
+
         output = ExtractionOutput()
-        doc = pymupdf.open(stream=file_bytes, filetype="pdf")
-        total_pages = len(doc)
-        output.metadata["page_count"] = total_pages
-        output.metadata["title"] = doc.metadata.get("title", "") if doc.metadata else ""
+        output.text_blocks = extract_res.text_blocks
+        output.tables = extract_res.tables
+        output.metadata = extract_res.metadata
 
-        if on_progress:
-            on_progress(f"Parsing PDF: {filename} ({total_pages} pages)...")
-
-        # Detect repeating template graphics/watermarks across >= 3 pages
-        xref_counts: dict[int, int] = {}
-        if total_pages >= 3:
-            for p_idx in range(total_pages):
-                p = doc[p_idx]
-                seen = set()
-                for img_info in p.get_images(full=True):
-                    x = img_info[0]
-                    if x not in seen:
-                        seen.add(x)
-                        xref_counts[x] = xref_counts.get(x, 0) + 1
-
-        extracted_candidates: list[dict[str, Any]] = []
-
-        for page_idx in range(total_pages):
-            page = doc[page_idx]
-            page_text = page.get_text("text").strip()
-            if page_text:
-                output.text_blocks.append({
-                    "page": page_idx + 1,
-                    "content": page_text,
-                    "source": f"{filename}#page={page_idx + 1}",
-                })
-
-            image_list = page.get_images(full=True)
-            if not image_list:
+        # Build ExtractedAssetPayload with rich AssetMetadata for each extracted visual figure
+        payload_map = {key: (data, ct) for key, data, ct in extract_res.image_payloads}
+        for img in extract_res.extracted_images:
+            storage_key = img.get("storage_key", "")
+            data, content_type = payload_map.get(storage_key, (b"", "image/png"))
+            if not data:
                 continue
-
-            visible_info = {item["xref"]: pymupdf.Rect(item["bbox"]) for item in page.get_image_info(xrefs=True)}
-            page_blocks = page.get_text("blocks")
-
-            for img_idx, img_info in enumerate(image_list):
-                xref = img_info[0]
-                # Filter repeating background headers/watermarks appearing across multiple pages
-                if xref_counts.get(xref, 0) >= 3:
-                    continue
-
-                rect = visible_info.get(xref)
-                if rect is not None:
-                    page_area = page.rect.width * page.rect.height
-                    img_area = rect.width * rect.height
-
-                    # Reject full page background covers (> 88% of page area)
-                    if img_area > page_area * 0.88:
-                        continue
-
-                    # Reject tiny icons / thin borders
-                    if rect.width < 40 or rect.height < 40 or img_area < 2500:
-                        continue
-                    rect_tuple = (rect.x0, rect.y0, rect.x1, rect.y1)
-                else:
-                    # Fallback when bbox is not returned in get_image_info (e.g. inline/transparency xrefs)
-                    try:
-                        probe_pix = pymupdf.Pixmap(doc, xref)
-                        if probe_pix.width < 80 or probe_pix.height < 80 or (probe_pix.width * probe_pix.height) < 10000:
-                            continue
-                        img_area = probe_pix.width * probe_pix.height
-                        rect_tuple = (0.0, 0.0, float(probe_pix.width), float(probe_pix.height))
-                    except Exception:
-                        continue
-
-                # Search surrounding blocks for captions
-                caption_text = ""
-                if page_blocks and rect is not None:
-                    nearby_blocks = []
-                    for b in page_blocks:
-                        if len(b) > 4:
-                            bt = str(b[4]).strip()
-                            if not bt:
-                                continue
-                            # Check horizontal alignment overlap with image
-                            if b[0] < rect.x1 + 60 and b[2] > rect.x0 - 60:
-                                dist_y = min(abs(b[1] - rect.y1), abs(rect.y0 - b[3]))
-                                if dist_y < 120:
-                                    nearby_blocks.append((dist_y, bt))
-                    if nearby_blocks:
-                        nearby_blocks.sort(key=lambda x: x[0])
-                        caption_text = " ".join(nearby_blocks[0][1].split())[:300]
-                elif page_blocks:
-                    # Use first descriptive block from page as fallback caption
-                    for b in page_blocks:
-                        if len(b) > 4:
-                            bt = str(b[4]).strip()
-                            if len(bt) > 15:
-                                caption_text = " ".join(bt.split())[:300]
-                                break
-
-                extracted_candidates.append({
-                    "xref": xref,
-                    "img_info": img_info,
-                    "page": page_idx + 1,
-                    "img_idx": img_idx,
-                    "caption": caption_text,
-                    "rect": rect_tuple,
-                    "area": img_area,
-                })
-
-        # Process and extract pixmaps. Xrefs are not stable deduplication keys:
-        # some PDFs embed identical template or scan layers under different
-        # xrefs on every page, so gate on normalized bytes as well.
-        seen_sha256: set[str] = set()
-        for cand in extracted_candidates:
-            xref = cand["xref"]
-            try:
-                pix = pymupdf.Pixmap(doc, xref)
-                if pix.colorspace and pix.colorspace.n != 3:
-                    pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
-
-                if pix.width < 50 or pix.height < 50:
-                    continue
-
-                mask_xref = cand["img_info"][1] if len(cand.get("img_info", [])) > 1 else 0
-                if mask_xref:
-                    try:
-                        mask = pymupdf.Pixmap(doc, mask_xref)
-                        if (mask.width, mask.height) == (pix.width, pix.height):
-                            if pix.alpha:
-                                pix = pymupdf.Pixmap(pix, 0)
-                            pix = pymupdf.Pixmap(pix, mask)
-                    except Exception:
-                        pass
-
-                ext = "png" if pix.alpha else "jpg"
-                img_bytes = pix.tobytes("png") if pix.alpha else pix.tobytes("jpg", jpg_quality=92)
-                sha256 = hashlib.sha256(img_bytes).hexdigest()
-                if sha256 in seen_sha256:
-                    continue
-                seen_sha256.add(sha256)
-                storage_key = f"extracted/{Path(filename).stem}_p{cand['page']}_img{cand['img_idx']}.{ext}"
-
-                aspect_ratio = round(pix.width / max(1, pix.height), 3)
-                from app.services.image_quality import classify_image_type
-                img_type = classify_image_type(cand.get("caption", ""), cand.get("nearby_text", ""), aspect_ratio)
-                semantic_tags = [
-                    w.lower() for w in re.findall(r"[A-Za-z]{4,}", cand.get("caption", ""))
-                    if w.lower() not in {"this", "that", "with", "from", "figure", "image"}
-                ][:8]
-                meta = AssetMetadata(
-                    asset_id=f"art_{sha256[:12]}",
-                    source_file=filename,
-                    page_or_slide=cand["page"],
-                    width=pix.width,
-                    height=pix.height,
-                    aspect_ratio=aspect_ratio,
-                    format=ext,
-                    sha256=sha256,
-                    image_type=img_type,
-                    section=cand.get("section", ""),
-                    semantic_tags=semantic_tags,
-                    caption=cand["caption"],
-                    nearby_text=cand.get("nearby_text") or f"Page {cand['page']} figure: {cand['caption']}",
-                    storage_key=storage_key,
-                    quality_score=0.95,
-                    is_valid_figure=True,
-                )
-
-                output.assets.append(ExtractedAssetPayload(storage_key, img_bytes, f"image/{ext}", meta))
-            except Exception as e:
-                logger.warning("Failed extracting PDF image xref %s: %s", xref, e)
-
-        try:
-            doc.close()
-        except Exception:
-            pass
+            meta = AssetMetadata(
+                asset_id=img.get("asset_id") or f"art_{img.get('sha256', '')[:12]}",
+                source_file=filename,
+                page_or_slide=img.get("source_page", 1),
+                width=img.get("width", 800),
+                height=img.get("height", 600),
+                aspect_ratio=img.get("aspect_ratio", 1.33),
+                format=storage_key.split(".")[-1] if "." in storage_key else "png",
+                sha256=img.get("sha256", ""),
+                image_type=img.get("image_type", "photograph"),
+                section=img.get("section", ""),
+                semantic_tags=img.get("semantic_tags", []),
+                caption=img.get("caption", ""),
+                nearby_text=img.get("nearby_text", ""),
+                storage_key=storage_key,
+                quality_score=img.get("quality_score", 0.95),
+                is_valid_figure=True,
+            )
+            output.assets.append(ExtractedAssetPayload(storage_key, data, content_type, meta))
 
         return output
 

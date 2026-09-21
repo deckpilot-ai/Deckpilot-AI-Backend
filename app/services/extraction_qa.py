@@ -98,7 +98,13 @@ class ExtractionQA:
         qa.total_pages = extraction_result.metadata.get("page_count", len(extraction_result.text_blocks))
         qa.text_blocks_count = len(extraction_result.text_blocks)
         qa.tables_detected = len(extraction_result.tables)
-        qa.images_extracted = len(extraction_result.extracted_images)
+        images = getattr(extraction_result, "extracted_images", [])
+        if not images and hasattr(extraction_result, "assets"):
+            images = [
+                a.metadata.model_dump() if hasattr(a.metadata, "model_dump") else dict(a.metadata)
+                for a in extraction_result.assets
+            ]
+        qa.images_extracted = len(images)
 
         page_char_counts: dict[int, int] = {}
         for tb in extraction_result.text_blocks:
@@ -133,7 +139,7 @@ class ExtractionQA:
             qa.extraction_passed = False
 
         # Image classification and captions QA
-        for img in extraction_result.extracted_images:
+        for img in images:
             img_type = img.get("image_type", "photograph")
             qa.images_classified[img_type] = qa.images_classified.get(img_type, 0) + 1
             if img.get("caption"):

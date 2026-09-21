@@ -42,6 +42,8 @@ _HEADING_RE = re.compile(
 )
 _SOURCE_LOCATOR_RE = re.compile(r"\[Source\s+([^#\]]+)(?:#page=(\d+))?[^\]]*\]", re.IGNORECASE)
 
+import unicodedata
+
 _STOP_WORDS = frozenset(
     "the a an and or but of in on at to for with by from that this is was are be been "
     "have has had will can could would should may might shall do does did not no its it "
@@ -51,9 +53,10 @@ _STOP_WORDS = frozenset(
 
 
 def _tokenise(text: str) -> list[str]:
-    """Lower-case word tokens, stop-word filtered."""
+    """Lower-case word tokens, stop-word filtered, with unicode accent/diacritic folding."""
+    norm = unicodedata.normalize("NFKD", text).encode("ASCII", "ignore").decode("utf-8")
     return [
-        w for w in re.findall(r"[a-z]{3,}", text.lower())
+        w for w in re.findall(r"[a-z]{3,}", norm.lower())
         if w not in _STOP_WORDS
     ]
 
@@ -70,7 +73,7 @@ def _term_freq(tokens: list[str]) -> dict[str, float]:
 
 
 def _score_relevance(chunk_tokens: list[str], query_terms: set[str]) -> float:
-    """TF-IDF-inspired relevance score of a chunk against a query term set."""
+    """TF-IDF-inspired relevance score of a chunk against a query term set with partial matching."""
     if not chunk_tokens or not query_terms:
         return 0.0
     tf = _term_freq(chunk_tokens)
@@ -79,6 +82,12 @@ def _score_relevance(chunk_tokens: list[str], query_terms: set[str]) -> float:
         if term in tf:
             idf_proxy = math.log(1 + len(term) / 4)
             score += tf[term] * idf_proxy
+        else:
+            # Substring/stem overlap (e.g. janapada in mahajanapadas)
+            for c_term, c_freq in tf.items():
+                if (term in c_term or c_term in term) and len(min(term, c_term, key=len)) >= 4:
+                    score += c_freq * math.log(1 + len(term) / 5) * 0.75
+                    break
     return score / (math.sqrt(len(query_terms)) or 1)
 
 
@@ -321,6 +330,17 @@ class GroundingChunker:
             })
             if len(source_refs) >= 3:
                 break
+
+        if not parts and chunks:
+            # Defensive fallback to ensure slide writer is never starved of source text
+            top_chunk = chunks[0]
+            parts.append(top_chunk["text"][:max_chars])
+            source_refs.append({
+                "document": top_chunk.get("source_doc") or "source",
+                "page": top_chunk.get("source_page", 1),
+                "chunk_id": f"chunk_{top_chunk['index']}",
+                "heading": top_chunk.get("heading", ""),
+            })
 
         return {
             "context_text": "\n\n".join(parts),

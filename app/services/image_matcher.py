@@ -30,9 +30,13 @@ STOPWORDS = {
 }
 
 
+import unicodedata
+
+
 def tokenize(text: str) -> set[str]:
-    """Tokenize and stem basic alphanumeric terms."""
-    clean = re.sub(r"[^\w\s]", " ", text.lower())
+    """Tokenize and stem basic alphanumeric terms with unicode diacritic folding."""
+    norm = unicodedata.normalize("NFKD", text).encode("ASCII", "ignore").decode("utf-8")
+    clean = re.sub(r"[^\w\s]", " ", norm.lower())
     words = clean.split()
     tokens = set()
     for w in words:
