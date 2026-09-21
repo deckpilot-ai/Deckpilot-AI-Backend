@@ -1,45 +1,15 @@
-services:
-  - type: web
-    name: deckpilotai-backend
-    runtime: docker
-    plan: free
-    branch: deploy-dev
-    healthCheckPath: /api/v1/health
-    autoDeploy: true
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: APP_NAME
-        value: deckpilotAI
-      - key: R2_BUCKET
-        value: deckpilotai
-      - key: JWT_SECRET
-        sync: false
-      - key: KEY_ENCRYPTION_SECRET
-        sync: false
-      - key: TURSO_DATABASE_URL
-        sync: false
-      - key: TURSO_AUTH_TOKEN
-        sync: false
-      - key: R2_ENDPOINT_URL
-        sync: false
-      - key: R2_ACCESS_KEY_ID
-        sync: false
-      - key: R2_SECRET_ACCESS_KEY
-        sync: false
-      - key: FRONTEND_ORIGIN
-        sync: false
-      - key: ALLOWED_HOSTS
-        sync: false
-      - key: EXPERIENTIALLABS_API_KEY
-        sync: false
-      - key: EXPERIENTIALLABS_BASE_URL
-        value: https://api.experientiallabs.ai/v1
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: GROQ_API_KEY
-        sync: false
+# ⚠️  RENDER DEPLOYMENT IS DISABLED
+#
+# DeckPilotAI Backend is deployed EXCLUSIVELY to AWS Lightsail via GitHub Actions.
+# Deployment workflow: .github/workflows/deploy-lightsail.yml
+#
+# ACTION REQUIRED (one-time, in Render dashboard):
+#   1. Go to https://dashboard.render.com
+#   2. Find the "deckpilotai-backend" service
+#   3. Click Settings → "Suspend Service" (or Delete if no longer needed)
+#
+# DO NOT re-enable autoDeploy or reconnect this repository to Render.
+# To deploy: push to the `deploy-dev` branch — GitHub Actions handles the rest.
+
+# Intentionally empty — no Render services defined.
+services: []

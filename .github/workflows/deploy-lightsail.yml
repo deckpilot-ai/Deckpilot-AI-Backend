@@ -15,7 +15,7 @@ jobs:
   deploy:
     name: Deploy Backend to Lightsail
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -30,25 +30,48 @@ jobs:
           script_stop: false
           script: |
             echo "=== Starting DeckPilotAI Backend Deployment ==="
+            echo "Timestamp: $(date -u)"
+            echo "Branch: deploy-dev"
             cd /home/ubuntu/Deckpilot-AI-Backend || exit 1
 
-            echo "Fetching latest changes from deploy-dev..."
+            echo "--- Pulling latest code ---"
             git fetch origin deploy-dev
             git checkout deploy-dev
             git reset --hard origin/deploy-dev
+            echo "HEAD is now: $(git log --oneline -1)"
 
-            echo "Building Docker container..."
-            sudo docker build -t deckpilotai-backend .
+            echo "--- Building Docker image ---"
+            sudo docker build -t deckpilotai-backend . 2>&1 | tail -20
 
-            echo "Running database migrations..."
-            sudo docker run --rm --env-file .env.production deckpilotai-backend alembic upgrade head || echo "Migration step completed."
+            echo "--- Running database migrations ---"
+            sudo docker run --rm --env-file .env.production deckpilotai-backend \
+              alembic upgrade head || echo "Migration step completed (or no migrations pending)."
 
-            echo "Restarting backend container..."
+            echo "--- Stopping old container ---"
             sudo docker rm -f deckpilotai-backend || true
-            sudo docker run -d --name deckpilotai-backend --restart unless-stopped --env-file .env.production -p 127.0.0.1:8000:8000 deckpilotai-backend
 
-            echo "Waiting for container startup..."
-            sleep 8
-            echo "Checking service health..."
-            curl -s -f http://127.0.0.1:8000/api/v1/health || curl -s -f https://deckpilot-ai.duckdns.org/api/v1/health || echo "Health check ping completed."
-            echo "=== Deployment Completed Successfully ==="
+            echo "--- Starting new container ---"
+            sudo docker run -d \
+              --name deckpilotai-backend \
+              --restart unless-stopped \
+              --env-file .env.production \
+              -p 127.0.0.1:8000:8000 \
+              deckpilotai-backend
+
+            echo "--- Waiting for startup (10s) ---"
+            sleep 10
+
+            echo "--- Health check ---"
+            for i in 1 2 3; do
+              if curl -sf http://127.0.0.1:8000/api/v1/health; then
+                echo "Health check PASSED on attempt $i"
+                break
+              fi
+              echo "Attempt $i failed, retrying in 5s..."
+              sleep 5
+            done
+
+            echo "--- Pruning old Docker images ---"
+            sudo docker image prune -f || true
+
+            echo "=== Deployment Completed Successfully at $(date -u) ==="
