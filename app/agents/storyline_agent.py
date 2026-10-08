@@ -18,6 +18,7 @@ from app.schemas.generation_state import (
     TableSpec,
 )
 from app.skills.skill_registry import get_skill_for_request
+from app.services.content_capacity_validator import ContentCapacityValidator
 from app.services.design_system import clean_text
 
 logger = logging.getLogger(__name__)
@@ -320,6 +321,24 @@ class StorylineAgent:
                 dark_background=(is_first and count > 1) or (is_last and count > 1) or (chosen_layout in (LayoutFamily.DARK_QUOTE, LayoutFamily.SECTION_DIVIDER)),
                 layout_hint=raw_slide.get("layoutHint") or raw_slide.get("layout_hint") or chosen_layout.value,
             )
+
+            # Pre-render capacity check and layout adaptation
+            fit_status = ContentCapacityValidator.check_layout_fit(spec, chosen_layout)
+            if fit_status == "OVERFLOW":
+                if len(bullets) == 4:
+                    spec.layout_family = LayoutFamily.CARD_GRID
+                    spec.archetype_id = "A13"
+                    spec.layout_hint = "card_grid"
+                elif len(bullets) >= 6:
+                    spec.layout_family = LayoutFamily.COUNCIL_EIGHT
+                    spec.archetype_id = "A25"
+                    spec.layout_hint = "council_eight"
+            elif fit_status == "UNDERFILL" and not is_first and not is_last and not img_id:
+                if len(bullets) <= 2:
+                    spec.layout_family = LayoutFamily.TWO_COLUMN
+                    spec.archetype_id = "A7"
+                    spec.layout_hint = "two_column"
+
             planned_specs.append(spec)
 
         return planned_specs

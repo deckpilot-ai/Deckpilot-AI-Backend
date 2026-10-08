@@ -27,7 +27,8 @@ async def auto_configure_design(
     project_id: Annotated[str | None, Form()] = None,
 ) -> dict[str, Any]:
     """Upload any PPTX presentation to reverse-engineer its visual language and configure into the system."""
-    if not file.filename.endswith(".pptx"):
+    filename = file.filename or ""
+    if not filename.endswith(".pptx"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded file must be a PowerPoint presentation (.pptx)",
@@ -36,7 +37,7 @@ async def auto_configure_design(
     # Validate project ownership if project_id provided
     if project_id:
         proj = db.get(Project, project_id)
-        if not proj or (proj.user_id != current_user.id and not current_user.is_superuser):
+        if not proj or (proj.user_id != current_user.id and current_user.role != "admin"):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
     pptx_bytes = await file.read()
@@ -44,7 +45,7 @@ async def auto_configure_design(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File is empty or too small")
 
     try:
-        detected_name = name or file.filename.rsplit(".", 1)[0]
+        detected_name = name or filename.rsplit(".", 1)[0]
         preset = DesignAutoConfigurator.configure_from_pptx(
             pptx_source=pptx_bytes,
             name=detected_name,
@@ -92,7 +93,7 @@ async def apply_preset_to_project(
 ) -> dict[str, Any]:
     """Attach a configured design preset to a specific project."""
     proj = db.get(Project, project_id)
-    if not proj or (proj.user_id != current_user.id and not current_user.is_superuser):
+    if not proj or (proj.user_id != current_user.id and current_user.role != "admin"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
     preset = DesignPresetRegistry.get_preset(preset_id)

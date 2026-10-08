@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.provider import AIProvider, AIProviderModel, AIKey
 from app.services.codecraft_models import (
     CodeCraftModelManager,
@@ -47,8 +48,9 @@ def test_codecraft_cooldown_tracking():
     assert CodeCraftModelManager.is_available(model_id) is False
 
 
-def test_sync_environment_codecraft_provider(db_session: Session):
+def test_sync_environment_codecraft_provider(db_session: Session, monkeypatch: pytest.MonkeyPatch):
     """Verify that CodeCraft provider is automatically synced with high priority and Claude models."""
+    monkeypatch.setattr(settings, "codecraft_api_key", "sk-codecraft-test-key")
     ProviderRouter.sync_environment_providers(db_session)
 
     provider = db_session.query(AIProvider).filter(AIProvider.name == "codecraft").first()

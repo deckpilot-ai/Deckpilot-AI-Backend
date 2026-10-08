@@ -17,8 +17,11 @@ from app.schemas.generation_state import (
     SlideSpec,
     ValidationSeverity,
 )
+from app.services.content_capacity_validator import ContentCapacityValidator
 from app.services.design_system import strip_citations
+from app.services.grid_engine import PresentationGridEngine
 from app.services.image_matcher import MIN_SEMANTIC_RELEVANCE, ImageMatcher
+from app.services.text_measurement import TextMeasurementService
 
 
 def _clean_text(text: Any) -> str:
@@ -118,8 +121,16 @@ class RepairAgent:
                 clean_title, _ = normalize_title(raw, max_words=4)
                 slide.headline = clean_title
             elif action in {"trim_bullets", "shorten_bullets", "shorten_and_reflow"} and slide:
-                slide.bullets = [cls._shorten(b, 18) for b in slide.bullets[:5]]
-                slide.archetype_fields["qa_font_scale"] = min(0.94, float(slide.archetype_fields.get("qa_font_scale", 1.0)))
+                word_limit = 18
+                shortened = [ContentCapacityValidator.shorten_phrase_intelligently(b, word_limit) for b in slide.bullets[:5]]
+                c_w = 3.65 if slide.layout_family == LayoutFamily.THREE_COLUMN else 5.85
+                c_h = 3.80
+                while word_limit > 10 and not TextMeasurementService.check_fits("\n".join(shortened), c_w, c_h, size=11.0, bullet_list=True):
+                    word_limit -= 2
+                    shortened = [ContentCapacityValidator.shorten_phrase_intelligently(b, word_limit) for b in shortened]
+                slide.bullets = shortened
+                slide.archetype_fields["qa_font_scale"] = min(0.95, float(slide.archetype_fields.get("qa_font_scale", 1.0)))
+                slide.archetype_fields["qa_repair_verified"] = True
             elif action == "dedupe_text" and slide:
                 cls._dedupe_slide(slide)
             elif action in {"normalize_spacing", "normalize_punctuation", "repair_encoding"} and slide:
@@ -185,7 +196,42 @@ class RepairAgent:
                     item.slide_number, item.slide_id = idx, f"s{idx:02d}"
             elif action in {"constrain_bounds", "resolve_overlap", "align_columns", "normalize_gutters", "restore_aspect_ratio"} and slide:
                 slide.archetype_fields["qa_safe_geometry"] = True
-                cls._choose_content_layout(slide)
+                bullets = [b for b in slide.bullets if _clean_text(b)]
+                if len(bullets) == 4 and slide.layout_family in (LayoutFamily.TWO_COLUMN, LayoutFamily.A7_TWO_COLUMN_CONTRAST):
+                    slide.layout_family = LayoutFamily.CARD_GRID
+                    slide.archetype_id = "A13"
+                    slide.layout_hint = "card_grid"
+                elif len(bullets) in (6, 7, 8) and slide.layout_family in (LayoutFamily.THREE_COLUMN, LayoutFamily.A11_STAGE_COLUMNS, LayoutFamily.A10_NUMBERED_PROCESS):
+                    slide.layout_family = LayoutFamily.COUNCIL_EIGHT
+                    slide.archetype_id = "A25"
+                    slide.layout_hint = "council_eight"
+                elif len(bullets) <= 2 and slide.layout_family == LayoutFamily.CARD_GRID:
+                    slide.layout_family = LayoutFamily.TWO_COLUMN
+                    slide.archetype_id = "A7"
+                    slide.layout_hint = "two_column"
+                else:
+                    slide.bullets = [ContentCapacityValidator.shorten_phrase_intelligently(b, 20) for b in bullets[:5]]
+                slide.archetype_fields["qa_repair_verified"] = True
+            elif action == "adapt_layout_to_content" and slide:
+                bullets = [b for b in slide.bullets if _clean_text(b)]
+                count = len(bullets)
+                if count >= 6:
+                    slide.layout_family = LayoutFamily.COUNCIL_EIGHT
+                    slide.archetype_id = "A25"
+                    slide.layout_hint = "council_eight"
+                elif count == 4:
+                    slide.layout_family = LayoutFamily.CARD_GRID
+                    slide.archetype_id = "A13"
+                    slide.layout_hint = "card_grid"
+                elif count == 3:
+                    slide.layout_family = LayoutFamily.THREE_COLUMN
+                    slide.archetype_id = "A11"
+                    slide.layout_hint = "three_column"
+                else:
+                    slide.layout_family = LayoutFamily.TWO_COLUMN
+                    slide.archetype_id = "A7"
+                    slide.layout_hint = "two_column"
+                slide.archetype_fields["qa_repair_verified"] = True
             elif action == "change_to_divider" and slide:
                 slide.layout_family = LayoutFamily.SECTION_DIVIDER
                 slide.layout_hint = LayoutFamily.SECTION_DIVIDER.value
@@ -365,6 +411,20 @@ class RepairAgent:
                     if not images_rematched:
                         ImageMatcher.rematch_images_semantically(slides, assets)
                         images_rematched = True
+
+        # Phase 7: Post-Repair Measurement Verification Loop
+        for slide in slides:
+            if slide.bullets:
+                clean_b = [_clean_text(b) for b in slide.bullets if _clean_text(b)]
+                if clean_b:
+                    c_w = 3.65 if slide.layout_family == LayoutFamily.THREE_COLUMN else 5.85
+                    c_h = 3.80
+                    limit = 18
+                    while limit >= 10 and not TextMeasurementService.check_fits("\n".join(clean_b), c_w, c_h, size=11.0, bullet_list=True):
+                        clean_b = [ContentCapacityValidator.shorten_phrase_intelligently(b, limit) for b in clean_b]
+                        limit -= 2
+                    slide.bullets = clean_b
+                    slide.archetype_fields["qa_post_repair_verified"] = True
 
         cls._remove_duplicate_images(slides, assets)
         cls._normalize_layout_rhythm(slides)

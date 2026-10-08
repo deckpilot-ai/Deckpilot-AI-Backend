@@ -141,7 +141,7 @@ def test_llm_priority_routing_cascade(db_session: Session):
     prov_a = ProviderRouter.register_provider(
         db=db_session,
         name="provider-alpha",
-        base_url="https://api.alpha.ai/v1",
+        base_url="https://api.openai.com/v1",
         priority=80,
     )
     ProviderRouter.add_key(db=db_session, provider_id=prov_a.id, label="alpha-key", secret="sk-alpha-test-secret")
@@ -204,7 +204,7 @@ def test_admin_model_diagnostics_and_test_all(client: TestClient, db_session: Se
         headers=headers,
         json={
             "name": "test-diag-prov",
-            "base_url": "https://api.diag.ai/v1",
+            "base_url": "https://api.openai.com/v1",
             "priority": 40,
             "api_key": "sk-diag-test-key-12345",
             "models": [

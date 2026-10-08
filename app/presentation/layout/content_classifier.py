@@ -22,6 +22,8 @@ class SlideSignals:
     has_comparison: bool = False
     is_dark_preferred: bool = False
     title_words: int = 0
+    total_words: int = 0
+    max_item_words: int = 0
     tags: List[str] = field(default_factory=list)
 
 
@@ -40,6 +42,8 @@ class ContentClassifier:
         
         signals.title_words = len(headline.split())
         signals.item_count = len(bullets)
+        signals.total_words = len(combined_text.split())
+        signals.max_item_words = max([len(str(b).split()) for b in bullets], default=0)
         signals.has_image = bool(slide_data.get("image_id") or slide_data.get("image_artifact_id"))
         signals.has_table = bool(slide_data.get("table_headers") or slide_data.get("table") or slide_data.get("table_rows"))
         signals.has_chart = bool(slide_data.get("chart_series") or slide_data.get("chart"))

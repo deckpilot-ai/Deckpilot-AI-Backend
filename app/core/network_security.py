@@ -27,6 +27,9 @@ def validate_provider_base_url(value: str) -> str:
         if address.is_private or address.is_loopback or address.is_link_local or address.is_reserved or not address.is_global:
             raise ValueError("Provider base URL cannot target private or metadata IP addresses")
 
+    if hostname not in settings.ai_provider_allowed_host_list:
+        raise ValueError("Provider base URL host is not in AI_PROVIDER_ALLOWED_HOSTS")
+
     if parsed.port not in {None, 80, 443}:
         raise ValueError(f"Provider base URL cannot use custom port {parsed.port}")
 

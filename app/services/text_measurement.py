@@ -18,6 +18,7 @@ from app.schemas.generation_state import (
 FONT_CHAR_WIDTH_RATIOS: dict[str, float] = {
     "segoe ui": 0.495,
     "calibri": 0.465,
+    "cambria": 0.485,
     "arial": 0.515,
     "helvetica": 0.510,
     "trebuchet ms": 0.525,
@@ -28,6 +29,16 @@ FONT_CHAR_WIDTH_RATIOS: dict[str, float] = {
     "montserrat": 0.535,
     "outfit": 0.520,
     "playfair display": 0.510,
+    "cinzel": 0.530,
+    "cormorant": 0.460,
+    "cormorant garamond": 0.460,
+    "inter": 0.505,
+    "lora": 0.495,
+    "merriweather": 0.530,
+    "poppins": 0.535,
+    "lato": 0.485,
+    "raleway": 0.510,
+    "open sans": 0.515,
     "default": 0.500,
 }
 
@@ -262,3 +273,115 @@ class TextMeasurementService:
                 )
 
         return issues
+
+    @classmethod
+    def check_fits(
+        cls,
+        text: str,
+        w: float,
+        h: float,
+        size: float = 13.0,
+        font_name: str = "Segoe UI",
+        bullet_list: bool = False,
+        role: str = "body",
+        padding_in: float = 0.04,
+    ) -> bool:
+        """Determines if text wrapped into width `w` at font size `size` fits inside height `h`."""
+        cleaned = cls.clean(text)
+        if not cleaned:
+            return True
+        _, est_h, _, _ = cls.measure_text_bounds(
+            cleaned,
+            font_name=font_name,
+            font_size_pt=size,
+            max_width_in=w,
+            role=role,
+            is_bullet_list=bullet_list,
+            padding_in=padding_in,
+        )
+        return est_h <= (h + 0.02)
+
+    @classmethod
+    def calculate_text_height(
+        cls,
+        text: str,
+        width_in: float,
+        font_name: str = "Segoe UI",
+        font_size_pt: float = 14.0,
+        role: str = "body",
+        bullet_list: bool = False,
+        padding_in: float = 0.04,
+    ) -> float:
+        """Calculates precise vertical height of wrapped text in inches."""
+        cleaned = cls.clean(text)
+        if not cleaned:
+            return 0.0
+        _, est_h, _, _ = cls.measure_text_bounds(
+            cleaned,
+            font_name=font_name,
+            font_size_pt=font_size_pt,
+            max_width_in=width_in,
+            role=role,
+            is_bullet_list=bullet_list,
+            padding_in=padding_in,
+        )
+        return est_h
+
+    @classmethod
+    def measure_title_fits(
+        cls,
+        text: str,
+        max_width_in: float,
+        max_height_in: float = 1.2,
+        font_name: str = "Segoe UI",
+        min_font_pt: float = 20.0,
+        max_font_pt: float = 32.0,
+    ) -> tuple[bool, float, list[str]]:
+        """Finds optimal title font size that fits container without wrapping onto >2 lines or overflowing height."""
+        cleaned = cls.clean(text)
+        if not cleaned:
+            return True, max_font_pt, []
+
+        curr = max_font_pt
+        best_lines: list[str] = []
+        while curr >= min_font_pt:
+            _, est_h, lines_cnt, lines = cls.measure_text_bounds(
+                cleaned, font_name=font_name, font_size_pt=curr, max_width_in=max_width_in, role="title"
+            )
+            # Presentation titles shouldn't exceed 2 lines and must fit in height
+            if est_h <= (max_height_in + 0.02) and lines_cnt <= 2:
+                return True, curr, lines
+            best_lines = lines
+            curr -= 1.0
+
+        return False, min_font_pt, best_lines
+
+    @classmethod
+    def split_content_for_layout(
+        cls,
+        bullets: list[str],
+        container_w: float,
+        container_h: float,
+        font_name: str = "Segoe UI",
+        font_size_pt: float = 13.0,
+    ) -> tuple[bool, list[str], list[str]]:
+        """Splits bullets into those that fit in the container and those that overflow.
+        
+        Returns (all_fit, fitting_bullets, overflow_bullets).
+        """
+        valid_bullets = [cls.clean(b) for b in bullets if cls.clean(b)]
+        if not valid_bullets:
+            return True, [], []
+
+        fitting: list[str] = []
+        overflow: list[str] = []
+
+        for b in valid_bullets:
+            test_list = fitting + [b]
+            combined = "\n".join(test_list)
+            if cls.check_fits(combined, container_w, container_h, size=font_size_pt, font_name=font_name, bullet_list=True):
+                fitting.append(b)
+            else:
+                overflow.append(b)
+
+        return (len(overflow) == 0), fitting, overflow

@@ -19,6 +19,7 @@ from pptx.util import Inches, Pt
 from app.schemas.generation_state import DesignSystem, SlideSpec
 from app.services.deck_archetypes import GRID_SPEC, LAYOUT_ARCHETYPES
 from app.services.design_system import clean_text
+from app.services.grid_engine import PresentationGridEngine
 
 logger = logging.getLogger(__name__)
 
@@ -499,10 +500,10 @@ class ArchetypeRenderer:
         if data.takeaway:
             r_cls._text(slide, data.takeaway, 0.6, 2.05, 12.1, 0.6, hex_to_rgb(ds.colors.text_secondary), body_font, 14)
             card_y = 2.85
-            card_h = 3.9
+            card_h = 3.80
         else:
-            card_y = 2.2
-            card_h = 4.55
+            card_y = 2.15
+            card_h = 4.45
 
         steps = data.bullets[:3] if data.bullets else [
             "Initiation: Mobilize resources and baseline operational requirements.",
@@ -510,16 +511,23 @@ class ArchetypeRenderer:
             "Institutionalization: Solidify governance mechanisms and scale impact.",
         ]
 
-        cw = 3.65
-        gap = 0.55
+        slots = PresentationGridEngine.compute_equal_columns(
+            count=len(steps[:3]),
+            margin_left=0.6,
+            content_top=card_y,
+            total_w=12.133,
+            height=card_h,
+            gap=0.45,
+        )
 
-        for k, step in enumerate(steps[:3]):
-            cx = 0.6 + k * (cw + gap)
-            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, cx, card_y, cw, card_h, tint_a, f"step-card-{k+1}", corner_radius=0.04)
+        for k, (step, slot) in enumerate(zip(steps[:3], slots)):
+            cx = slot.x
+            cw = slot.w
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, cx, slot.y, cw, slot.h, tint_a, f"step-card-{k+1}", corner_radius=0.04)
 
             # Top badge
-            r_cls._shape(slide, MSO_SHAPE.OVAL, cx + 0.35, card_y + 0.35, 0.6, 0.6, ink, f"step-badge-{k+1}")
-            r_cls._text(slide, f"0{k+1}", cx + 0.35, card_y + 0.4, 0.6, 0.5, white, title_font, 16, bold=True, center=True)
+            r_cls._shape(slide, MSO_SHAPE.OVAL, cx + 0.35, slot.y + 0.35, 0.6, 0.6, ink, f"step-badge-{k+1}")
+            r_cls._text(slide, f"0{k+1}", cx + 0.35, slot.y + 0.4, 0.6, 0.5, white, title_font, 16, bold=True, center=True)
 
             parts = step.split(":", 1) if ":" in step else [step]
             heading_h = 0.75 if len(parts) > 1 else 1.8
@@ -528,7 +536,7 @@ class ArchetypeRenderer:
                 slide,
                 parts[0].strip(),
                 cx + 0.35,
-                card_y + 1.15,
+                slot.y + 1.15,
                 cw - 0.7,
                 heading_h,
                 primary,
@@ -537,16 +545,16 @@ class ArchetypeRenderer:
                 bold=len(parts) > 1,
                 center=True,
             )
-            r_cls._shape(slide, MSO_SHAPE.RECTANGLE, cx + 0.35, card_y + 1.75, 1.2, 0.04, primary, f"rule-{k+1}")
+            r_cls._shape(slide, MSO_SHAPE.RECTANGLE, cx + 0.35, slot.y + 1.75, 1.2, 0.04, primary, f"rule-{k+1}")
             if len(parts) > 1:
                 desc = parts[1].strip()
-                r_cls._text(slide, desc[:160], cx + 0.35, card_y + 1.9, cw - 0.7, card_h - 2.1, hex_to_rgb(ds.colors.text_secondary), body_font, 15, center=True)
+                r_cls._text(slide, desc[:160], cx + 0.35, slot.y + 1.9, cw - 0.7, slot.h - 2.1, hex_to_rgb(ds.colors.text_secondary), body_font, 15, center=True)
 
             # Connecting Arrow Chip
-            if k < 2:
-                arrow_x = cx + cw + 0.12
-                arrow_y = card_y + card_h / 2 - 0.2
-                r_cls._shape(slide, MSO_SHAPE.CHEVRON, arrow_x, arrow_y, 0.32, 0.4, primary, f"arrow-{k+1}")
+            if k < len(slots) - 1:
+                arrow_x = cx + cw + 0.08
+                arrow_y = slot.y + slot.h / 2 - 0.2
+                r_cls._shape(slide, MSO_SHAPE.CHEVRON, arrow_x, arrow_y, 0.28, 0.4, primary, f"arrow-{k+1}")
 
     # ──────────────────────────────────────────────────────────────────────────
     # A11: Stage / Maturity Columns
@@ -562,12 +570,20 @@ class ArchetypeRenderer:
 
         stages = data.bullets[:4] if len(data.bullets) >= 4 else (data.bullets[:3] if data.bullets else ["Stage 1", "Stage 2", "Stage 3"])
         count = len(stages)
-        cw = (12.1 - 0.35 * (count - 1)) / count
+        slots = PresentationGridEngine.compute_equal_columns(
+            count=count,
+            margin_left=0.6,
+            content_top=2.15,
+            total_w=12.133,
+            height=4.45,
+            gap=0.35,
+        )
 
-        for j, st in enumerate(stages):
-            x = 0.6 + j * (cw + 0.35)
-            y = 2.1
-            h = 4.65
+        for j, (st, slot) in enumerate(zip(stages, slots)):
+            x = slot.x
+            cw = slot.w
+            y = slot.y
+            h = slot.h
 
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, cw, h, tint_a, f"col-{j+1}", corner_radius=0.03)
 
@@ -593,18 +609,22 @@ class ArchetypeRenderer:
         body_font = ds.typography.body_font.name
 
         items = data.bullets[:4] if len(data.bullets) >= 4 else (data.bullets if data.bullets else ["Driver 1", "Driver 2", "Driver 3", "Driver 4"])
-        cols = 2
-        rows = 2
-        cw = 5.85
-        ch = 2.15
-        gap_x = 0.4
-        gap_y = 0.35
+        slots = PresentationGridEngine.compute_card_grid(
+            cols=2,
+            rows=2,
+            margin_left=0.6,
+            content_top=2.15,
+            total_w=12.133,
+            total_h=4.45,
+            gutter_x=0.35,
+            gutter_y=0.35,
+        )
 
-        for k, item in enumerate(items[:4]):
-            r = k // cols
-            c = k % cols
-            x = 0.6 + c * (cw + gap_x)
-            y = 2.15 + r * (ch + gap_y)
+        for k, (item, slot) in enumerate(zip(items[:4], slots)):
+            x = slot.x
+            y = slot.y
+            cw = slot.w
+            ch = slot.h
 
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, cw, ch, tint_a, f"grid-cell-{k+1}", corner_radius=0.04)
 
@@ -864,14 +884,22 @@ class ArchetypeRenderer:
         count = len(items)
         cols = 4 if count >= 7 else (3 if count == 6 else (2 if count <= 4 else 4))
         rows = math.ceil(count / cols)
-        cw = (12.1 - 0.25 * (cols - 1)) / cols
-        ch = (4.75 - 0.25 * (rows - 1)) / rows
+        slots = PresentationGridEngine.compute_card_grid(
+            cols=cols,
+            rows=rows,
+            margin_left=0.6,
+            content_top=2.15,
+            total_w=12.133,
+            total_h=4.45,
+            gutter_x=0.25,
+            gutter_y=0.25,
+        )
 
-        for k, item in enumerate(items):
-            r = k // cols
-            c = k % cols
-            x = 0.6 + c * (cw + 0.25)
-            y = 2.05 + r * (ch + 0.25)
+        for k, (item, slot) in enumerate(zip(items, slots)):
+            x = slot.x
+            y = slot.y
+            cw = slot.w
+            ch = slot.h
 
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, cw, ch, tint_a, f"council-cell-{k+1}", corner_radius=0.04)
 

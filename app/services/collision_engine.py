@@ -274,3 +274,82 @@ class CollisionDetectionEngine:
                     )
 
         return issues
+
+
+class PlacementTracker:
+    """Tracks placed visual elements per slide to prevent collisions at render-time."""
+
+    def __init__(
+        self,
+        canvas_w: float = 13.333,
+        canvas_h: float = 7.500,
+        footer_top: float = 6.90,
+    ):
+        self.canvas_w = canvas_w
+        self.canvas_h = canvas_h
+        self.footer_top = footer_top
+        self.placed_boxes: list[BoundingBox] = []
+
+    def place(self, bbox: BoundingBox) -> bool:
+        """Records an element's bounding box."""
+        self.placed_boxes.append(bbox)
+        return True
+
+    def would_collide(self, bbox: BoundingBox, buffer: float = 0.03) -> BoundingBox | None:
+        """Checks if placing bbox would collide with any already placed box."""
+        # Check boundary/footer collision
+        if bbox.bottom > self.footer_top and bbox.kind not in ("footer", "page_number", "background"):
+            return BoundingBox(id="footer_boundary", name="Footer Zone", kind="footer", x=0, y=self.footer_top, w=self.canvas_w, h=self.canvas_h - self.footer_top)
+
+        for existing in self.placed_boxes:
+            if existing.kind == "background" or bbox.kind == "background":
+                continue
+            if existing.parent_id == bbox.id or bbox.parent_id == existing.id:
+                continue
+            if existing.parent_id and existing.parent_id == bbox.parent_id:
+                if existing.intersects(bbox, buffer=buffer):
+                    return existing
+                continue
+            # Containment check (e.g. text or badge inside card)
+            if (existing.kind in ("card", "shape") and bbox.kind in ("text", "icon", "badge", "image", "shape") and existing.contains(bbox)) or \
+               (bbox.kind in ("card", "shape") and existing.kind in ("text", "icon", "badge", "image", "shape") and bbox.contains(existing)):
+                continue
+
+            if existing.intersects(bbox, buffer=buffer):
+                return existing
+
+        return None
+
+    def find_free_vertical_slot(self, x: float, min_y: float, w: float, h: float, max_y: float = 6.60) -> float | None:
+        """Finds nearest vertical position >= min_y where rect (x, y, w, h) does not collide and stays above max_y."""
+        curr_y = min_y
+        step = 0.10
+        while curr_y + h <= max_y + 0.02:
+            test_box = BoundingBox(id="probe", name="probe", kind="text", x=x, y=curr_y, w=w, h=h)
+            if not self.would_collide(test_box):
+                return round(curr_y, 3)
+            curr_y += step
+        return None
+
+    @classmethod
+    def validate_footer_clearance(cls, boxes: list[BoundingBox], footer_top: float = 6.90) -> list[BoundingBox]:
+        """Returns all boxes that illegally penetrate the footer zone."""
+        intrusions: list[BoundingBox] = []
+        for box in boxes:
+            if box.kind not in ("footer", "page_number", "background") and box.bottom > footer_top:
+                intrusions.append(box)
+        return intrusions
+
+    @classmethod
+    def validate_boundary_containment(
+        cls,
+        boxes: list[BoundingBox],
+        canvas_w: float = 13.333,
+        canvas_h: float = 7.500,
+    ) -> list[BoundingBox]:
+        """Returns all boxes that extend outside the slide canvas."""
+        violations: list[BoundingBox] = []
+        for box in boxes:
+            if box.x < -0.05 or box.y < -0.05 or box.right > canvas_w + 0.05 or box.bottom > canvas_h + 0.05:
+                violations.append(box)
+        return violations

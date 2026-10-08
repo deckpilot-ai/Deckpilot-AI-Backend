@@ -1,4 +1,4 @@
-"""Deterministic 120-checkpoint presentation QA engine."""
+"""Deterministic presentation QA engine with the registered checkpoint set."""
 
 from __future__ import annotations
 

@@ -79,7 +79,9 @@ def test_generation_pipeline_and_pptx_export(client: TestClient, db_session: Ses
     assert any(event.get("phase") == "checking" for event in qa_events)
     assert any(event.get("phase") == "results" for event in qa_events)
     assert any(event.get("phase") == "completed" for event in qa_events)
-    assert job_detail["qa_summary"]["checkpoints_total"] == 120
+    from app.agents.qa_checkpoints import CHECKPOINTS
+
+    assert job_detail["qa_summary"]["checkpoints_total"] == len(CHECKPOINTS)
     assert job_detail["qa_summary"]["checkpoints_passed"] >= 1
 
     # 5. Fetch Deck Version

@@ -139,12 +139,31 @@ class SemanticLayoutSelector:
                     score -= 50.0
                     reasons.append("Penalized: requires image but none provided")
 
-            # 3. Item Count Alignment
+            # 3. Item Count & Content Volume Alignment
             if meta.min_items <= signals.item_count <= meta.max_items:
                 score += 15.0
                 reasons.append(f"Item count {signals.item_count} fits [{meta.min_items}, {meta.max_items}]")
             elif signals.item_count > meta.max_items:
-                score -= 30.0
+                score -= 35.0
+                reasons.append(f"Penalized: item count {signals.item_count} exceeds max {meta.max_items}")
+
+            # High text volume penalty on compact grids; boost spacious layouts
+            if getattr(signals, "max_item_words", 0) > 36:
+                if meta.family in ("grid", "quadrant", "council", "agenda"):
+                    score -= 30.0
+                    reasons.append("Penalized: verbose item copy risks overflowing compact grid cards")
+                elif meta.family in ("two_column", "split_comparison", "editorial_prose"):
+                    score += 20.0
+                    reasons.append("Boosted: high item word count accommodated by spacious columns")
+
+            # Low text volume penalty on dense grids; boost focus layouts
+            if signals.item_count <= 2 and getattr(signals, "total_words", 0) < 40:
+                if meta.family in ("grid", "agenda", "council"):
+                    score -= 40.0
+                    reasons.append("Penalized: sparse content looks empty in multi-cell grid")
+                elif meta.family in ("hero", "quote", "definition", "stat_highlight"):
+                    score += 25.0
+                    reasons.append("Boosted: concise content fits focus / hero layouts")
 
             # 4. Feature Affinity
             if signals.has_process and meta.supports_process:

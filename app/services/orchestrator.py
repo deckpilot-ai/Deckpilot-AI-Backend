@@ -1123,7 +1123,7 @@ class JobOrchestrator:
                     _emit(
                         "visual_qa",
                         "running",
-                        "QA pass 1: running 120 content, typography, geometry, whitespace, image, and integrity checks...",
+                        "QA pass 1: running the registered content, typography, geometry, whitespace, image, and integrity checks...",
                         {"phase": "checking", "pass_number": 1, "stage_progress": 0.08},
                     )
 
@@ -1214,7 +1214,7 @@ class JobOrchestrator:
                         _emit(
                             "visual_qa",
                             "running",
-                            f"QA pass {qa_pass}: rechecking all 120 checkpoints after repair.",
+                            f"QA pass {qa_pass}: rechecking all registered checkpoints after repair.",
                             {
                                 "phase": "rechecking",
                                 "pass_number": qa_pass,

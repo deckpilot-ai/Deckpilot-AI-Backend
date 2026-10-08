@@ -298,6 +298,21 @@ class ImageMatcher:
                         continue
                     caption = asset["caption"] or asset["summary"] or "Source document visual reference"
                     if isinstance(slide, SlideSpec):
+                        slide_text = f"{slide.headline} {slide.objective} {slide.takeaway} {' '.join(slide.bullets or [])}"
+                    else:
+                        slide_text = f"{slide.get('headline', '')} {slide.get('purpose', '')} {slide.get('takeaway', '')} {' '.join(normalize_bullet_items(slide.get('bullets')))}"
+                    evidence = f"{asset['caption']} {asset['nearby_text']} {asset['summary']}".strip()
+                    score = cls.calculate_relevance(
+                        slide_text,
+                        evidence or asset["caption"],
+                        topic_context=topic_context,
+                        slide_section=(slide.section if isinstance(slide, SlideSpec) else slide.get("section", "")),
+                        image_section=asset["section"],
+                        image_type=asset["image_type"],
+                    )
+                    if score < min_relevance_threshold:
+                        continue
+                    if isinstance(slide, SlideSpec):
                         if slide.table_spec or slide.chart_spec or slide.diagram_spec:
                             continue
                         slide.image_artifact_id = asset["id"]

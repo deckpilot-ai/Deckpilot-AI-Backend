@@ -16,6 +16,8 @@ jobs:
     name: Deploy Backend to Lightsail
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      DEPLOY_BRANCH: ${{ github.ref_name }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -27,25 +29,27 @@ jobs:
           username: ${{ secrets.LIGHTSAIL_USER || 'ubuntu' }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           port: ${{ secrets.LIGHTSAIL_PORT || 22 }}
-          script_stop: false
+          script_stop: true
+          envs: DEPLOY_BRANCH
           script: |
+            set -eu
             echo "=== Starting DeckPilotAI Backend Deployment ==="
             echo "Timestamp: $(date -u)"
-            echo "Branch: deploy-dev"
-            cd /home/ubuntu/Deckpilot-AI-Backend || exit 1
+            echo "Branch: ${DEPLOY_BRANCH}"
+            cd /home/ubuntu/Deckpilot-AI-Backend
 
             echo "--- Pulling latest code ---"
-            git fetch origin deploy-dev
-            git checkout deploy-dev
-            git reset --hard origin/deploy-dev
+            git fetch origin "${DEPLOY_BRANCH}"
+            git checkout "${DEPLOY_BRANCH}"
+            git reset --hard "origin/${DEPLOY_BRANCH}"
             echo "HEAD is now: $(git log --oneline -1)"
 
             echo "--- Building Docker image ---"
-            sudo docker build -t deckpilotai-backend . 2>&1 | tail -20
+            sudo docker build -t deckpilotai-backend .
 
             echo "--- Running database migrations ---"
             sudo docker run --rm --env-file .env.production deckpilotai-backend \
-              alembic upgrade head || echo "Migration step completed (or no migrations pending)."
+              alembic upgrade head
 
             echo "--- Stopping old container ---"
             sudo docker rm -f deckpilotai-backend || true
@@ -58,18 +62,23 @@ jobs:
               -p 127.0.0.1:8000:8000 \
               deckpilotai-backend
 
-            echo "--- Waiting for startup (10s) ---"
-            sleep 10
-
-            echo "--- Health check ---"
+            echo "--- Waiting for startup and checking liveness/readiness ---"
+            healthy=0
             for i in 1 2 3; do
-              if curl -sf http://127.0.0.1:8000/api/v1/health; then
-                echo "Health check PASSED on attempt $i"
+              if curl -fsS http://127.0.0.1:8000/api/v1/health \
+                && curl -fsS http://127.0.0.1:8000/api/v1/health/ready; then
+                echo "Health checks PASSED on attempt ${i}"
+                healthy=1
                 break
               fi
-              echo "Attempt $i failed, retrying in 5s..."
+              echo "Attempt ${i} failed, retrying in 5s..."
               sleep 5
             done
+            if [ "${healthy}" -ne 1 ]; then
+              echo "Health checks failed; recent container logs:"
+              sudo docker logs --tail 200 deckpilotai-backend || true
+              exit 1
+            fi
 
             echo "--- Pruning old Docker images ---"
             sudo docker image prune -f || true

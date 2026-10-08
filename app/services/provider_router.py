@@ -219,17 +219,18 @@ class ProviderRouter:
             logger.info("Synced new API key '%s' for provider %s", label, provider_name)
 
         provider_configs = [
+            ("axqua", settings.axqua_base_url or "https://axqua.com/v1", settings.axqua_api_key, 40),
             ("gemini", "https://generativelanguage.googleapis.com/v1beta/openai", settings.gemini_api_key, 35),
             ("openrouter", "https://openrouter.ai/api/v1", settings.openrouter_api_key, 34),
             ("groq", "https://api.groq.com/openai/v1", settings.groq_api_key, 33),
             ("apmix", settings.apmix_base_url or "https://api.apmix.ai/v1", settings.apmix_api_key, 32),
             ("dahl", settings.dahl_base_url or "https://inference.dahl.global/v1", settings.dahl_api_key, 31),
             ("inceptionlabs", settings.inceptionlabs_base_url or "https://api.inceptionlabs.ai/v1", settings.inceptionlabs_api_key, 30),
-            ("bynara", settings.bynara_base_url or "https://router.bynara.id/v1", settings.bynara_api_key, 29),
+            ("bynara", settings.bynara_base_url or "https://router.bynara.id/v1", settings.bynara_api_key, 27),
             ("nvidia", settings.nvidia_base_url or "https://integrate.api.nvidia.com/v1", settings.nvidia_api_key, 25),
             ("bazaarlink", settings.bazaarlink_base_url or "https://api.bazaarlink.ai/v1", settings.bazaarlink_api_key, 5),
             ("routeway", settings.routeway_base_url or "https://api.routeway.ai/v1", settings.routeway_api_key, 5),
-            ("codecraft", settings.codecraft_base_url or "https://codecraftapi.com/v1", settings.codecraft_api_key, 4),
+            ("codecraft", settings.codecraft_base_url or "https://codecraftapi.com/v1", settings.codecraft_api_key, 15),
             ("experientiallabs", settings.experientiallabs_base_url or "https://api.experientiallabs.ai/v1", settings.effective_experientiallabs_api_key, 4),
             ("openai", "https://api.openai.com/v1", settings.openai_api_key, 3),
             ("mistral", "https://api.mistral.ai/v1", settings.mistral_api_key, 2),
@@ -313,6 +314,49 @@ class ProviderRouter:
                         {"model_id": "qwen3.8-max", "display_name": "Qwen 3.8 Max", "priority": 90, "enabled": 1, "context_length": 1000000},
                         {"model_id": "claude-fable-5-1", "display_name": "Claude Fable 5.1", "priority": 88, "enabled": 1, "context_length": 200000},
                     ]
+                elif name == "axqua":
+                    default_models = [
+                        {"model_id": "gpt-6-astra", "display_name": "GPT-6 Astra (Flagship)", "priority": 105, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "claude-opus-5", "display_name": "Claude Opus 5 (Anthropic)", "priority": 104, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "claude-opus-4-8", "display_name": "Claude Opus 4.8 (Anthropic)", "priority": 103, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "claude-opus-4-7", "display_name": "Claude Opus 4.7 (Anthropic)", "priority": 102, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "claude-opus-4-6", "display_name": "Claude Opus 4.6 (Anthropic)", "priority": 101, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "claude-sonnet-5", "display_name": "Claude Sonnet 5 (Anthropic)", "priority": 100, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "claude-sonnet-4-6", "display_name": "Claude Sonnet 4.6 (Anthropic)", "priority": 98, "enabled": 1, "context_length": 1000000},
+                        {"model_id": "gemini-3.8-flash", "display_name": "Gemini 3.8 Flash (Google)", "priority": 96, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "gpt-6-luna", "display_name": "GPT-6 Luna (OpenAI)", "priority": 95, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "gpt-6-sol", "display_name": "GPT-6 Sol (OpenAI)", "priority": 94, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "deepseek-v4.1-flash", "display_name": "DeepSeek V4.1 Flash", "priority": 92, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "grok-4.7", "display_name": "Grok 4.7 (xAI)", "priority": 90, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "grok-4.6", "display_name": "Grok 4.6 (xAI)", "priority": 89, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "kimi-k3", "display_name": "Kimi K3 (Moonshot)", "priority": 88, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "kimi-k2.7-code", "display_name": "Kimi K2.7 Code (Moonshot)", "priority": 87, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "glm-5.3", "display_name": "GLM 5.3 (Zhipu)", "priority": 86, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "glm-5.3-flash", "display_name": "GLM 5.3 Flash (Zhipu)", "priority": 85, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "minimax-m3", "display_name": "MiniMax M3", "priority": 84, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "qwen3.8-max", "display_name": "Qwen 3.8 Max (Alibaba)", "priority": 82, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "gemini-3.7-flash", "display_name": "Gemini 3.7 Flash (Google)", "priority": 80, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "gemini-3.6-flash", "display_name": "Gemini 3.6 Flash (Google)", "priority": 78, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "gemini-3.1-pro", "display_name": "Gemini 3.1 Pro (Google)", "priority": 77, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "gpt-5.5", "display_name": "GPT 5.5 (OpenAI)", "priority": 76, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "gpt-5.6-luna", "display_name": "GPT 5.6 Luna (OpenAI)", "priority": 75, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "gpt-5.6-sol", "display_name": "GPT 5.6 Sol (OpenAI)", "priority": 74, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "gpt-5.6-terra", "display_name": "GPT 5.6 Terra (OpenAI)", "priority": 73, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "claude-fable-5", "display_name": "Claude Fable 5", "priority": 72, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "claude-haiku-4-5", "display_name": "Claude Haiku 4.5", "priority": 71, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "deepseek-v4-pro", "display_name": "DeepSeek V4 Pro", "priority": 70, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "deepseek-v4-flash", "display_name": "DeepSeek V4 Flash", "priority": 69, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "grok-4.5", "display_name": "Grok 4.5 (xAI)", "priority": 68, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "glm-5.2", "display_name": "GLM 5.2 (Zhipu)", "priority": 67, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "glm-5-turbo", "display_name": "GLM 5 Turbo", "priority": 66, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "mimo-v2.5-pro", "display_name": "Mimo V2.5 Pro", "priority": 65, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "mimo-v2.5", "display_name": "Mimo V2.5", "priority": 64, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "qwen3.8-flash", "display_name": "Qwen 3.8 Flash", "priority": 63, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "muse-spark-1.3", "display_name": "Muse Spark 1.3", "priority": 62, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "composer-2.5-fast", "display_name": "Composer 2.5 Fast", "priority": 61, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "hy4-preview", "display_name": "HY4 Preview", "priority": 60, "enabled": 1, "context_length": 1050000},
+                        {"model_id": "space-bunny", "display_name": "Space Bunny", "priority": 59, "enabled": 1, "context_length": 1050000},
+                    ]
                 elif name == "apmix":
                     default_models = [
                         {"model_id": "gemini-2.5-flash-free", "display_name": "Gemini 2.5 Flash Free (Rank #1)", "priority": 100, "enabled": 1, "context_length": 1000000},
@@ -324,14 +368,12 @@ class ProviderRouter:
                     ]
                 elif name == "bynara":
                     default_models = [
-                        {"model_id": "agnes-2.5-flash", "display_name": "Agnes 2.5 Flash (Free • Vision)", "priority": 102, "enabled": 1, "context_length": 512000},
                         {"model_id": "ling-3.0-flash-vl-free", "display_name": "Ling 3.0 Flash VL (Free • Vision)", "priority": 100, "enabled": 1, "context_length": 262144},
                         {"model_id": "ling-3.0-flash-fin-free", "display_name": "Ling 3.0 Flash Fin (Free • Text)", "priority": 98, "enabled": 1, "context_length": 262144},
                         {"model_id": "nemotron-3.5-lightning-free", "display_name": "Nemotron 3.5 Lightning (Free • 1M)", "priority": 95, "enabled": 1, "context_length": 1048576},
                         {"model_id": "nemotron-3-ultra-free", "display_name": "Nemotron 3 Ultra (Free • 1M)", "priority": 92, "enabled": 1, "context_length": 1048576},
                         {"model_id": "ling-3.0-flash-sante-free", "display_name": "Ling 3.0 Flash Sante (Free • Text)", "priority": 90, "enabled": 1, "context_length": 262144},
                         {"model_id": "nemotron-3-super-free", "display_name": "Nemotron 3 Super (Free • Text)", "priority": 88, "enabled": 1, "context_length": 262144},
-                        {"model_id": "stepfun-3.7-flash", "display_name": "StepFun 3.7 Flash (Free • Vision)", "priority": 60, "enabled": 1, "context_length": 262144},
                         {"model_id": "nex-n2.5-pro", "display_name": "Nex N2.5 Pro (Free • Vision)", "priority": 85, "enabled": 1, "context_length": 262144},
                         {"model_id": "laguna-s-2.1", "display_name": "Laguna S-2.1 (Free • Text)", "priority": 80, "enabled": 1, "context_length": 262144},
                     ]
@@ -382,6 +424,8 @@ class ProviderRouter:
             extra_keys.append(("inceptionlabs", extra_key, f"inceptionlabs-env-key-{idx}"))
         for idx, extra_key in enumerate(settings.apmix_all_api_keys[1:], start=2):
             extra_keys.append(("apmix", extra_key, f"apmix-env-key-{idx}"))
+        for idx, extra_key in enumerate(settings.axqua_all_api_keys[1:], start=2):
+            extra_keys.append(("axqua", extra_key, f"axqua-env-key-{idx}"))
         for idx, extra_key in enumerate(settings.openrouter_all_api_keys[1:], start=2):
             extra_keys.append(("openrouter", extra_key, f"openrouter-env-key-{idx}"))
 
@@ -583,7 +627,7 @@ class ProviderRouter:
         provider_type: str = "openai_compatible",
     ) -> list[dict[str, Any]]:
         """Fetch available models dynamically from any OpenAI-compatible or standard AI provider endpoint."""
-        cleaned_url = base_url.strip().rstrip("/")
+        cleaned_url = validate_provider_base_url(base_url)
         if cleaned_url.endswith("/chat/completions"):
             cleaned_url = cleaned_url[:-len("/chat/completions")].rstrip("/")
 
@@ -644,14 +688,12 @@ class ProviderRouter:
                         if discovered:
                             if "bynara" in cleaned_url:
                                 free_model_ids = {
-                                    "agnes-2.5-flash",
                                     "ling-3.0-flash-vl-free",
                                     "ling-3.0-flash-fin-free",
                                     "nemotron-3.5-lightning-free",
                                     "nemotron-3-ultra-free",
                                     "ling-3.0-flash-sante-free",
                                     "nemotron-3-super-free",
-                                    "stepfun-3.7-flash",
                                     "nex-n2.5-pro",
                                     "laguna-s-2.1",
                                 }
@@ -701,14 +743,12 @@ class ProviderRouter:
             ]
         elif "bynara" in cleaned_url:
             bynara_curated = [
-                ("agnes-2.5-flash", "Agnes 2.5 Flash (Free • Vision)", 512000, "High-quality multimodal vision & text model (Free)", 102),
                 ("ling-3.0-flash-vl-free", "Ling 3.0 Flash VL (Free • Vision)", 262144, "Multimodal vision & text model (Free)", 100),
                 ("ling-3.0-flash-fin-free", "Ling 3.0 Flash Fin (Free • Text)", 262144, "Financial & analytical generation model (Free)", 98),
                 ("nemotron-3.5-lightning-free", "Nemotron 3.5 Lightning (Free • 1M)", 1048576, "1M context ultra-fast instruction model (Free)", 95),
                 ("nemotron-3-ultra-free", "Nemotron 3 Ultra (Free • 1M)", 1048576, "1M context flagship reasoning model (Free)", 92),
                 ("ling-3.0-flash-sante-free", "Ling 3.0 Flash Sante (Free • Text)", 262144, "Domain scientific & knowledge model (Free)", 90),
                 ("nemotron-3-super-free", "Nemotron 3 Super (Free • Text)", 262144, "High throughput reasoning model (Free)", 88),
-                ("stepfun-3.7-flash", "StepFun 3.7 Flash (Free • Vision)", 262144, "StepFun multimodal flash model (Free)", 86),
                 ("nex-n2.5-pro", "Nex N2.5 Pro (Free • Vision)", 262144, "Vision & multimodal presentation layout model (Free)", 85),
                 ("laguna-s-2.1", "Laguna S-2.1 (Free • Text)", 262144, "Low-latency text generation model (100% off)", 80),
             ]
@@ -1180,6 +1220,21 @@ class ProviderRouter:
                         ("zai-org/GLM-5.3-Flash", 95),
                         ("MiniMaxAI/MiniMax-M2.7", 85),
                     ]
+                elif "axqua" in p_name:
+                    model_candidates = [
+                        ("gpt-6-astra", 105),
+                        ("claude-opus-5", 104),
+                        ("claude-opus-4-8", 103),
+                        ("claude-opus-4-7", 102),
+                        ("claude-opus-4-6", 101),
+                        ("claude-sonnet-5", 100),
+                        ("claude-sonnet-4-6", 98),
+                        ("gemini-3.8-flash", 96),
+                        ("gpt-6-luna", 95),
+                        ("gpt-6-sol", 94),
+                        ("deepseek-v4.1-flash", 92),
+                        ("grok-4.7", 90),
+                    ]
                 elif "apmix" in p_name:
                     model_candidates = [
                         ("gemini-2.5-flash-free", 100),
@@ -1191,14 +1246,12 @@ class ProviderRouter:
                     ]
                 elif "bynara" in p_name:
                     model_candidates = [
-                        ("agnes-2.5-flash", 102),
                         ("ling-3.0-flash-vl-free", 100),
                         ("ling-3.0-flash-fin-free", 98),
                         ("nemotron-3.5-lightning-free", 95),
                         ("nemotron-3-ultra-free", 92),
                         ("ling-3.0-flash-sante-free", 90),
                         ("nemotron-3-super-free", 88),
-                        ("stepfun-3.7-flash", 60),  # Lower priority — slow response times observed
                         ("nex-n2.5-pro", 85),
                         ("laguna-s-2.1", 80),
                     ]
@@ -1668,6 +1721,21 @@ class ProviderRouter:
                     model_candidates = [("mercury-2.5", 100), ("mercury-2", 95)]
                 elif "dahl" in p_name:
                     model_candidates = [("deepseek-ai/DeepSeek-V4-Flash-0731", 100), ("zai-org/GLM-5.3-Flash", 95), ("MiniMaxAI/MiniMax-M2.7", 85)]
+                elif "axqua" in p_name:
+                    model_candidates = [
+                        ("gpt-6-astra", 105),
+                        ("claude-opus-5", 104),
+                        ("claude-opus-4-8", 103),
+                        ("claude-opus-4-7", 102),
+                        ("claude-opus-4-6", 101),
+                        ("claude-sonnet-5", 100),
+                        ("claude-sonnet-4-6", 98),
+                        ("gemini-3.8-flash", 96),
+                        ("gpt-6-luna", 95),
+                        ("gpt-6-sol", 94),
+                        ("deepseek-v4.1-flash", 92),
+                        ("grok-4.7", 90),
+                    ]
                 elif "apmix" in p_name:
                     model_candidates = [("gemini-2.5-flash-free", 100), ("gpt-5.6-luna-free", 95)]
                 elif "bynara" in p_name:

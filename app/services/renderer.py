@@ -21,6 +21,9 @@ from app.schemas.generation_state import (
 )
 from app.services.archetype_renderer import ArchetypeRenderer, _split_title_body
 from app.services.design_system import clean_text, default_brand, normalize_brand
+from app.services.content_capacity_validator import ContentCapacityValidator
+from app.services.grid_engine import PresentationGridEngine
+from app.services.text_measurement import TextMeasurementService
 from app.tools.chart_engine import ChartEngine
 from app.tools.diagram_engine import DiagramEngine
 from app.tools.image_intelligence import ImageIntelligence
@@ -48,12 +51,15 @@ class PPTXRenderer:
     SLIDE_HEIGHT = Inches(7.5)
 
     @staticmethod
-    def _fits(text, w, h, size=13, bullet_list=False):
-        capacity = max(1, int((w - 0.04 - (0.23 if bullet_list else 0)) * 72 / (size * 0.56)))
-        paragraphs = clean_text(text).split("\n")
-        lines = sum(max(1, math.ceil(len(line) / capacity)) for line in paragraphs)
-        spacing = max(0, len(paragraphs) - 1) * 5 if bullet_list else 0
-        return ((lines * size * 1.25 + spacing) / 72 + 0.06) - 0.02 <= h
+    def _fits(text, w, h, size=13, bullet_list=False, font_name="Segoe UI"):
+        return TextMeasurementService.check_fits(
+            text=text,
+            w=w,
+            h=h,
+            size=float(size),
+            font_name=font_name,
+            bullet_list=bullet_list,
+        )
 
     @classmethod
     def _shape(cls, slide, kind, x, y, w, h, color, name="card", corner_radius=0.08):
@@ -107,17 +113,17 @@ class PPTXRenderer:
         floor = 18 if title and size >= 24 else min(int(round(size)), 11)
         curr_size = int(round(size))
         while True:
-            if cls._fits(text, w, h, curr_size, bullet_list):
+            if cls._fits(text, w, h, curr_size, bullet_list, font_name=font_name):
                 break
             if curr_size <= floor:
                 # Text exceeds budget at floor size — trim text progressively until it fits
                 if bullet_list:
                     lines_list = text.split("\n")
-                    while len(lines_list) > 1 and not cls._fits("\n".join(lines_list), w, h, floor, bullet_list):
+                    while len(lines_list) > 1 and not cls._fits("\n".join(lines_list), w, h, floor, bullet_list, font_name=font_name):
                         lines_list.pop()
                     text = "\n".join(lines_list)
-                if not cls._fits(text, w, h, floor, bullet_list):
-                    while len(text) > 20 and not cls._fits(text + "…", w, h, floor, bullet_list):
+                if not cls._fits(text, w, h, floor, bullet_list, font_name=font_name):
+                    while len(text) > 20 and not cls._fits(text + "…", w, h, floor, bullet_list, font_name=font_name):
                         text = text[:-10].rstrip()
                     text = text.rstrip() + "…"
                 curr_size = floor
@@ -222,14 +228,16 @@ class PPTXRenderer:
             size = 16
             floor = 13
 
-        while size > floor and not cls._fits(text, text_w, h - 0.4, size, bullet_list):
+        while size > floor and not cls._fits(text, text_w, h - 0.4, size, bullet_list, font_name=font_name):
             size -= 1
 
-        capacity = max(1, int((text_w - 0.04 - (0.23 if bullet_list else 0)) * 72 / (size * 0.56)))
-        paragraphs = clean_text(text).split("\n")
-        lines = sum(max(1, math.ceil(len(line) / capacity)) for line in paragraphs)
-        spacing = max(0, len(paragraphs) - 1) * 5 if bullet_list else 0
-        actual_h = (lines * size * 1.25 + spacing) / 72 + 0.46
+        actual_h = TextMeasurementService.calculate_text_height(
+            text=text,
+            width_in=text_w,
+            font_name=font_name,
+            font_size_pt=float(size),
+            bullet_list=bullet_list,
+        ) + 0.46
         card_h = h if fixed_height else min(h, max(1.2, actual_h))
 
         cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, card_h, fill, "card")
@@ -285,6 +293,8 @@ class PPTXRenderer:
         text_secondary = hex_to_rgb(design_system.colors.text_secondary)
         title_font = design_system.typography.title_font.name
         body_font = design_system.typography.body_font.name
+
+        slide_specs = ContentCapacityValidator.validate_and_fix(slide_specs, design_system)
 
         for index, slide_data in enumerate(slide_specs):
             cls._active_font_scale = max(1.0, min(1.3, float(slide_data.archetype_fields.get("qa_font_scale", 1.0))))
@@ -654,12 +664,18 @@ class PPTXRenderer:
                 count = len(items)
                 cols = 2 if count == 4 else min(count, 3) or 1
                 rows = math.ceil(count / cols) or 1
-                h_card = (3.65 - 0.35 * (rows - 1)) / rows
-                w_card = (12.1 - 0.35 * (cols - 1)) / cols
-                for j, item in enumerate(items):
-                    x_c = 0.6 + (j % cols) * (w_card + 0.35)
-                    y_c = 2.4 + (j // cols) * (h_card + 0.35)
-                    cls._card(slide, item, x_c, y_c, w_card, h_card, fill, body_col, primary, body_font, j + 1, fixed_height=True)
+                slots = PresentationGridEngine.compute_card_grid(
+                    cols=cols,
+                    rows=rows,
+                    margin_left=0.6,
+                    content_top=2.25,
+                    total_w=12.133,
+                    total_h=4.20,
+                    gutter_x=0.35,
+                    gutter_y=0.35,
+                )
+                for j, (item, slot) in enumerate(zip(items, slots)):
+                    cls._card(slide, item, slot.x, slot.y, slot.w, slot.h, fill, body_col, primary, body_font, j + 1, fixed_height=True)
 
             else:
                 # If image_bytes is present, prioritize visual framed layout with rich typographic hierarchy
@@ -739,22 +755,45 @@ class PPTXRenderer:
                     # compact cards used by API clients and regression tests.
                     midpoint = max(1, math.ceil(len(bullets) / 2))
                     groups = [bullets] if len(bullets) <= 1 else [bullets[:midpoint], bullets[midpoint:]]
-                    for j, group in enumerate(groups):
-                        if group:
-                            card_width = 12.1 if len(groups) == 1 else 5.875
+                    if len(groups) == 1:
+                        if groups[0]:
                             cls._card(
                                 slide,
-                                "\n".join(group),
-                                0.6 + j * 6.225,
+                                "\n".join(groups[0]),
+                                0.6,
                                 2.25,
-                                card_width,
-                                4.0,
+                                12.133,
+                                4.20,
                                 fill,
                                 body_col,
                                 accent,
                                 body_font,
                                 fixed_height=True,
                             )
+                    else:
+                        slots = PresentationGridEngine.compute_equal_columns(
+                            count=2,
+                            margin_left=0.6,
+                            content_top=2.25,
+                            total_w=12.133,
+                            height=4.20,
+                            gap=0.35,
+                        )
+                        for j, (group, slot) in enumerate(zip(groups, slots)):
+                            if group:
+                                cls._card(
+                                    slide,
+                                    "\n".join(group),
+                                    slot.x,
+                                    slot.y,
+                                    slot.w,
+                                    slot.h,
+                                    fill,
+                                    body_col,
+                                    accent,
+                                    body_font,
+                                    fixed_height=True,
+                                )
 
             # Speaker Notes
             notes = slide_data.speaker_notes or f"Presenter guidance for Slide {index + 1}: {title}"
