@@ -197,6 +197,8 @@ class ContentCapacityValidator:
 
             # 1. Headline / Title Optimization
             raw_title = clean_text(slide.headline or getattr(slide, "key_message", "") or "")
+            if raw_title and len(raw_title) > 400:
+                raise ValueError("Slide text exceeds its layout budget; shorten the source copy and regenerate")
             if raw_title:
                 title_words = len(raw_title.split())
                 if title_words > cls.MAX_TITLE_WORDS:
@@ -209,7 +211,7 @@ class ContentCapacityValidator:
 
             if bullets:
                 # Progressive bullet shortening for cards
-                max_bullet_words = 28 if len(bullets) <= 3 else (22 if len(bullets) <= 4 else 18)
+                max_bullet_words = 45 if len(bullets) <= 3 else (38 if len(bullets) <= 4 else 32)
                 fixed_bullets = []
                 for b in bullets:
                     if len(b.split()) > max_bullet_words:

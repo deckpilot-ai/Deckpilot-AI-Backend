@@ -598,6 +598,24 @@ class ArchetypeSelector:
         "system_diagram": ["A22"],
         "hub_spoke": ["A22", "A25"],
         "pipeline_architecture": ["A23"],
+        # 17 Layouts from deckpilot-skill catalog
+        "title_dark": ["A1", "A2"],
+        "section_divider": ["A3"],
+        "agenda_numbered": ["A4", "A29"],
+        "two_col_text_visual": ["A8", "A7", "A28"],
+        "icon_cards_3": ["A10", "A13"],
+        "icon_cards_4_grid": ["A13", "A29"],
+        "icon_rows": ["A9", "A10", "A11"],
+        "stat_trio": ["A15", "A21", "A8"],
+        "stat_hero": ["A8", "A15"],
+        "compare_2col": ["A6", "A7", "A26", "A12"],
+        "process_flow": ["A10", "A30", "A9", "A11"],
+        "timeline_h": ["A24", "A11"],
+        "chart_with_takeaway": ["A14"],
+        "table_focus": ["A16"],
+        "quote_big": ["A27", "A17"],
+        "half_bleed_image": ["A8", "A26", "A28"],
+        "closing_dark": ["A17", "A18"],
     }
 
     @classmethod
@@ -606,20 +624,21 @@ class ArchetypeSelector:
         content_type: str,
         content_summary: str = "",
         previous_archetype: str | None = None,
+        used_archetypes: list[str] | None = None,
         style_family: Literal["A", "B"] = "A",
         has_image: bool = False,
         has_chart: bool = False,
         has_table: bool = False,
     ) -> str:
-        """Select an archetype from catalog, avoiding back-to-back repeats."""
+        """Select an archetype from catalog, enforcing deckpilot-skill non-repeat and max-3-uses rules."""
         # Hardware overrides
         if has_chart:
             return "A14"
         if has_table:
             return "A16"
-        if has_image and content_type == "title":
+        if has_image and content_type in ("title", "title_dark"):
             return "A2"
-        if has_image and content_type in ("stat_highlight", "stats", "two_column"):
+        if has_image and content_type in ("stat_highlight", "stats", "two_column", "two_col_text_visual", "half_bleed_image"):
             return "A8"
 
         candidates = cls.CONTENT_TYPE_MAP.get(content_type.lower(), ["A13", "A7", "A10"])
@@ -638,8 +657,19 @@ class ArchetypeSelector:
         if not filtered:
             filtered = candidates
 
-        # Avoid repeating the immediate predecessor
-        if previous_archetype and len(filtered) > 1 and filtered[0] == previous_archetype:
-            return filtered[1]
+        used = used_archetypes or []
+        MAX_USES = 3
 
-        return filtered[0] if filtered else "A13"
+        # 1. Pick candidate that does not match previous archetype AND has been used < 3 times
+        pick_ = next((c for c in filtered if c != previous_archetype and used.count(c) < MAX_USES), None)
+
+        # 2. If all candidates exceed max uses, pick any candidate that does not match previous
+        if not pick_:
+            pick_ = next((c for c in filtered if c != previous_archetype), None)
+
+        # 3. Fallback to general narrative/grid pool if all candidates blocked
+        if not pick_:
+            pool = ["A13", "A7", "A10", "A5", "A6", "A11", "A8", "A29"]
+            pick_ = next((c for c in pool if c != previous_archetype and used.count(c) < MAX_USES), pool[0])
+
+        return pick_

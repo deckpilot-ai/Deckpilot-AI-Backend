@@ -966,6 +966,8 @@ class JobOrchestrator:
                         slide["speakerNotes"] = f"Presenter note for Slide {idx + 1}: Emphasize the core takeaways and operational milestones."
                     slide["speaker_notes"] = slide["speakerNotes"]
 
+                from app.services.spec_validator import SpecValidator
+                context["deck_spec"] = SpecValidator.sanitize_spec_inplace(context["deck_spec"])
                 context["deck_spec"] = prepare_deck(context["deck_spec"], enriched_prompt)
                 db.add(Artifact(project_id=project_id, job_id=job_id, type="deck_draft", json_data=json.dumps(context["deck_spec"])))
                 _update_task("slide_writer", "completed", completed=True)

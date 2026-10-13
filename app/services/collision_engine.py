@@ -84,8 +84,9 @@ class CollisionDetectionEngine:
         for i in range(n):
             box_a = boxes[i]
 
-            # 1. Canvas Boundary Check
-            if (
+            # 1. Canvas Boundary Check (skip background bleed and decorative accents)
+            is_decor_or_bg = box_a.kind == "background" or any(tag in box_a.name.lower() for tag in ("accent", "bleed", "backdrop", "corner", "decor", "signature"))
+            if not is_decor_or_bg and (
                 box_a.x < -0.05
                 or box_a.y < -0.05
                 or box_a.right > canvas_w + 0.05
@@ -109,7 +110,8 @@ class CollisionDetectionEngine:
                 )
 
             # 2. Footer Zone Intrusion (bottom 0.45 inches reserved for footer and page markers)
-            if box_a.kind not in ("footer", "page_number", "background") and box_a.bottom > (canvas_h - 0.35):
+            is_footer_element = box_a.kind in ("footer", "page_number", "background") or any(tag in box_a.name.lower() for tag in ("footer", "page-pill", "page-number", "signature", "accent"))
+            if not is_footer_element and box_a.bottom > (canvas_h - 0.35):
                 issues.append(
                     ValidationIssue(
                         checkpoint_id="QA-042",
@@ -130,7 +132,12 @@ class CollisionDetectionEngine:
                 # Ignore background accents or elements intentionally linked by parent-child hierarchy
                 if box_a.kind == "background" or box_b.kind == "background":
                     continue
+                if is_decor_or_bg or any(tag in box_b.name.lower() for tag in ("accent", "bleed", "backdrop", "corner", "decor", "signature")):
+                    continue
                 if box_a.parent_id == box_b.id or box_b.parent_id == box_a.id:
+                    continue
+                # Footer container pair (page-pill background + page-number-text)
+                if (box_a.kind == "footer" and box_b.kind == "footer") or ("page" in box_a.name.lower() and "page" in box_b.name.lower()):
                     continue
                 if box_a.parent_id and box_a.parent_id == box_b.parent_id:
                     # Siblings inside the same card (e.g. card title vs card body text)
@@ -150,8 +157,8 @@ class CollisionDetectionEngine:
                     continue
 
                 # Check if one box legitimately contains the other (e.g. text or badge inside card container)
-                if (box_a.kind in ("card", "shape") and box_b.kind in ("text", "icon", "badge", "image", "shape") and box_a.contains(box_b)) or \
-                   (box_b.kind in ("card", "shape") and box_a.kind in ("text", "icon", "badge", "image", "shape") and box_b.contains(box_a)) or \
+                if (box_a.kind in ("card", "shape", "footer") and box_b.kind in ("text", "icon", "badge", "image", "shape", "footer") and box_a.contains(box_b)) or \
+                   (box_b.kind in ("card", "shape", "footer") and box_a.kind in ("text", "icon", "badge", "image", "shape", "footer") and box_b.contains(box_a)) or \
                    (box_a.kind == "badge" and box_b.kind in ("icon", "text") and box_a.contains(box_b)) or \
                    (box_b.kind == "badge" and box_a.kind in ("icon", "text") and box_b.contains(box_a)):
                     continue

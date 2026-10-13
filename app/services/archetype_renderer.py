@@ -67,11 +67,9 @@ class ArchetypeRenderer:
         aid = archetype_id.upper()
         if aid in LAYOUT_ARCHETYPES:
             return True
-        from app.presentation.themes.development_editorial.theme import DevelopmentEditorialTheme
-        if DevelopmentEditorialTheme.supports_layout(aid):
+        if aid.startswith("L") or aid.startswith("F"):
             return True
-        from app.presentation.themes.federalism_editorial.theme import FederalismEditorialTheme
-        return FederalismEditorialTheme.supports_layout(aid)
+        return False
 
     @classmethod
     def render(
@@ -119,7 +117,7 @@ class ArchetypeRenderer:
         if arch.startswith("F") or (FederalismEditorialTheme.supports_layout(arch) and getattr(design_system, "theme_id", "") == "federalism-editorial-v1"):
             return FederalismEditorialTheme.render_slide(slide, arch, data_dict, images_map)
 
-        if DevelopmentEditorialTheme.supports_layout(arch):
+        if arch.startswith("L") or (DevelopmentEditorialTheme.supports_layout(arch) and getattr(design_system, "theme_id", "") == "development-editorial-v1"):
             return DevelopmentEditorialTheme.render_slide(slide, arch, data_dict, images_map)
 
         method_name = f"_render_{arch.lower()}"
@@ -962,18 +960,18 @@ class ArchetypeRenderer:
             body_text = "\n".join(grp[:2])
             r_cls._text(slide, clean_text(body_text)[:180], 0.85, ry + 0.68, left_w - 0.5, rh - 0.8, hex_to_rgb(ds.colors.text_primary), body_font, 11.5, bullet_list=len(grp) > 1)
 
-        # Right 45%: Framed Photo Mat / Map Frame
-        r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.1, 2.05, 5.6, 4.7, white, "map-frame", corner_radius=0.03)
+        # Right 45%: Framed Photo Mat / Map Frame or Strategic Synthesis Box
         if img:
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.1, 2.05, 5.6, 4.7, white, "map-frame", corner_radius=0.03)
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.25, 2.2, 5.3, 3.9, tint_a, "photo-mat", corner_radius=0.02)
             r_cls._render_picture(slide, img, 7.35, 2.3, 5.1, 3.7)
             caption = data.image_caption or "Comparative reference visual"
             r_cls._text(slide, clean_text(caption)[:90], 7.25, 6.25, 5.3, 0.38, primary, body_font, 10.5, italic=True, center=True)
         else:
-            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.25, 2.2, 5.3, 4.35, tint_a, "synthesis-box", corner_radius=0.03)
-            r_cls._text(slide, "STRATEGIC SYNTHESIS", 7.55, 2.45, 4.7, 0.35, primary, body_font, 12, bold=True)
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.1, 2.05, 5.6, 4.7, tint_a, "synthesis-box", corner_radius=0.03)
+            r_cls._text(slide, "STRATEGIC SYNTHESIS", 7.45, 2.35, 4.9, 0.35, primary, body_font, 12, bold=True)
             takeaway = data.takeaway or data.key_message or "Key comparative findings across core operational frameworks."
-            r_cls._text(slide, clean_text(takeaway)[:200], 7.55, 2.95, 4.7, 3.2, hex_to_rgb(ds.colors.text_primary), title_font, 14)
+            r_cls._text(slide, clean_text(takeaway)[:200], 7.45, 2.85, 4.9, 3.5, hex_to_rgb(ds.colors.text_primary), title_font, 14)
 
     # ──────────────────────────────────────────────────────────────────────────
     # A27: Core State Quote with Emblem Disc

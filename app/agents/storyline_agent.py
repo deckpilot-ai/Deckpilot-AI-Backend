@@ -286,6 +286,7 @@ class StorylineAgent:
                     content_type=c_type,
                     content_summary=purpose,
                     previous_archetype=prev_arch,
+                    used_archetypes=recent_archetypes,
                     has_image=bool(img_id),
                     has_chart=bool(chart_spec),
                     has_table=bool(table_spec),
@@ -335,9 +336,39 @@ class StorylineAgent:
                     spec.layout_hint = "council_eight"
             elif fit_status == "UNDERFILL" and not is_first and not is_last and not img_id:
                 if len(bullets) <= 2:
-                    spec.layout_family = LayoutFamily.TWO_COLUMN
-                    spec.archetype_id = "A7"
-                    spec.layout_hint = "two_column"
+                    prev_arch = planned_specs[-1].archetype_id if planned_specs else None
+                    if prev_arch == "A7" or (planned_specs and planned_specs[-1].layout_family == LayoutFamily.TWO_COLUMN):
+                        spec.layout_family = LayoutFamily.A5_DEFINITION
+                        spec.archetype_id = "A5"
+                        spec.layout_hint = "definition"
+                    else:
+                        spec.layout_family = LayoutFamily.TWO_COLUMN
+                        spec.archetype_id = "A7"
+                        spec.layout_hint = "two_column"
+
+            # Strict anti-repetition guard against preceding slide
+            if planned_specs and not is_first and not is_last:
+                prev_slide = planned_specs[-1]
+                if spec.archetype_id and spec.archetype_id == prev_slide.archetype_id:
+                    alt_archs = ["A26", "A6", "A10", "A5", "A13", "A29", "A12"]
+                    alt = next((a for a in alt_archs if a != prev_slide.archetype_id and a not in recent_archetypes[-2:]), "A26")
+                    spec.archetype_id = alt
+                    for lf in LayoutFamily:
+                        if lf.value == alt or lf.name.startswith(f"{alt}_"):
+                            spec.layout_family = lf
+                            spec.layout_hint = lf.value
+                            break
+                elif spec.layout_family == prev_slide.layout_family and spec.layout_family != LayoutFamily.SECTION_DIVIDER:
+                    alt_families = [
+                        LayoutFamily.CARD_GRID,
+                        LayoutFamily.COMPARISON,
+                        LayoutFamily.METRICS_GRID,
+                        LayoutFamily.A5_DEFINITION,
+                        LayoutFamily.PROCESS_STEPS,
+                    ]
+                    alt_lf = next((lf for lf in alt_families if lf != prev_slide.layout_family), LayoutFamily.CARD_GRID)
+                    spec.layout_family = alt_lf
+                    spec.layout_hint = alt_lf.value
 
             planned_specs.append(spec)
 

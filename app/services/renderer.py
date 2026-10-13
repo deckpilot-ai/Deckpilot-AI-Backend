@@ -309,10 +309,10 @@ class PPTXRenderer:
                 cand = slide_data.layout_hint.upper()
                 if cand.startswith("A") and cand[1:].isdigit():
                     arch_id = cand
-                elif cand.startswith("L") or cand.startswith("F") or DevelopmentEditorialTheme.supports_layout(cand) or FederalismEditorialTheme.supports_layout(cand):
+                elif cand.startswith("L") or cand.startswith("F"):
                     arch_id = cand
 
-            is_editorial_layout = bool(arch_id and (arch_id.startswith("L") or arch_id.startswith("F") or DevelopmentEditorialTheme.supports_layout(arch_id) or FederalismEditorialTheme.supports_layout(arch_id)))
+            is_editorial_layout = bool(arch_id and (arch_id.startswith("L") or arch_id.startswith("F")))
             is_standalone_cover = is_editorial_layout or layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.A1_TITLE_BLOB, LayoutFamily.A2_TITLE_SPLIT, LayoutFamily.A3_DIVIDER_HERO, LayoutFamily.A17_CLOSING_TAKEAWAYS) or arch_id in ("A1", "A2", "A3", "A17", "F01", "F13", "F24")
             dark = slide_data.dark_background or (layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE, LayoutFamily.A17_CLOSING_TAKEAWAYS) and design_system.subject_domain != "markets") or arch_id in ("A1", "A3", "A17")
 
@@ -349,7 +349,8 @@ class PPTXRenderer:
             # Persistent Page Number Pill Colors
             pill_bg = tint(ink, 0.28) if dark else tint(primary, 0.12)
             pill_fg = white if dark else ink
-            if not is_editorial_layout:
+            can_archetype = bool(arch_id and ArchetypeRenderer.can_render(arch_id))
+            if not is_editorial_layout and not can_archetype:
                 cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
                 cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True, name="page-number-text")
 
@@ -361,47 +362,30 @@ class PPTXRenderer:
             if not arch_id:
                 layout_to_arch = {
                     LayoutFamily.A1_TITLE_BLOB: "A1",
-                    LayoutFamily.HERO: "A1",
                     LayoutFamily.A2_TITLE_SPLIT: "A2",
-                    LayoutFamily.TITLE_SUBTITLE: "A2",
                     LayoutFamily.A3_DIVIDER_HERO: "A3",
-                    LayoutFamily.SECTION_DIVIDER: "A3",
                     LayoutFamily.A4_ROADMAP_AGENDA: "A4",
                     LayoutFamily.A5_DEFINITION: "A5",
                     LayoutFamily.A6_TWO_ENTITY_COMPARISON: "A6",
-                    LayoutFamily.COMPARISON: "A6",
                     LayoutFamily.A7_TWO_COLUMN_CONTRAST: "A7",
-                    LayoutFamily.TWO_COLUMN: "A7",
                     LayoutFamily.A8_STAT_IMAGE_HIGHLIGHT: "A8",
-                    LayoutFamily.BIG_NUMBERS: "A8",
                     LayoutFamily.A9_PROCESS_CHAIN: "A9",
                     LayoutFamily.A10_NUMBERED_PROCESS: "A10",
-                    LayoutFamily.PROCESS_STEPS: "A10",
-                    LayoutFamily.ROADMAP: "A10",
                     LayoutFamily.A11_STAGE_COLUMNS: "A11",
-                    LayoutFamily.THREE_COLUMN: "A11",
                     LayoutFamily.A12_BEFORE_AFTER: "A12",
-                    LayoutFamily.BEFORE_AFTER: "A12",
                     LayoutFamily.A13_ICON_GRID: "A13",
-                    LayoutFamily.CARD_GRID: "A13",
                     LayoutFamily.A14_CHART_INSIGHT: "A14",
-                    LayoutFamily.CHART_FOCUS: "A14",
                     LayoutFamily.A15_DUAL_STAT_COMPARISON: "A15",
                     LayoutFamily.A16_NATIVE_TABLE: "A16",
-                    LayoutFamily.TABLE_FOCUS: "A16",
                     LayoutFamily.A17_CLOSING_TAKEAWAYS: "A17",
-                    LayoutFamily.CLOSING: "A17",
                     LayoutFamily.A18_RECAP_CHECKLIST: "A18",
                     LayoutFamily.A19_GLOSSARY_GRID: "A19",
                     LayoutFamily.A20_ORG_HIERARCHY: "A20",
                     LayoutFamily.A21_KPI_CLUSTER: "A21",
-                    LayoutFamily.METRICS_GRID: "A21",
                     LayoutFamily.A22_HUB_SPOKE: "A22",
-                    LayoutFamily.ARCHITECTURE_DIAGRAM: "A22",
                     LayoutFamily.A23_VERTICAL_PIPELINE: "A23",
                     LayoutFamily.A24_TIMELINE_BAND: "A24",
                     LayoutFamily.TIMELINE_BAND: "A24",
-                    LayoutFamily.TIMELINE: "A24",
                     LayoutFamily.A25_COUNCIL_EIGHT: "A25",
                     LayoutFamily.COUNCIL_EIGHT: "A25",
                     LayoutFamily.A26_TWO_HIGHWAYS: "A26",
@@ -410,8 +394,6 @@ class PPTXRenderer:
                     LayoutFamily.FORTS_QUOTE_EMBLEM: "A27",
                     LayoutFamily.A28_CONCEPT_DEFINITION_IMAGE: "A28",
                     LayoutFamily.CONCEPT_DEFINITION_IMAGE: "A28",
-                    LayoutFamily.IMAGE_FOCUS: "A28",
-                    LayoutFamily.TEXT_IMAGE: "A28",
                     LayoutFamily.A29_BIG_QUESTIONS: "A29",
                     LayoutFamily.BIG_QUESTIONS: "A29",
                     LayoutFamily.A30_STEPPED_VALUE_CHAIN: "A30",
@@ -429,7 +411,7 @@ class PPTXRenderer:
                     # Redraw page pill on top to ensure never obscured
                     if not is_editorial_layout:
                         cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
-                        cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True)
+                        cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True, name="page-number-text")
                     continue
 
             # --- Layout Routing ---
@@ -846,6 +828,8 @@ class PPTXRenderer:
             ds.colors.primary = brand["colors"]["primary"]
             ds.colors.accent = brand["colors"]["accent"]
             ds.colors.neutral = brand["colors"]["neutral"]
+            if "ink" in brand.get("colors", {}):
+                ds.colors.ink = brand["colors"]["ink"]
 
         available_assets = None
         if source_images:

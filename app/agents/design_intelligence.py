@@ -166,13 +166,19 @@ class DesignIntelligenceAgent:
                         if isinstance(val, str) and re.match(r"^#[0-9A-Fa-f]{6}$", val):
                             setattr(colors, k, val)
 
-        # Enforce Palette Coherence only if primary blue and accent is harsh orange
+        # Enforce Palette Coherence and mathematical WCAG AA contrast guarantees from theme_engine
+        from app.services.theme_engine import ensure_contrast
         prim_lower = colors.primary.lower()
         if prim_lower in ("#132a52", "#1e3a8a", "#2563eb", "#0284c7", "#1f3864", "#2f5597"):
             acc_lower = colors.accent.lower()
             if acc_lower in ("#e4791f", "#d97706", "#f59e0b", "#ea580c", "#f97316"):
                 colors.accent = colors.primary
                 colors.secondary = "#0284C7" if prim_lower != "#0284c7" else "#38BDF8"
+
+        # Guarantee minimum contrast for text and accent
+        colors.ink = f"#{ensure_contrast(colors.ink.lstrip('#'), 'FFFFFF', 6.0)}"
+        colors.text_primary = colors.ink
+        colors.accent = f"#{ensure_contrast(colors.accent.lstrip('#'), colors.tint_a.lstrip('#'), 3.0)}"
 
         typography = TypographyHierarchy(
             title_font=FontConfig(name=dominant_title),

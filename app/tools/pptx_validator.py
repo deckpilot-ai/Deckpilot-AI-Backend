@@ -62,7 +62,9 @@ class PPTXValidator:
 
                     # Classify kind
                     sh_lower = sh_name.lower()
-                    if any(tag in sh_lower for tag in ("accent", "bleed", "backdrop", "corner", "tick", "divider", "line")):
+                    if any(tag in sh_lower for tag in ("page-pill", "page-number", "page_number", "page-num", "footer", "page")):
+                        kind = "footer"
+                    elif any(tag in sh_lower for tag in ("accent", "bleed", "backdrop", "corner", "tick", "divider", "line", "signature", "decor")):
                         kind = "background"
                     elif any(tag in sh_lower for tag in ("card", "box", "panel", "container", "row-", "frame", "mat")):
                         kind = "card"
@@ -76,8 +78,6 @@ class PPTXValidator:
                         kind = "chart"
                     elif getattr(shape, "has_table", False):
                         kind = "table"
-                    elif any(tag in sh_lower for tag in ("footer", "page")):
-                        kind = "footer"
                     elif any(tag in sh_lower for tag in ("title", "headline", "eyebrow", "header")):
                         kind = "header"
                     elif shape.has_text_frame and shape.text.strip():
