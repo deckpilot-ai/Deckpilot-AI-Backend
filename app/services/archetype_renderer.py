@@ -4,7 +4,6 @@ Implements the exact layout geometry, card headers, photo mats, pill rows,
 and connector elements from deck-agent-package/layout_archetypes.json.
 """
 
-import io
 import logging
 import math
 import re
@@ -12,12 +11,10 @@ from typing import Any
 
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
-from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.xmlchemy import OxmlElement
-from pptx.util import Inches, Pt
 
 from app.schemas.generation_state import DesignSystem, SlideSpec
-from app.services.deck_archetypes import GRID_SPEC, LAYOUT_ARCHETYPES
+from app.services.deck_archetypes import LAYOUT_ARCHETYPES
 from app.services.design_system import clean_text
 from app.services.grid_engine import PresentationGridEngine
 
@@ -28,7 +25,7 @@ def hex_to_rgb(value: str, default: tuple[int, int, int] = (19, 42, 82)) -> RGBC
     val = value.lstrip("#")
     try:
         return RGBColor(int(val[0:2], 16), int(val[2:4], 16), int(val[4:6], 16))
-    except Exception:
+    except (ValueError, TypeError, IndexError):
         return RGBColor(*default)
 
 
@@ -61,15 +58,50 @@ class ArchetypeRenderer:
     """Renders slides matching archetypes A1 through A23 with exact geometry."""
 
     @classmethod
+    def _apply_shape_alpha(cls, shape: Any, alpha_val: int = 15000) -> None:
+        """Applies DrawingML alpha transparency (e.g. 15000 = 15% opacity) to a shape's solid fill."""
+        try:
+            solid_fill = shape._element.spPr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}solidFill')
+            if solid_fill is not None:
+                srgb_clr = solid_fill.find('{http://schemas.openxmlformats.org/drawingml/2006/main}srgbClr')
+                if srgb_clr is not None:
+                    for child in list(srgb_clr):
+                        if child.tag.endswith('alpha'):
+                            srgb_clr.remove(child)
+                    alpha = OxmlElement('a:alpha')
+                    alpha.set('val', str(alpha_val))
+                    srgb_clr.append(alpha)
+        except (AttributeError, TypeError, IndexError, ValueError):
+            pass
+
+    @classmethod
+    def _apply_pill_glass(cls, shape: Any, border_color_rgb: RGBColor, alpha_val: int = 12000) -> None:
+        """Applies frosted glass effect: translucent white fill with subtle tinted outline."""
+        try:
+            cls._apply_shape_alpha(shape, alpha_val)
+            ln = shape._element.spPr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}ln')
+            if ln is None:
+                ln = OxmlElement('a:ln')
+                shape._element.spPr.append(ln)
+            ln.set('w', '12700')
+            for child in list(ln):
+                ln.remove(child)
+            ln_fill = OxmlElement('a:solidFill')
+            ln_clr = OxmlElement('a:srgbClr')
+            ln_clr.set('val', f"{border_color_rgb[0]:02X}{border_color_rgb[1]:02X}{border_color_rgb[2]:02X}")
+            ln_fill.append(ln_clr)
+            ln.append(ln_fill)
+        except (AttributeError, TypeError, IndexError, ValueError):
+            pass
+
+    @classmethod
     def can_render(cls, archetype_id: str | None) -> bool:
         if not archetype_id:
             return False
         aid = archetype_id.upper()
         if aid in LAYOUT_ARCHETYPES:
             return True
-        if aid.startswith("L") or aid.startswith("F"):
-            return True
-        return False
+        return bool(aid.startswith(("L", "F")))
 
     @classmethod
     def render(
@@ -82,8 +114,12 @@ class ArchetypeRenderer:
         renderer_cls: Any = None,
     ) -> bool:
         arch = archetype_id.upper()
-        from app.presentation.themes.development_editorial.theme import DevelopmentEditorialTheme
-        from app.presentation.themes.federalism_editorial.theme import FederalismEditorialTheme
+        from app.presentation.themes.development_editorial.theme import (
+            DevelopmentEditorialTheme,
+        )
+        from app.presentation.themes.federalism_editorial.theme import (
+            FederalismEditorialTheme,
+        )
 
         raw_title = clean_text(slide_data.headline or getattr(slide_data, "key_message", "") or getattr(slide_data, "objective", "") or "")
         raw_kicker = clean_text(getattr(slide_data, "eyebrow", "") or "")
@@ -112,7 +148,9 @@ class ArchetypeRenderer:
             "table_headers": getattr(slide_data, "table_headers", []),
             "table_rows": getattr(slide_data, "table_rows", []),
         }
-        images_map = {slide_data.image_artifact_id or "": image_bytes}
+        images_map: dict[str, bytes] | None = (
+            {slide_data.image_artifact_id or "": image_bytes} if image_bytes is not None else None
+        )
 
         if arch.startswith("F") or (FederalismEditorialTheme.supports_layout(arch) and getattr(design_system, "theme_id", "") == "federalism-editorial-v1"):
             return FederalismEditorialTheme.render_slide(slide, arch, data_dict, images_map)
@@ -143,6 +181,7 @@ class ArchetypeRenderer:
     def _render_a1(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
         ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
+        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
         accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
         white = RGBColor(255, 255, 255)
         title_font = ds.typography.title_font.name
@@ -171,13 +210,16 @@ class ArchetypeRenderer:
         else:
             main_title = raw_title
 
-        # 3. Signature decorative organic circles (matches Expected PPT benchmark)
-        r_cls._shape(slide, MSO_SHAPE.OVAL, 9.60, -2.20, 6.50, 6.50, tint(ink, 0.12), "accent-circle-tr")
-        r_cls._shape(slide, MSO_SHAPE.OVAL, 11.00, 3.60, 5.20, 5.20, tint(ink, 0.10), "accent-circle-mr")
-        r_cls._shape(slide, MSO_SHAPE.OVAL, -1.60, 4.60, 4.40, 4.40, tint(ink, 0.10), "accent-circle-bl")
+        # 3. Signature decorative translucent circles (matches Federalism & Marathas benchmark)
+        c1 = r_cls._shape(slide, MSO_SHAPE.OVAL, 9.60, -2.20, 6.50, 6.50, primary, "accent-circle-tr")
+        cls._apply_shape_alpha(c1, 18000)
+        c2 = r_cls._shape(slide, MSO_SHAPE.OVAL, 11.00, 3.60, 5.20, 5.20, accent, "accent-circle-mr")
+        cls._apply_shape_alpha(c2, 14000)
+        c3 = r_cls._shape(slide, MSO_SHAPE.OVAL, -1.60, 4.60, 4.40, 4.40, secondary, "accent-circle-bl")
+        cls._apply_shape_alpha(c3, 15000)
 
         # 4. Eyebrow (Saffron/Gold accent color, tracked uppercase)
-        eyebrow = (data.eyebrow or "CURATED EDUCATIONAL & STRATEGIC BRIEFING").upper()
+        eyebrow = (data.eyebrow or data.section or (data.key_message if len(data.key_message or "") < 35 else "") or "EXECUTIVE PRESENTATION").upper()
         r_cls._text(slide, eyebrow, 0.75, 1.30, 11.5, 0.35, accent, body_font, 13, bold=True)
 
         # 5. Main Title (Short words, 50-56pt Cambria, Pure Crisp White)
@@ -192,22 +234,21 @@ class ArchetypeRenderer:
             sub_col = tint(white, 0.12)  # Soft high-contrast light tone (#E2EEEC / #F0E4DA)
             r_cls._text(slide, raw_subtitle, 0.75, 3.68, 11.2, 0.95, sub_col, body_font, 18)
 
-        # 8. Topic Badges / Category Pills (Dark glass pill background, pure white bold text)
+        # 8. Topic Badges / Category Pills (Glassmorphic pill background with subtle secondary outline)
         pills = data.bullets[:4] if data.bullets else ["Strategic Foundations", "Operational Delivery", "Institutional Impact"]
         pill_y = 4.88
         px = 0.75
         for p in pills:
             label = clean_text(p).split(":")[0].strip()[:35]
-            pw = max(2.0, min(3.6, len(label) * 0.11 + 0.6))
-            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, px, pill_y, pw, 0.45, tint(ink, 0.28), "topic-pill", corner_radius=0.25)
+            pw = max(2.0, min(3.8, len(label) * 0.11 + 0.6))
+            pill_shape = r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, px, pill_y, pw, 0.45, white, "topic-pill", corner_radius=0.25)
+            cls._apply_pill_glass(pill_shape, secondary)
             r_cls._text(slide, label, px, pill_y + 0.05, pw, 0.35, white, body_font, 11.5, bold=True, center=True)
             px += pw + 0.25
 
-        # 9. Footer category note
-        footer_note = "Executive Advisory & Comprehensive Research Presentation"
-        if data.speaker_notes and ":" in data.speaker_notes:
-            footer_note = data.speaker_notes.split(":")[0].strip()[:65]
-        r_cls._text(slide, footer_note, 0.75, 6.35, 9.5, 0.35, tint(white, 0.38), body_font, 12)
+        # 9. Footer category note (dynamic)
+        footer_note = data.section or (data.speaker_notes.split(":")[0].strip() if data.speaker_notes and ":" in data.speaker_notes else "") or "Comprehensive Strategic Presentation"
+        r_cls._text(slide, footer_note, 0.75, 6.35, 9.5, 0.35, tint(white, 0.35), body_font, 12)
 
     # ──────────────────────────────────────────────────────────────────────────
     # A2: Title Cover - Split Panel
@@ -215,9 +256,10 @@ class ArchetypeRenderer:
     @classmethod
     def _render_a2(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
         ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
-        primary = hex_to_rgb(ds.colors.primary)
+        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
         accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
+        tint_b = hex_to_rgb(getattr(ds.colors, "tint_b", "#FBF6EA"))
         white = RGBColor(255, 255, 255)
         title_font = ds.typography.title_font.name
         body_font = ds.typography.body_font.name
@@ -245,12 +287,14 @@ class ArchetypeRenderer:
         else:
             main_title = raw_title
 
-        # Signature decorative background circles (matches Expected PPT benchmark)
-        r_cls._shape(slide, MSO_SHAPE.OVAL, -0.90, -0.90, 2.60, 2.60, tint(ink, 0.14), "accent-circle-tl")
-        r_cls._shape(slide, MSO_SHAPE.OVAL, 0.20, 5.90, 1.70, 1.70, tint(ink, 0.12), "accent-circle-bl")
+        # Signature decorative background circles (translucent accent & secondary)
+        c1 = r_cls._shape(slide, MSO_SHAPE.OVAL, -0.90, -0.90, 2.60, 2.60, secondary, "accent-circle-tl")
+        cls._apply_shape_alpha(c1, 18000)
+        c2 = r_cls._shape(slide, MSO_SHAPE.OVAL, 0.20, 5.90, 1.70, 1.70, accent, "accent-circle-bl")
+        cls._apply_shape_alpha(c2, 16000)
 
         # Left 55%: text narrative
-        eyebrow = (data.eyebrow or "CASE STUDY & ANALYSIS").upper()
+        eyebrow = (data.eyebrow or data.section or "CASE STUDY & ANALYSIS").upper()
         r_cls._text(slide, eyebrow, 0.70, 1.30, 6.6, 0.35, accent, body_font, 13, bold=True)
 
         title_size = 48 if len(main_title) < 28 else 40
@@ -263,19 +307,25 @@ class ArchetypeRenderer:
             sub_col = tint(white, 0.12)
             r_cls._text(slide, raw_subtitle, 0.70, 3.88, 6.5, 1.5, sub_col, body_font, 16.5)
 
-        r_cls._text(slide, "COMPREHENSIVE RESEARCH EVALUATION", 0.70, 6.30, 6.5, 0.35, tint(white, 0.38), body_font, 11, bold=True)
+        footer_tag = (
+            data.section or
+            (data.speaker_notes.split(":")[0].strip() if data.speaker_notes and ":" in data.speaker_notes else "") or
+            "A comprehensive study presentation"
+        )
+        r_cls._text(slide, footer_tag, 0.70, 6.30, 6.5, 0.35, tint(white, 0.35), body_font, 11)
 
-        # Right 45%: Framed Hero Photo with Mat in Ink Block
-        r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.6, 1.1, 5.15, 5.2, tint(ink, 0.25), "photo-container", corner_radius=0.03)
+        # Right 45%: Framed Hero Photo with Mat (warm museum frame from benchmark)
+        r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.6, 1.1, 5.15, 5.2, tint_b, "photo-container", corner_radius=0.03)
         if img:
-            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.85, 1.25, 4.65, 4.2, tint_a, "photo-mat", corner_radius=0.02)
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.85, 1.25, 4.65, 4.2, white, "photo-mat", corner_radius=0.02)
             r_cls._render_picture(slide, img, 7.95, 1.35, 4.45, 4.0)
             caption = data.image_caption or "Documentary reference figure"
-            r_cls._text(slide, caption[:80], 7.85, 5.65, 4.65, 0.45, white, body_font, 10, italic=True, center=True)
+            r_cls._text(slide, caption[:80], 7.85, 5.65, 4.65, 0.45, tint(ink, 0.4), body_font, 10, italic=True, center=True)
         else:
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.85, 1.25, 4.65, 4.2, tint_a, "photo-mat", corner_radius=0.02)
             r_cls._shape(slide, MSO_SHAPE.OVAL, 9.6, 2.3, 1.2, 1.2, accent, "center-badge")
             r_cls._text(slide, "★", 9.6, 2.3, 1.2, 1.2, white, body_font, 30, center=True)
-            r_cls._text(slide, "Strategic Focus", 8.0, 3.8, 4.35, 0.8, white, title_font, 22, bold=True, center=True)
+            r_cls._text(slide, "Strategic Focus", 8.0, 3.8, 4.35, 0.8, ink, title_font, 22, bold=True, center=True)
 
     # ──────────────────────────────────────────────────────────────────────────
     # A3: Section Divider - Photo Hero
@@ -297,8 +347,9 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.RECTANGLE, 0, 3.5, 13.333, 4.0, ink, "scrim")
 
         # Brand Capsule top-right
+        brand_label = (data.eyebrow or data.section or "EXECUTIVE BRIEFING").upper()[:24]
         r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 10.4, 0.4, 2.3, 0.6, white, "brand-capsule", corner_radius=0.3)
-        r_cls._text(slide, "DECKPILOT ADVISORY", 10.4, 0.45, 2.3, 0.5, ink, body_font, 10, bold=True, center=True)
+        r_cls._text(slide, brand_label, 10.4, 0.45, 2.3, 0.5, ink, body_font, 10, bold=True, center=True)
 
         # Headline
         title = data.headline or "Strategic Section"
@@ -312,6 +363,7 @@ class ArchetypeRenderer:
     @classmethod
     def _render_a4(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
         primary = hex_to_rgb(ds.colors.primary)
+        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
         white = RGBColor(255, 255, 255)
         body_col = hex_to_rgb(ds.colors.text_secondary)
@@ -335,7 +387,8 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, y, 12.1, row_h, bg, f"agenda-row-{k+1}", corner_radius=0.04)
 
             # Circular badge
-            r_cls._shape(slide, MSO_SHAPE.OVAL, 0.85, y + 0.12, 0.48, 0.48, primary, f"badge-{k+1}")
+            badge_col = primary if k % 2 == 0 else secondary
+            r_cls._shape(slide, MSO_SHAPE.OVAL, 0.85, y + 0.12, 0.48, 0.48, badge_col, f"badge-{k+1}")
             r_cls._text(slide, f"0{k+1}", 0.85, y + 0.14, 0.48, 0.44, white, body_font, 11, bold=True, center=True)
 
             # Label & Description
@@ -355,6 +408,8 @@ class ArchetypeRenderer:
     def _render_a5(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
         ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
+        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
         tint_b = hex_to_rgb(getattr(ds.colors, "tint_b", ds.colors.neutral))
         white = RGBColor(255, 255, 255)
@@ -364,7 +419,7 @@ class ArchetypeRenderer:
         # Left 52%: Definition Card in Ink
         r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 2.05, 6.2, 2.45, ink, "def-card", corner_radius=0.04)
         def_text = data.takeaway or data.key_message or (data.bullets[0] if data.bullets else data.headline)
-        r_cls._text(slide, "DEFINITION & CORE CONCEPT", 0.9, 2.25, 5.6, 0.3, tint(primary, 0.6), body_font, 11, bold=True)
+        r_cls._text(slide, "DEFINITION & CORE CONCEPT", 0.9, 2.25, 5.6, 0.3, accent, body_font, 11, bold=True)
         r_cls._text(slide, clean_text(def_text)[:240], 0.9, 2.65, 5.6, 1.7, white, title_font, 17)
 
         # Right 45%: Two Stacked Attribute Rows
@@ -373,7 +428,8 @@ class ArchetypeRenderer:
         for j, attr in enumerate(attrs[:2]):
             ay = 2.05 + j * 1.3
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 7.1, ay, 5.6, 1.15, tint_a, f"attr-{j+1}", corner_radius=0.04)
-            r_cls._shape(slide, MSO_SHAPE.OVAL, 7.35, ay + 0.2, 0.45, 0.45, primary, f"attr-badge-{j+1}")
+            badge_col = primary if j % 2 == 0 else secondary
+            r_cls._shape(slide, MSO_SHAPE.OVAL, 7.35, ay + 0.2, 0.45, 0.45, badge_col, f"attr-badge-{j+1}")
             r_cls._text(slide, f"0{j+1}", 7.35, ay + 0.22, 0.45, 0.4, white, body_font, 10.5, bold=True, center=True)
             a_head, a_body = _split_title_body(attr, max_title_chars=35)
             r_cls._text(slide, a_head, 8.0, ay + 0.15, 4.5, 0.32, primary, title_font, 13, bold=True)
@@ -464,12 +520,13 @@ class ArchetypeRenderer:
             r_cls._text(slide, str(m.get("value", "")), 0.85, sy + 0.1, 4.5, 0.55, primary, title_font, 36, bold=True)
             r_cls._text(slide, str(m.get("label", "")), 0.85, sy + 0.68, 4.5, 0.38, hex_to_rgb(ds.colors.text_secondary), body_font, 12)
 
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
         # Callout card at bottom left
         r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, 4.8, 5.0, 1.95, ink, "callout-card", corner_radius=0.04)
-        r_cls._shape(slide, MSO_SHAPE.OVAL, 0.85, 5.0, 0.45, 0.45, primary, "callout-icon")
+        r_cls._shape(slide, MSO_SHAPE.OVAL, 0.85, 5.0, 0.45, 0.45, accent, "callout-icon")
         r_cls._text(slide, "★", 0.85, 5.0, 0.45, 0.45, white, body_font, 12, bold=True, center=True)
         callout_txt = data.takeaway or (data.bullets[0] if data.bullets else "Strategic evidence analysis")
-        r_cls._text(slide, "KEY EVIDENCE INSIGHT", 1.45, 5.05, 4.0, 0.3, tint(primary, 0.6), body_font, 11, bold=True)
+        r_cls._text(slide, "KEY EVIDENCE INSIGHT", 1.45, 5.05, 4.0, 0.3, accent, body_font, 11, bold=True)
         r_cls._text(slide, callout_txt[:160], 0.85, 5.5, 4.5, 1.1, white, body_font, 12)
 
         # Right 52%: Framed Photo Mat
@@ -487,8 +544,8 @@ class ArchetypeRenderer:
     # ──────────────────────────────────────────────────────────────────────────
     @classmethod
     def _render_a10(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
-        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
+        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
         white = RGBColor(255, 255, 255)
         title_font = ds.typography.title_font.name
@@ -524,7 +581,8 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, cx, slot.y, cw, slot.h, tint_a, f"step-card-{k+1}", corner_radius=0.04)
 
             # Top badge
-            r_cls._shape(slide, MSO_SHAPE.OVAL, cx + 0.35, slot.y + 0.35, 0.6, 0.6, ink, f"step-badge-{k+1}")
+            badge_col = primary if k % 2 == 0 else secondary
+            r_cls._shape(slide, MSO_SHAPE.OVAL, cx + 0.35, slot.y + 0.35, 0.6, 0.6, badge_col, f"step-badge-{k+1}")
             r_cls._text(slide, f"0{k+1}", cx + 0.35, slot.y + 0.4, 0.6, 0.5, white, title_font, 16, bold=True, center=True)
 
             parts = step.split(":", 1) if ":" in step else [step]
@@ -599,8 +657,8 @@ class ArchetypeRenderer:
     # ──────────────────────────────────────────────────────────────────────────
     @classmethod
     def _render_a13(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
-        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
+        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
         white = RGBColor(255, 255, 255)
         title_font = ds.typography.title_font.name
@@ -627,7 +685,8 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, cw, ch, tint_a, f"grid-cell-{k+1}", corner_radius=0.04)
 
             # Circular Badge
-            r_cls._shape(slide, MSO_SHAPE.OVAL, x + 0.3, y + 0.25, 0.55, 0.55, ink, f"cell-badge-{k+1}")
+            badge_col = primary if k % 2 == 0 else secondary
+            r_cls._shape(slide, MSO_SHAPE.OVAL, x + 0.3, y + 0.25, 0.55, 0.55, badge_col, f"cell-badge-{k+1}")
             r_cls._text(slide, f"0{k+1}", x + 0.3, y + 0.28, 0.55, 0.5, white, body_font, 12, bold=True, center=True)
 
             parts = _split_title_body(item, max_title_chars=40)
@@ -641,10 +700,8 @@ class ArchetypeRenderer:
     @classmethod
     def _render_a14(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
         from app.tools.chart_engine import ChartEngine
-        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
-        white = RGBColor(255, 255, 255)
         title_font = ds.typography.title_font.name
         body_font = ds.typography.body_font.name
 
@@ -674,7 +731,6 @@ class ArchetypeRenderer:
     @classmethod
     def _render_a15(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
         ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
-        primary = hex_to_rgb(ds.colors.primary)
         white = RGBColor(255, 255, 255)
         title_font = ds.typography.title_font.name
         body_font = ds.typography.body_font.name
@@ -684,15 +740,18 @@ class ArchetypeRenderer:
             {"value": "3x", "label": "Latency Reduction", "desc": "Sub-second failover across verified provider clusters."},
         ]
 
+        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
+
         for j, m in enumerate(metrics[:2]):
             x = 0.6 + j * 6.25
             w = 5.85
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, 2.15, w, 4.55, ink, f"stat-box-{j+1}", corner_radius=0.04)
-            r_cls._text(slide, str(m.get("value", "10x")), x + 0.4, 2.5, w - 0.8, 1.2, white, title_font, 56, bold=True, center=True)
-            r_cls._text(slide, str(m.get("label", "Key Benchmark")), x + 0.4, 3.85, w - 0.8, 0.45, tint(primary, 0.6), body_font, 14, bold=True, center=True)
-            r_cls._shape(slide, MSO_SHAPE.RECTANGLE, x + w / 2 - 0.8, 4.45, 1.6, 0.04, primary, f"rule-{j+1}")
+            val_col = accent if j == 0 else white
+            r_cls._text(slide, str(m.get("value", "10x")), x + 0.4, 2.5, w - 0.8, 1.2, val_col, title_font, 56, bold=True, center=True)
+            r_cls._text(slide, str(m.get("label", "Key Benchmark")), x + 0.4, 3.85, w - 0.8, 0.45, white, body_font, 14, bold=True, center=True)
+            r_cls._shape(slide, MSO_SHAPE.RECTANGLE, x + w / 2 - 0.8, 4.45, 1.6, 0.04, accent, f"rule-{j+1}")
             desc = m.get("desc") or (data.bullets[j] if j < len(data.bullets) else "")
-            r_cls._text(slide, desc[:150], x + 0.5, 4.65, w - 1.0, 1.8, tint(white, 0.2), body_font, 12, center=True)
+            r_cls._text(slide, desc[:150], x + 0.5, 4.65, w - 1.0, 1.8, tint(white, 0.25), body_font, 12, center=True)
 
     # ──────────────────────────────────────────────────────────────────────────
     # A16: Native Data Table
@@ -785,8 +844,8 @@ class ArchetypeRenderer:
     # ──────────────────────────────────────────────────────────────────────────
     @classmethod
     def _render_a24(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
-        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
+        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
         accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
         tint_b = hex_to_rgb(getattr(ds.colors, "tint_b", ds.colors.neutral))
@@ -819,7 +878,7 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, cx, card_y, cw, card_h, bg_col, f"timeline-card-{k+1}", corner_radius=0.04)
 
             # Parse year / era & description dynamically
-            year_match = re.search(r"\b(1\d{3}|20\d{2}|[1-9]\d{0,1}(?:st|nd|rd|th)\s+century|\b\d{1,4}\s*(?:bce|ce|bc|ad)\b|\b\d{4}\b)\b", m, re.I)
+            year_match = re.search(r"\b(1\d{3}|20\d{2}|[1-9]\d{0,1}(?:st|nd|rd|th)\s+century|\b\d{1,4}\s*(?:bce|ce|bc|ad)\b|\b\d{4}\b)\b", m, re.IGNORECASE)
             if year_match:
                 year_tag = year_match.group(0).strip()
                 desc_text = m.replace(year_tag, "", 1).lstrip(" :-·–—").strip()
@@ -841,7 +900,8 @@ class ArchetypeRenderer:
             # Top Milestone Year Pill
             pill_w = min(cw - 0.4, max(1.2, len(year_tag) * 0.12 + 0.4))
             pill_x = cx + (cw - pill_w) / 2
-            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, pill_x, card_y + 0.15, pill_w, 0.46, ink, f"year-pill-{k+1}", corner_radius=0.2)
+            pill_col = primary if k % 2 == 0 else secondary
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, pill_x, card_y + 0.15, pill_w, 0.46, pill_col, f"year-pill-{k+1}", corner_radius=0.2)
             r_cls._text(slide, year_tag[:18], pill_x, card_y + 0.18, pill_w, 0.38, white, title_font, 12, bold=True, center=True)
 
             # Headline & Event narrative
@@ -869,7 +929,7 @@ class ArchetypeRenderer:
     def _render_a25(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
         ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
-        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
+        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
         white = RGBColor(255, 255, 255)
         title_font = ds.typography.title_font.name
@@ -902,7 +962,8 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, cw, ch, tint_a, f"council-cell-{k+1}", corner_radius=0.04)
 
             # Circular number disc badge
-            r_cls._shape(slide, MSO_SHAPE.OVAL, x + 0.2, y + 0.2, 0.45, 0.45, primary, f"council-badge-{k+1}")
+            badge_col = primary if k % 2 == 0 else secondary
+            r_cls._shape(slide, MSO_SHAPE.OVAL, x + 0.2, y + 0.2, 0.45, 0.45, badge_col, f"council-badge-{k+1}")
             r_cls._text(slide, f"0{k+1}", x + 0.2, y + 0.22, 0.45, 0.4, white, body_font, 10.5, bold=True, center=True)
 
             role_name, role_desc = _split_title_body(item, max_title_chars=28)
@@ -916,9 +977,8 @@ class ArchetypeRenderer:
     # ──────────────────────────────────────────────────────────────────────────
     @classmethod
     def _render_a26(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
-        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
-        accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
+        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
         tint_b = hex_to_rgb(getattr(ds.colors, "tint_b", ds.colors.neutral))
         white = RGBColor(255, 255, 255)
@@ -954,7 +1014,7 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, ry, left_w, rh, bg, f"route-card-{j+1}", corner_radius=0.04)
 
             # Route Header Pill
-            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.85, ry + 0.18, 3.8, 0.38, primary if j == 0 else ink, f"route-pill-{j+1}", corner_radius=0.15)
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.85, ry + 0.18, 3.8, 0.38, primary if j == 0 else secondary, f"route-pill-{j+1}", corner_radius=0.15)
             r_cls._text(slide, hdr, 0.85, ry + 0.20, 3.8, 0.32, white, body_font, 10.5, bold=True, center=True)
 
             body_text = "\n".join(grp[:2])
@@ -980,6 +1040,7 @@ class ArchetypeRenderer:
     def _render_a27(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
         ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
+        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
         accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
         white = RGBColor(255, 255, 255)
@@ -996,7 +1057,8 @@ class ArchetypeRenderer:
         for k, p in enumerate(pillars):
             py = 2.05 + k * (card_h + 0.2)
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 0.6, py, left_w, card_h, tint_a, f"pillar-card-{k+1}", corner_radius=0.04)
-            r_cls._shape(slide, MSO_SHAPE.OVAL, 0.85, py + 0.2, 0.45, 0.45, primary, f"pillar-disc-{k+1}")
+            badge_col = primary if k % 2 == 0 else secondary
+            r_cls._shape(slide, MSO_SHAPE.OVAL, 0.85, py + 0.2, 0.45, 0.45, badge_col, f"pillar-disc-{k+1}")
             r_cls._text(slide, f"0{k+1}", 0.85, py + 0.22, 0.45, 0.4, white, body_font, 11, bold=True, center=True)
 
             pparts = _split_title_body(p, max_title_chars=32)
@@ -1080,8 +1142,8 @@ class ArchetypeRenderer:
     # ──────────────────────────────────────────────────────────────────────────
     @classmethod
     def _render_a29(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
-        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
+        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
         accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
         white = RGBColor(255, 255, 255)
@@ -1103,7 +1165,8 @@ class ArchetypeRenderer:
             # Centered Large Circular Badge
             badge_size = 1.15
             badge_x = cx + (cw - badge_size) / 2
-            r_cls._shape(slide, MSO_SHAPE.OVAL, badge_x, card_y + 0.35, badge_size, badge_size, primary, f"q-badge-{j+1}")
+            badge_col = primary if j % 2 == 0 else secondary
+            r_cls._shape(slide, MSO_SHAPE.OVAL, badge_x, card_y + 0.35, badge_size, badge_size, badge_col, f"q-badge-{j+1}")
             r_cls._text(slide, f"0{j+1}", badge_x, card_y + 0.38, badge_size, badge_size - 0.1, white, title_font, 26, bold=True, center=True)
 
             # Parse question title vs explanation
@@ -1131,8 +1194,8 @@ class ArchetypeRenderer:
     # ──────────────────────────────────────────────────────────────────────────
     @classmethod
     def _render_a30(cls, slide, data: SlideSpec, ds: DesignSystem, img: bytes | None, r_cls):
-        ink = hex_to_rgb(getattr(ds.colors, "ink", ds.colors.primary))
         primary = hex_to_rgb(ds.colors.primary)
+        secondary = hex_to_rgb(getattr(ds.colors, "secondary", ds.colors.primary))
         accent = hex_to_rgb(getattr(ds.colors, "accent", ds.colors.primary))
         tint_a = hex_to_rgb(getattr(ds.colors, "tint_a", ds.colors.card_fill))
         tint_b = hex_to_rgb(getattr(ds.colors, "tint_b", ds.colors.neutral))
@@ -1154,7 +1217,8 @@ class ArchetypeRenderer:
             r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, sx, step_y, step_w, step_h, tint_a, f"step-box-{k+1}", corner_radius=0.04)
 
             # Step Pill
-            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, sx + 0.2, step_y + 0.2, step_w - 0.4, 0.42, ink, f"step-hdr-{k+1}", corner_radius=0.15)
+            step_pill_col = primary if k % 2 == 0 else secondary
+            r_cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, sx + 0.2, step_y + 0.2, step_w - 0.4, 0.42, step_pill_col, f"step-hdr-{k+1}", corner_radius=0.15)
             r_cls._text(slide, f"STEP 0{k+1}", sx + 0.2, step_y + 0.23, step_w - 0.4, 0.35, white, body_font, 11, bold=True, center=True)
 
             parts = _split_title_body(st, max_title_chars=30)

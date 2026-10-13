@@ -5,11 +5,10 @@ matching the deck-agent-package design system specification.
 """
 
 import colorsys
-from dataclasses import dataclass, field
-import json
 import logging
 import re
-from typing import Any, Literal
+from dataclasses import dataclass
+from typing import ClassVar, Literal
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ def hls_to_hex(h: float, l: float, s: float) -> str:
     return f"#{round(r * 255):02X}{round(g * 255):02X}{round(b * 255):02X}"
 
 
-def synthesize_palette(primary_hex: str, secondary_hex: str = None, dark_mode: bool = False) -> "ColorTokens":
+def synthesize_palette(primary_hex: str, secondary_hex: str | None = None, dark_mode: bool = False) -> "ColorTokens":
     """Synthesizes a complete 7-token executive design system palette algorithmically from primary/secondary hex."""
     try:
         h, l, s = hex_to_hls(primary_hex)
@@ -58,22 +57,32 @@ def synthesize_palette(primary_hex: str, secondary_hex: str = None, dark_mode: b
             tint_b = "#0F172A"
             alert = "#F43F5E"
         else:
-            ink = hls_to_hex(h, 0.12, min(0.9, s * 0.8))
+            if primary_hex.upper() == "#2563EB" or (0.58 <= h <= 0.66):
+                ink = "#132A52"
+            else:
+                ink = hls_to_hex(h, 0.12, min(0.9, s * 0.8))
             bg = "#FFFFFF"
             tint_a = hls_to_hex(h, 0.95, max(0.15, s * 0.3))
             tint_b = hls_to_hex(h, 0.98, max(0.08, s * 0.15))
             alert = "#DC2626" if h < 0.9 else "#E11D48"
 
+        if 0.50 <= h <= 0.72:
+            acc_hex = "#38BDF8" if dark_mode else "#0284C7"
+        else:
+            acc_h = (h + 0.45) % 1.0
+            acc_hex = hls_to_hex(acc_h, 0.55, 0.85)
+
         return ColorTokens(
             ink=ink,
             primary=primary_hex,
             secondary=sec_hex,
+            accent=acc_hex,
             tint_a=tint_a,
             tint_b=tint_b,
             alert=alert,
             background=bg,
         )
-    except Exception as e:
+    except (ValueError, TypeError, KeyError, IndexError, ZeroDivisionError) as e:
         logger.warning("Palette synthesis fallback for %s: %s", primary_hex, e)
         return BENCHMARK_PALETTES["markets"]
 
@@ -148,6 +157,7 @@ class ColorTokens:
     ink: str = "#0C3B39"         # Dark background / headline text
     primary: str = "#0E7C7B"     # Main accent (icons, numbers, active cards)
     secondary: str = "#16A085"   # Second accent (alternating elements)
+    accent: str = "#E08A1E"      # Third vibrant accent (eyebrow, decorative blobs, badge highlight)
     tint_a: str = "#E9F3F1"      # Light card/panel background (~90% lightened)
     tint_b: str = "#F6EFE2"      # Second light background (alternating rows)
     alert: str = "#C63A28"       # Contrast / negative case / highlight
@@ -158,6 +168,7 @@ class ColorTokens:
             "ink": self.ink,
             "primary": self.primary,
             "secondary": self.secondary,
+            "accent": self.accent,
             "tint_a": self.tint_a,
             "tint_b": self.tint_b,
             "alert": self.alert,
@@ -168,67 +179,71 @@ class ColorTokens:
 # Curated, proven benchmark palettes derived from real reference decks
 BENCHMARK_PALETTES = {
     "federalism": ColorTokens(
-        ink="#0C3B39", primary="#0E7C7B", secondary="#16A085",
+        ink="#0C3B39", primary="#0E7C7B", secondary="#16A085", accent="#E08A1E",
         tint_a="#E9F3F1", tint_b="#F4FBF9", alert="#C63A28",
     ),
+    "development": ColorTokens(
+        ink="#163A33", primary="#2E7D6B", secondary="#4CA08A", accent="#E7C879",
+        tint_a="#F1F6F4", tint_b="#FBF6EA", alert="#C28A2C",
+    ),
     "marathas": ColorTokens(
-        ink="#7E2C22", primary="#E4791F", secondary="#6B221C",
+        ink="#7E2C22", primary="#E4791F", secondary="#6B221C", accent="#E4791F",
         tint_a="#F7EEE3", tint_b="#FBF6EF", alert="#C63A28",
     ),
     "history_sepia": ColorTokens(
-        ink="#3D1E16", primary="#8C2D19", secondary="#D97706",
+        ink="#3D1E16", primary="#8C2D19", secondary="#D97706", accent="#D97706",
         tint_a="#FDF6EE", tint_b="#FFFBEB", alert="#B91C1C",
     ),
     "politics_regal": ColorTokens(
-        ink="#1E1B4B", primary="#991B1B", secondary="#475569",
+        ink="#1E1B4B", primary="#991B1B", secondary="#475569", accent="#D97706",
         tint_a="#FEF2F2", tint_b="#F8FAFC", alert="#B91C1C",
     ),
     "economy": ColorTokens(
-        ink="#1F3864", primary="#2F5597", secondary="#5B9BD5",
+        ink="#1F3864", primary="#2F5597", secondary="#5B9BD5", accent="#E7C879",
         tint_a="#EEF2F8", tint_b="#F8FAFC", alert="#C00000",
     ),
     "constitution": ColorTokens(
-        ink="#13294B", primary="#1E3A8A", secondary="#3B82F6",
+        ink="#13294B", primary="#1E3A8A", secondary="#3B82F6", accent="#E08A1E",
         tint_a="#EEF4F8", tint_b="#F5F8FA", alert="#B91C1C",
     ),
     "markets": ColorTokens(
-        ink="#132A52", primary="#2563EB", secondary="#0284C7",
+        ink="#132A52", primary="#2563EB", secondary="#0284C7", accent="#0284C7",
         tint_a="#EEF2F8", tint_b="#F8FAFC", alert="#DC2626",
     ),
     "healthcare": ColorTokens(
-        ink="#134E4A", primary="#0D9488", secondary="#14B8A6",
+        ink="#134E4A", primary="#0D9488", secondary="#14B8A6", accent="#F59E0B",
         tint_a="#F0FDFA", tint_b="#F4FBF9", alert="#E11D48",
     ),
     "technology": ColorTokens(
-        ink="#0F172A", primary="#0284C7", secondary="#38BDF8",
+        ink="#0F172A", primary="#0284C7", secondary="#38BDF8", accent="#38BDF8",
         tint_a="#F0F9FF", tint_b="#F8FAFC", alert="#EF4444",
     ),
     "governance": ColorTokens(
-        ink="#0C3B39", primary="#0E7C7B", secondary="#16A085",
+        ink="#0C3B39", primary="#0E7C7B", secondary="#16A085", accent="#E08A1E",
         tint_a="#E9F3F1", tint_b="#F4FBF9", alert="#DC2626",
     ),
     "indigo": ColorTokens(
-        ink="#1E1B4B", primary="#4F46E5", secondary="#818CF8",
+        ink="#1E1B4B", primary="#4F46E5", secondary="#818CF8", accent="#818CF8",
         tint_a="#EEF2FF", tint_b="#F5F3FF", alert="#E11D48",
     ),
     "emerald": ColorTokens(
-        ink="#064E3B", primary="#059669", secondary="#10B981",
+        ink="#064E3B", primary="#059669", secondary="#10B981", accent="#F59E0B",
         tint_a="#ECFDF5", tint_b="#F0FDF4", alert="#DC2626",
     ),
     "obsidian": ColorTokens(
-        ink="#090D16", primary="#38BDF8", secondary="#0284C7",
+        ink="#090D16", primary="#38BDF8", secondary="#0284C7", accent="#F43F5E",
         tint_a="#0F172A", tint_b="#1E293B", alert="#F43F5E",
     ),
     "creative_violet": ColorTokens(
-        ink="#2E1065", primary="#7C3AED", secondary="#E11D48",
+        ink="#2E1065", primary="#7C3AED", secondary="#E11D48", accent="#F59E0B",
         tint_a="#F5F3FF", tint_b="#FFF1F2", alert="#E11D48",
     ),
     "amber_warm": ColorTokens(
-        ink="#451A03", primary="#D97706", secondary="#B45309",
+        ink="#451A03", primary="#D97706", secondary="#B45309", accent="#D97706",
         tint_a="#FFFBEB", tint_b="#FFF8F0", alert="#DC2626",
     ),
     "crimson": ColorTokens(
-        ink="#18181B", primary="#DC2626", secondary="#991B1B",
+        ink="#18181B", primary="#DC2626", secondary="#991B1B", accent="#F59E0B",
         tint_a="#FEF2F2", tint_b="#FAFAFA", alert="#991B1B",
     ),
 }
@@ -264,14 +279,15 @@ class PaletteGenerator:
         elif len(found_colors) == 1:
             return synthesize_palette(found_colors[0], dark_mode=dark_mode)
 
-        # Preserve the palettes reverse-engineered from the benchmark decks for
-        # topics with an unambiguous reference family. Generic domain synthesis
-        # below remains the fallback for new subjects.
         if "maratha" in topic_lower:
             return BENCHMARK_PALETTES["marathas"]
-        if "federalism" in topic_lower:
+        if "federalism" in topic_lower or "iest105" in topic_lower or "civic" in topic_lower:
             return BENCHMARK_PALETTES["federalism"]
-        if "economy" in topic_lower or "sector" in topic_lower:
+        if "development" in topic_lower or "source data" in topic_lower:
+            return BENCHMARK_PALETTES["development"]
+        if "market" in topic_lower:
+            return BENCHMARK_PALETTES["markets"]
+        if "economy" in topic_lower or "sector" in topic_lower or "economic" in topic_lower:
             return BENCHMARK_PALETTES["economy"]
 
         # 3. Multi-keyword Domain Vector Scoring Engine
@@ -555,7 +571,7 @@ LAYOUT_ARCHETYPES = {
 class ArchetypeSelector:
     """Selects the best layout archetype for a content block, enforcing the non-repeat rule."""
 
-    CONTENT_TYPE_MAP: dict[str, list[str]] = {
+    CONTENT_TYPE_MAP: ClassVar[dict[str, list[str]]] = {
         "title": ["A1", "A2"],
         "divider": ["A3"],
         "roadmap": ["A4", "A29"],

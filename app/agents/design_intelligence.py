@@ -2,7 +2,7 @@
 
 import logging
 import re
-from typing import Any
+from typing import Any, ClassVar
 
 from app.schemas.generation_state import (
     ColorPalette,
@@ -20,7 +20,7 @@ class DesignIntelligenceAgent:
     """Infers complete visual language and generates structured DesignSystem object."""
 
     # High-quality font pairing catalog
-    FONT_PAIRINGS = {
+    FONT_PAIRINGS: ClassVar[dict[str, tuple[FontConfig, FontConfig]]] = {
         "modern_sans": (FontConfig(name="Segoe UI"), FontConfig(name="Segoe UI")),
         "corporate_clean": (FontConfig(name="Calibri"), FontConfig(name="Calibri")),
         "editorial_serif": (FontConfig(name="Georgia"), FontConfig(name="Calibri")),
@@ -28,7 +28,7 @@ class DesignIntelligenceAgent:
     }
 
     # Dynamic palette collections
-    PALETTES_BY_DOMAIN = {
+    PALETTES_BY_DOMAIN: ClassVar[dict[str, ColorPalette]] = {
         "tech": ColorPalette(
             primary="#0F172A",
             secondary="#1E293B",
@@ -96,7 +96,7 @@ class DesignIntelligenceAgent:
     ) -> DesignSystem:
         topic_lower = goal.topic.lower()
         p_type = goal.presentation_type.value.lower() if hasattr(goal.presentation_type, "value") else str(goal.presentation_type).lower()
-        skill = get_skill_for_request(goal.topic, p_type)
+        _skill = get_skill_for_request(goal.topic, p_type)
 
         # Determine subject domain
         if any(w in topic_lower or w in p_type for w in ("tech", "architecture", "ai", "cloud", "software", "data", "cyber", "robot")):
@@ -122,11 +122,18 @@ class DesignIntelligenceAgent:
         search_prompt = f"{goal.topic} {user_directives}".strip()
         tokens = PaletteGenerator.generate_palette(search_prompt)
         
+        if hasattr(tokens, "accent") and tokens.accent:
+            resolved_accent = tokens.accent
+        elif getattr(tokens, "primary", "") in ("#2563EB", "#0284C7", "#1E3A8A", "#132A52"):
+            resolved_accent = "#0284C7"
+        else:
+            resolved_accent = "#E08A1E"
+
         colors = ColorPalette(
             ink=tokens.ink,
             primary=tokens.primary,
             secondary=tokens.secondary,
-            accent=tokens.primary,
+            accent=resolved_accent,
             tint_a=tokens.tint_a,
             tint_b=tokens.tint_b,
             alert=tokens.alert,
@@ -147,9 +154,10 @@ class DesignIntelligenceAgent:
         ref_colors = (reference_profile or {}).get("colors", {})
         if ref_colors.get("primary_hint") and re.match(r"^#[0-9A-Fa-f]{6}$", ref_colors["primary_hint"]):
             colors.primary = ref_colors["primary_hint"]
-            colors.accent = ref_colors["primary_hint"]
+        if ref_colors.get("secondary_hint") and re.match(r"^#[0-9A-Fa-f]{6}$", ref_colors["secondary_hint"]):
+            colors.secondary = ref_colors["secondary_hint"]
         if ref_colors.get("accent_hint") and re.match(r"^#[0-9A-Fa-f]{6}$", ref_colors["accent_hint"]):
-            colors.secondary = ref_colors["accent_hint"]
+            colors.accent = ref_colors["accent_hint"]
 
         if llm_brand_hints and isinstance(llm_brand_hints, dict):
             hint_cols = llm_brand_hints.get("colors", {})
