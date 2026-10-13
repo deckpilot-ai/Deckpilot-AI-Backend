@@ -16,20 +16,22 @@ from app.db.engine import SessionLocal
 from app.models.user import User
 
 
-def create_or_update_user(email: str, password: str, role: str = "admin"):
+def create_or_update_user(email: str, password: str | None = None, role: str = "admin"):
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.email == email).first()
         now = int(time.time())
-        pwd_hash = hash_password(password)
 
         if user:
-            user.password_hash = pwd_hash
+            if password:
+                user.password_hash = hash_password(password)
             user.role = role
             user.status = "active"
             user.updated_at = now
             print(f"Updated existing user '{email}' (role: {role}).")
         else:
+            effective_pwd = password or "Admin@123456"
+            pwd_hash = hash_password(effective_pwd)
             user = User(
                 id=str(uuid.uuid4()),
                 email=email,
@@ -88,7 +90,7 @@ def create_or_update_user(email: str, password: str, role: str = "admin"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Create or update user account")
     parser.add_argument("--email", default="admin@creatorpilot.ai", help="User email")
-    parser.add_argument("--password", default="Admin@123456", help="User password")
+    parser.add_argument("--password", default=None, help="User password (optional when updating existing user, defaults to Admin@123456 for new user)")
     parser.add_argument("--role", default="admin", choices=["user", "admin"], help="User role")
     args = parser.parse_args()
 

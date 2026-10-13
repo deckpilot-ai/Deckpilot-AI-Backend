@@ -1,0 +1,18 @@
+{
+  "case_id": "case_005_history",
+  "domain": "history",
+  "source_type": "prompt_only",
+  "target_slides": 15,
+  "prompt": "15 slides detailed presentation on the Industrial Revolution, technological inventions, and global socioeconomic impacts.",
+  "sources": [],
+  "expected_rules": {
+    "min_slides": 14,
+    "max_slides": 17,
+    "requires_timeline": true,
+    "requires_source_images": false,
+    "minimum_source_utilization": 0.0,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

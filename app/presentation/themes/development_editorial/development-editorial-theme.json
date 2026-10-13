@@ -1,0 +1,188 @@
+{
+  "$schema": "https://deckpilot.ai/schemas/presentation-theme-v1.json",
+  "id": "development-editorial-v1",
+  "name": "Development Editorial Theme",
+  "version": "1.0.0",
+  "description": "Educational and editorial presentation design system reverse-engineered from benchmark Development PPTX",
+  "slide": {
+    "width_in": 13.333,
+    "height_in": 7.5,
+    "aspect_ratio": "16:9",
+    "margin_x_in": 0.6,
+    "margin_top_in": 0.48,
+    "margin_bottom_in": 0.55,
+    "safe_content_width_in": 12.133
+  },
+  "colors": {
+    "canvas": "#FFFFFF",
+    "canvasDark": "#163A33",
+    "ink": "#20302C",
+    "inkMuted": "#5E726B",
+    "greenDark": "#1F4F45",
+    "greenPrimary": "#2E7D6B",
+    "greenMid": "#4CA08A",
+    "gold": "#C28A2C",
+    "goldLight": "#E7C879",
+    "panel": "#F1F6F4",
+    "panelBorder": "#DDE8E3",
+    "quote": "#FBF4E4",
+    "quoteBorder": "#EAD9A8",
+    "quoteText": "#5A4715",
+    "warmFrame": "#FBF6EA",
+    "imageBorder": "#D7E2DD",
+    "divider": "#CBDAD3",
+    "textOnDark": "#CFE2DB",
+    "textOnDarkMuted": "#BFD6CE",
+    "textFooterDark": "#9FBCB3",
+    "numberGhost": "#E5EFEB",
+    "white": "#FFFFFF"
+  },
+  "fonts": {
+    "display": "Cambria",
+    "body": "Calibri"
+  },
+  "typography": {
+    "kicker": {
+      "font": "Calibri",
+      "size_pt": 13.0,
+      "bold": true,
+      "uppercase": true,
+      "tracking_pt": 2.0,
+      "dot_diameter_in": 0.16,
+      "color_light": "#C28A2C",
+      "color_dark": "#E7C879"
+    },
+    "coverTitle": {
+      "font": "Cambria",
+      "size_pt": 48.0,
+      "bold": true,
+      "color": "#FFFFFF"
+    },
+    "slideTitle": {
+      "font": "Cambria",
+      "size_pt": 33.0,
+      "bold": true,
+      "color_light": "#20302C",
+      "color_dark": "#FFFFFF",
+      "max_lines": 2,
+      "preferred_words": [3, 8]
+    },
+    "bodyLead": {
+      "font": "Calibri",
+      "size_pt": 16.0,
+      "bold": false,
+      "line_spacing": 1.15,
+      "color_light": "#20302C",
+      "color_dark": "#CFE2DB"
+    },
+    "cardTitle": {
+      "font": "Cambria",
+      "size_pt": 16.5,
+      "bold": true,
+      "color_light": "#20302C",
+      "color_dark": "#FFFFFF"
+    },
+    "cardBody": {
+      "font": "Calibri",
+      "size_pt": 13.0,
+      "bold": false,
+      "line_spacing": 1.15,
+      "color_light": "#5E726B",
+      "color_dark": "#CFE2DB"
+    },
+    "stat": {
+      "font": "Cambria",
+      "size_pt": 34.0,
+      "bold": true,
+      "color_primary": "#2E7D6B",
+      "color_warning": "#C28A2C"
+    },
+    "ghostNumber": {
+      "font": "Cambria",
+      "size_pt": 26.0,
+      "bold": true,
+      "color": "#E5EFEB"
+    },
+    "quoteText": {
+      "font": "Cambria",
+      "size_pt": 20.0,
+      "bold": true,
+      "color": "#5A4715"
+    },
+    "caption": {
+      "font": "Calibri",
+      "size_pt": 11.0,
+      "italic": true,
+      "color": "#5E726B"
+    }
+  },
+  "shadows": {
+    "card": {
+      "blur_rad_emu": 88900,
+      "blur_pt": 7.0,
+      "dist_emu": 38100,
+      "dist_pt": 3.0,
+      "dir_deg": 90.0,
+      "color": "000000",
+      "alpha": 18000
+    },
+    "image": {
+      "blur_rad_emu": 88900,
+      "blur_pt": 7.0,
+      "dist_emu": 38100,
+      "dist_pt": 3.0,
+      "dir_deg": 90.0,
+      "color": "000000",
+      "alpha": 18000
+    }
+  },
+  "spacing": {
+    "xs": 0.1,
+    "sm": 0.2,
+    "md": 0.3,
+    "lg": 0.45,
+    "xl": 0.8
+  },
+  "corner_radius": {
+    "card": "val 16667",
+    "badge": "round"
+  },
+  "chart": {
+    "palette": ["#2E7D6B", "#C28A2C", "#4CA08A", "#1F4F45"],
+    "label_color": "#5E726B",
+    "gridline_color": "#CBDAD3"
+  },
+  "table": {
+    "header_fill": "#2E7D6B",
+    "header_text": "#FFFFFF",
+    "cell_fill": "#FFFFFF",
+    "cell_text": "#20302C",
+    "border_color": "#CBDAD3"
+  },
+  "layouts": [
+    {"id": "L01", "name": "Cover / Title Hero", "dark": true, "has_image": true},
+    {"id": "L02", "name": "Chapter / Agenda Map", "dark": false, "card_count": 6},
+    {"id": "L03", "name": "Concept + Question Box + Image", "dark": false, "has_image": true},
+    {"id": "L04", "name": "Table + Image + Insight", "dark": false, "has_table": true, "has_image": true},
+    {"id": "L05", "name": "Two Concept Cards + Image + Strip", "dark": false, "card_count": 2, "has_image": true},
+    {"id": "L06", "name": "Four Concept Grid + Quote + Image", "dark": false, "card_count": 4, "has_image": true},
+    {"id": "L07", "name": "Three Comparison Rows", "dark": false, "row_count": 3, "has_image": true},
+    {"id": "L08", "name": "Three Icon Question Cards + Image", "dark": false, "card_count": 3, "has_image": true},
+    {"id": "L09", "name": "Three-Step Process", "dark": false, "card_count": 3, "has_strip": true},
+    {"id": "L10", "name": "KPI / Stat Trio", "dark": false, "stat_count": 3},
+    {"id": "L11", "name": "Chart + Visual Comparison", "dark": false, "has_chart": true, "image_count": 2},
+    {"id": "L12", "name": "Chart + Table + Question Callout", "dark": false, "has_chart": true, "has_table": true},
+    {"id": "L13", "name": "Chart + Image + Dark Insight", "dark": false, "has_chart": true, "has_image": true},
+    {"id": "L14", "name": "Three Concept Rows + Image + Note", "dark": false, "row_count": 3, "has_image": true},
+    {"id": "L15", "name": "Table + Multi-Image Evidence", "dark": false, "has_table": true, "image_count": 2},
+    {"id": "L16", "name": "Three-Pillar Framework", "dark": false, "pillar_count": 3, "has_image": true},
+    {"id": "L17", "name": "Comparative Bar Chart + Table", "dark": false, "has_chart": true, "has_table": true},
+    {"id": "L18", "name": "Dark Section Opener", "dark": true, "card_count": 2, "has_quote": true},
+    {"id": "L19", "name": "Stacked Statistics + Illustration", "dark": false, "stat_count": 3, "has_image": true},
+    {"id": "L20", "name": "Data Table + Image + Two Insight Tiles", "dark": false, "has_table": true, "has_image": true},
+    {"id": "L21", "name": "Dark Three-Card Principle", "dark": true, "card_count": 3, "has_strip": true},
+    {"id": "L22", "name": "Six Takeaway Grid", "dark": false, "card_count": 6},
+    {"id": "L23", "name": "Closing / Reflection Hero", "dark": true, "has_image": true},
+    {"id": "L_TIMELINE", "name": "Editorial Timeline Track", "dark": false, "event_count": 4}
+  ]
+}

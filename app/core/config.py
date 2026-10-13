@@ -34,18 +34,33 @@ class Settings(BaseSettings):
     r2_bucket: str = "deckpilotai"
     local_storage_dir: str = "./local_storage"
 
+    # Data Cleaner & Storage Optimization Policy
+    storage_cleaner_enabled: bool = True
+    storage_cleaner_retention_days: int = Field(default=3, ge=1, le=365)
+    storage_cleaner_interval_hours: int = Field(default=24, ge=1, le=168)
+
     # Frontend
     frontend_origin: str = (
         "http://localhost:3000,"
+        "http://localhost:3001,"
+        "http://127.0.0.1:3000,"
+        "http://127.0.0.1:3001,"
+        "https://deckpilotai.com,"
+        "https://www.deckpilotai.com,"
         "https://deckpilot-ai-frontend.aideckpilot.workers.dev,"
         "https://deckpilot-ai-frontend.creatorpilot-ai.workers.dev,"
         "https://deckpilot-ai-frontend.pages.dev"
     )
-    allowed_hosts: str = "localhost,127.0.0.1,testserver"
+    allowed_hosts: str = (
+        "localhost,127.0.0.1,testserver,13.206.242.145,"
+        "deckpilotai.com,*.deckpilotai.com,"
+        "deckpilot-ai.duckdns.org,*.duckdns.org,"
+        "deckpilot-ai-backend.onrender.com,deckpilotai-backend.onrender.com"
+    )
     ai_provider_allowed_hosts: str = (
         "openrouter.ai,api.openai.com,generativelanguage.googleapis.com,oauth2.googleapis.com,www.googleapis.com,"
         "api.groq.com,api.mistral.ai,api.anthropic.com,api.experientiallabs.ai,"
-        "codecraftapi.com,api.codecraftapi.com,integrate.api.nvidia.com,api.bazaarlink.ai,api.routeway.ai,api.apmix.ai,api.inceptionlabs.ai,router.bynara.id,inference.dahl.global,"
+        "codecraftapi.com,api.codecraftapi.com,integrate.api.nvidia.com,api.bazaarlink.ai,api.routeway.ai,api.apmix.ai,api.inceptionlabs.ai,router.bynara.id,inference.dahl.global,axqua.com,api.deepseek.com,"
         "api.unsplash.com,images.unsplash.com,api.pexels.com,images.pexels.com,pixabay.com,cdn.pixabay.com"
     )
 
@@ -78,29 +93,32 @@ class Settings(BaseSettings):
     experientiallabs_base_url: str = "https://api.experientiallabs.ai/v1"
     codecraft_api_key: str = ""
     codecraft_base_url: str = "https://codecraftapi.com/v1"
-    nvidia_api_key: str = "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"
+    nvidia_api_key: str = ""
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
-    bazaarlink_api_key: str = "sk-bl-CnaXx41rPQYL4Wqiw_ovTLX7V2ncRqafdgg0bVLomg4GzLtM"
+    bazaarlink_api_key: str = ""
     bazaarlink_base_url: str = "https://api.bazaarlink.ai/v1"
-    routeway_api_key: str = "sk-pQ9EXqxpBIyYbrJZer7ez_2GYG_DY06GzAQdWwIIlGdL3oALdWF1RMav6sR9uiSmSSgkxw"
+    routeway_api_key: str = ""
     routeway_base_url: str = "https://api.routeway.ai/v1"
-    apmix_api_key: str = "apx_live_UXYEOHORQCieF7rAQPvDds9OgQOJ2LpmS0hiQfIw"
+    apmix_api_key: str = ""
     apmix_api_key_2: str = ""
     apmix_base_url: str = "https://api.apmix.ai/v1"
-    bynara_api_key: str = "sk-nry-tUedwzBrphpauAQtbNkTfzT9Vz1NJc1yAlnaBjsE77U"
+    axqua_api_key: str = ""
+    axqua_api_key_2: str = ""
+    axqua_base_url: str = "https://axqua.com/v1"
+    bynara_api_key: str = ""
     bynara_api_key_2: str = ""
     bynara_base_url: str = "https://router.bynara.id/v1"
-    dahl_api_key: str = "dahl_3Jj687BUWByhYF4Sb5qt3XVGAZnLQyE3V"
+    dahl_api_key: str = ""
     dahl_api_key_2: str = ""
     dahl_base_url: str = "https://inference.dahl.global/v1"
-    inceptionlabs_api_key: str = "sk_24a0ac3e50e8c1944d612f2f235a1f08"
+    inceptionlabs_api_key: str = ""
     inceptionlabs_api_key_2: str = ""
     inceptionlabs_base_url: str = "https://api.inceptionlabs.ai/v1"
-    unsplash_access_key: str = "aA081iOoBrg6tzC5mLvsOH6Zpr8KyP9Rxcl0gUAuRQM"
-    unsplash_secret_key: str = "Sre8TS9N9s6xfZahgQfjOiVV5BKqYfUf5l1HKIj8SiQ"
-    unsplash_app_id: str = "1063175"
-    pexels_api_key: str = "rLUG07NzqsWWuqFUqcFBRGWkHB0KkcqdWwT591VHQR4LmNfwfTSsAyUR"
-    pixabay_api_key: str = "57664903-214397a32b9ca84ea40b6bd18"
+    unsplash_access_key: str = ""
+    unsplash_secret_key: str = ""
+    unsplash_app_id: str = ""
+    pexels_api_key: str = ""
+    pixabay_api_key: str = ""
 
     @property
     def effective_experientiallabs_api_key(self) -> str:
@@ -132,6 +150,11 @@ class Settings(BaseSettings):
         return [k.strip() for k in (self.apmix_api_key, self.apmix_api_key_2) if k and k.strip()]
 
     @property
+    def axqua_all_api_keys(self) -> list[str]:
+        """Return all configured non-empty Axqua API keys (primary + any extras)."""
+        return [k.strip() for k in (self.axqua_api_key, self.axqua_api_key_2) if k and k.strip()]
+
+    @property
     def openrouter_all_api_keys(self) -> list[str]:
         """Return all configured non-empty OpenRouter API keys (primary + any extras)."""
         return [k.strip() for k in (self.openrouter_api_key, self.openrouter_api_key_2) if k and k.strip()]
@@ -153,11 +176,19 @@ class Settings(BaseSettings):
 
     @property
     def frontend_origins(self) -> list[str]:
-        return [origin.strip().rstrip("/") for origin in self.frontend_origin.split(",") if origin.strip()]
+        origins = [origin.strip().rstrip("/") for origin in self.frontend_origin.split(",") if origin.strip()]
+        for default_origin in ("https://deckpilotai.com", "https://www.deckpilotai.com"):
+            if default_origin not in origins:
+                origins.append(default_origin)
+        return origins
 
     @property
     def allowed_host_list(self) -> list[str]:
-        return [host.strip() for host in self.allowed_hosts.split(",") if host.strip()]
+        hosts = [host.strip() for host in self.allowed_hosts.split(",") if host.strip()]
+        for default_host in ("deckpilotai.com", "*.deckpilotai.com"):
+            if default_host not in hosts:
+                hosts.append(default_host)
+        return hosts
 
     @property
     def ai_provider_allowed_host_list(self) -> list[str]:
@@ -188,9 +219,12 @@ class Settings(BaseSettings):
                 raise ValueError("TURSO_DATABASE_URL is required in production")
             if not all(r2_values):
                 raise ValueError("Cloudflare R2 storage is required in production")
-            if any(not origin.startswith("https://") for origin in self.frontend_origins):
-                raise ValueError("Production frontend origins must use HTTPS")
-            if not self.allowed_host_list or "*" in self.allowed_host_list:
+            if any(
+                not origin.startswith(("https://", "http://localhost", "http://127.0.0.1"))
+                for origin in self.frontend_origins
+            ):
+                raise ValueError("Production frontend origins must use HTTPS (except local development hosts)")
+            if not self.allowed_host_list or ("*" in self.allowed_host_list and len(self.allowed_host_list) == 1):
                 raise ValueError("Production ALLOWED_HOSTS must be explicit")
             if self.db_echo:
                 raise ValueError("DB_ECHO must be disabled in production")

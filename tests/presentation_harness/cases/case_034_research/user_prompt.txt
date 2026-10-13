@@ -1,0 +1,1 @@
+12 slides academic thesis presentation on autonomous robotics navigation, SLAM algorithms, and sensor fusion.
