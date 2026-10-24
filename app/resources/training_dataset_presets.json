@@ -1,0 +1,6002 @@
+[
+  {
+    "id": "preset_deck001_vermilion_haze",
+    "name": "Vermilion Haze (Executive Briefing Benchmark)",
+    "deck_id": "deck001",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Executive Briefing",
+    "subject": "History",
+    "mode": "tint",
+    "scheme": "analogous",
+    "base_hue": 23.0,
+    "colors": {
+      "ink": "#211812",
+      "primary": "#7E5033",
+      "secondary": "#B7A56D",
+      "accent": "#9B983C",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#EDE0D8",
+      "alert": "#DC2626",
+      "background": "#F3EAE4",
+      "paper": "#F3EAE4",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#EDE0D8",
+      "neutral": "#FFFFFF",
+      "text_primary": "#211812",
+      "text_secondary": "#69594F",
+      "line": "#D9C9BF",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 14.7,
+      "onPrimary_on_primary": 6.81,
+      "onAccent_on_accent": 5.76,
+      "muted_on_bg": 5.63
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Calibri",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 1,
+      "title_style": "kicker",
+      "card_style": "solid",
+      "icon_style": "circle",
+      "divider_style": 1,
+      "footer_style": "left",
+      "bg_style": "plain",
+      "image_style": "frame",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck002_jade_abyss",
+    "name": "Jade Abyss (Executive Briefing Benchmark)",
+    "deck_id": "deck002",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Executive Briefing",
+    "subject": "Economics",
+    "mode": "dark",
+    "scheme": "split",
+    "base_hue": 160.5,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#7F8986",
+      "secondary": "#45A6AA",
+      "accent": "#E245C5",
+      "tint_a": "#243A33",
+      "tint_b": "#3A534B",
+      "alert": "#F43F5E",
+      "background": "#141D1A",
+      "paper": "#141D1A",
+      "card_fill": "#243A33",
+      "card_fill_alt": "#3A534B",
+      "neutral": "#243A33",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B0BFBA",
+      "line": "#3F5A51",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 15.88,
+      "onPrimary_on_primary": 4.83,
+      "onAccent_on_accent": 4.88,
+      "muted_on_bg": 9.02
+    },
+    "typography": {
+      "title_font": "Trebuchet MS",
+      "body_font": "Calibri",
+      "numeric_font": "Trebuchet MS"
+    },
+    "format": {
+      "cover_style": 4,
+      "title_style": "boxed",
+      "card_style": "glass",
+      "icon_style": "letter",
+      "divider_style": 4,
+      "footer_style": "center",
+      "bg_style": "plain",
+      "image_style": "plain",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck003_orchid_horizon",
+    "name": "Orchid Horizon (Executive Briefing Benchmark)",
+    "deck_id": "deck003",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Executive Briefing",
+    "subject": "Geography",
+    "mode": "light",
+    "scheme": "complementary",
+    "base_hue": 298.0,
+    "colors": {
+      "ink": "#241825",
+      "primary": "#511453",
+      "secondary": "#C961A6",
+      "accent": "#4F964D",
+      "tint_a": "#F7F2F7",
+      "tint_b": "#EEDFEE",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F7F2F7",
+      "card_fill_alt": "#EEDFEE",
+      "neutral": "#F7F2F7",
+      "text_primary": "#241825",
+      "text_secondary": "#6A576B",
+      "line": "#DCD0DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 17.04,
+      "onPrimary_on_primary": 13.33,
+      "onAccent_on_accent": 4.81,
+      "muted_on_bg": 6.59
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Arial",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 7,
+      "title_style": "sidebar",
+      "card_style": "outline",
+      "icon_style": "rounded",
+      "divider_style": 2,
+      "footer_style": "tag",
+      "bg_style": "plain",
+      "image_style": "matte",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck004_marigold_parchment",
+    "name": "Marigold Parchment (Executive Briefing Benchmark)",
+    "deck_id": "deck004",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Executive Briefing",
+    "subject": "History",
+    "mode": "light",
+    "scheme": "mono",
+    "base_hue": 75.5,
+    "colors": {
+      "ink": "#20221B",
+      "primary": "#5A653D",
+      "secondary": "#8B966E",
+      "accent": "#779950",
+      "tint_a": "#F7F8F5",
+      "tint_b": "#E9EDDF",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F7F8F5",
+      "card_fill_alt": "#E9EDDF",
+      "neutral": "#F7F8F5",
+      "text_primary": "#20221B",
+      "text_secondary": "#64675B",
+      "line": "#D8DAD3",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.08,
+      "onPrimary_on_primary": 6.24,
+      "onAccent_on_accent": 5.35,
+      "muted_on_bg": 5.78
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Calibri",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 10,
+      "title_style": "panel",
+      "card_style": "solid",
+      "icon_style": "square",
+      "divider_style": 5,
+      "footer_style": "none",
+      "bg_style": "plain",
+      "image_style": "shadow",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck005_azure_lantern",
+    "name": "Azure Lantern (Executive Briefing Benchmark)",
+    "deck_id": "deck005",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Executive Briefing",
+    "subject": "Geography",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 213.0,
+    "colors": {
+      "ink": "#181E25",
+      "primary": "#243850",
+      "secondary": "#7BB2BF",
+      "accent": "#6FA641",
+      "tint_a": "#F2F4F7",
+      "tint_b": "#DCE5F0",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F2F4F7",
+      "card_fill_alt": "#DCE5F0",
+      "neutral": "#F2F4F7",
+      "text_primary": "#181E25",
+      "text_secondary": "#57606B",
+      "line": "#D0D6DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.78,
+      "onPrimary_on_primary": 11.96,
+      "onAccent_on_accent": 5.97,
+      "muted_on_bg": 6.38
+    },
+    "typography": {
+      "title_font": "Bookman Old Style",
+      "body_font": "Arial",
+      "numeric_font": "Bookman Old Style"
+    },
+    "format": {
+      "cover_style": 3,
+      "title_style": "badge",
+      "card_style": "glass",
+      "icon_style": "circle",
+      "divider_style": 3,
+      "footer_style": "left",
+      "bg_style": "plain",
+      "image_style": "frame",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck006_rose_meadow",
+    "name": "Rose Meadow (Executive Briefing Benchmark)",
+    "deck_id": "deck006",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Executive Briefing",
+    "subject": "Geography",
+    "mode": "light",
+    "scheme": "complementary",
+    "base_hue": 350.5,
+    "colors": {
+      "ink": "#25181A",
+      "primary": "#7D1525",
+      "secondary": "#BC644C",
+      "accent": "#46A99A",
+      "tint_a": "#F9F3F4",
+      "tint_b": "#F0E2E4",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F9F3F4",
+      "card_fill_alt": "#F0E2E4",
+      "neutral": "#F9F3F4",
+      "text_primary": "#25181A",
+      "text_secondary": "#6B575A",
+      "line": "#DCD0D2",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 17.15,
+      "onPrimary_on_primary": 10.47,
+      "onAccent_on_accent": 6.13,
+      "muted_on_bg": 6.7
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Arial",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 6,
+      "title_style": "center",
+      "card_style": "outline",
+      "icon_style": "letter",
+      "divider_style": 1,
+      "footer_style": "center",
+      "bg_style": "plain",
+      "image_style": "plain",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck007_fern_twilight",
+    "name": "Fern Twilight (Executive Briefing Benchmark)",
+    "deck_id": "deck007",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Executive Briefing",
+    "subject": "Economics",
+    "mode": "dark",
+    "scheme": "mono",
+    "base_hue": 128.0,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#55A960",
+      "secondary": "#588D5F",
+      "accent": "#5AB065",
+      "tint_a": "#29392B",
+      "tint_b": "#2E4331",
+      "alert": "#F43F5E",
+      "background": "#132613",
+      "paper": "#132613",
+      "card_fill": "#29392B",
+      "card_fill_alt": "#2E4331",
+      "neutral": "#29392B",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B0BFB2",
+      "line": "#3F5A42",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 14.75,
+      "onPrimary_on_primary": 5.99,
+      "onAccent_on_accent": 6.49,
+      "muted_on_bg": 8.32
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Calibri",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 9,
+      "title_style": "kicker",
+      "card_style": "solid",
+      "icon_style": "rounded",
+      "divider_style": 4,
+      "footer_style": "tag",
+      "bg_style": "plain",
+      "image_style": "matte",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck008_indigo_harbor",
+    "name": "Indigo Harbor (Executive Briefing Benchmark)",
+    "deck_id": "deck008",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Executive Briefing",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 265.6,
+    "colors": {
+      "ink": "#1E1825",
+      "primary": "#3A225A",
+      "secondary": "#615BC1",
+      "accent": "#9C5928",
+      "tint_a": "#F6F4F9",
+      "tint_b": "#EAE2F5",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F6F4F9",
+      "card_fill_alt": "#EAE2F5",
+      "neutral": "#F6F4F9",
+      "text_primary": "#1E1825",
+      "text_secondary": "#5F576B",
+      "line": "#D5D0DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 17.32,
+      "onPrimary_on_primary": 13.49,
+      "onAccent_on_accent": 5.42,
+      "muted_on_bg": 6.86
+    },
+    "typography": {
+      "title_font": "Calibri",
+      "body_font": "Calibri",
+      "numeric_font": "Calibri"
+    },
+    "format": {
+      "cover_style": 2,
+      "title_style": "boxed",
+      "card_style": "glass",
+      "icon_style": "square",
+      "divider_style": 2,
+      "footer_style": "none",
+      "bg_style": "plain",
+      "image_style": "shadow",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck009_ember_orchard",
+    "name": "Ember Orchard (Executive Briefing Benchmark)",
+    "deck_id": "deck009",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Executive Briefing",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "analogous",
+    "base_hue": 43.1,
+    "colors": {
+      "ink": "#252118",
+      "primary": "#6D5519",
+      "secondary": "#C2937A",
+      "accent": "#68744D",
+      "tint_a": "#F8F7F5",
+      "tint_b": "#F3EFE4",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F8F7F5",
+      "card_fill_alt": "#F3EFE4",
+      "neutral": "#F8F7F5",
+      "text_primary": "#252118",
+      "text_secondary": "#6B6557",
+      "line": "#DCD9D0",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.04,
+      "onPrimary_on_primary": 7.09,
+      "onAccent_on_accent": 5.01,
+      "muted_on_bg": 5.79
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Arial",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 5,
+      "title_style": "sidebar",
+      "card_style": "outline",
+      "icon_style": "circle",
+      "divider_style": 5,
+      "footer_style": "left",
+      "bg_style": "plain",
+      "image_style": "frame",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck010_teal_midnight",
+    "name": "Teal Midnight (Executive Briefing Benchmark)",
+    "deck_id": "deck010",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Executive Briefing",
+    "subject": "Political Science",
+    "mode": "dark",
+    "scheme": "split",
+    "base_hue": 180.6,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#459A9B",
+      "secondary": "#4D84A5",
+      "accent": "#E25599",
+      "tint_a": "#254040",
+      "tint_b": "#335656",
+      "alert": "#F43F5E",
+      "background": "#1B292A",
+      "paper": "#1B292A",
+      "card_fill": "#254040",
+      "card_fill_alt": "#335656",
+      "neutral": "#254040",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#ADC2C3",
+      "line": "#396060",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 13.87,
+      "onPrimary_on_primary": 5.26,
+      "onAccent_on_accent": 4.97,
+      "muted_on_bg": 8.07
+    },
+    "typography": {
+      "title_font": "Century Schoolbook",
+      "body_font": "Calibri",
+      "numeric_font": "Century Schoolbook"
+    },
+    "format": {
+      "cover_style": 8,
+      "title_style": "panel",
+      "card_style": "solid",
+      "icon_style": "letter",
+      "divider_style": 3,
+      "footer_style": "center",
+      "bg_style": "plain",
+      "image_style": "plain",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck011_magenta_abyss",
+    "name": "Magenta Abyss (Study Guide Benchmark)",
+    "deck_id": "deck011",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Study Guide",
+    "subject": "History",
+    "mode": "dark",
+    "scheme": "triadic",
+    "base_hue": 318.1,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#BB3091",
+      "secondary": "#A84EAE",
+      "accent": "#66A6C2",
+      "tint_a": "#3F2537",
+      "tint_b": "#522C47",
+      "alert": "#F43F5E",
+      "background": "#2E192A",
+      "paper": "#2E192A",
+      "card_fill": "#3F2537",
+      "card_fill_alt": "#522C47",
+      "neutral": "#3F2537",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#C4ABBD",
+      "line": "#633656",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 15.04,
+      "onPrimary_on_primary": 5.32,
+      "onAccent_on_accent": 6.46,
+      "muted_on_bg": 7.69
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Arial",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 2,
+      "title_style": "panel",
+      "card_style": "outline",
+      "icon_style": "letter",
+      "divider_style": 1,
+      "footer_style": "left",
+      "bg_style": "panel",
+      "image_style": "plain",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck012_lime_basalt",
+    "name": "Lime Basalt (Study Guide Benchmark)",
+    "deck_id": "deck012",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Study Guide",
+    "subject": "Economics",
+    "mode": "dark",
+    "scheme": "analogous",
+    "base_hue": 100.6,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#69A94B",
+      "secondary": "#7C8A5C",
+      "accent": "#B3BB69",
+      "tint_a": "#293224",
+      "tint_b": "#3C4B34",
+      "alert": "#F43F5E",
+      "background": "#1E2C18",
+      "paper": "#1E2C18",
+      "card_fill": "#293224",
+      "card_fill_alt": "#3C4B34",
+      "neutral": "#293224",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B5BFB0",
+      "line": "#485A3F",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 13.57,
+      "onPrimary_on_primary": 6.11,
+      "onAccent_on_accent": 8.48,
+      "muted_on_bg": 7.73
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Calibri",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 5,
+      "title_style": "badge",
+      "card_style": "solid",
+      "icon_style": "rounded",
+      "divider_style": 4,
+      "footer_style": "center",
+      "bg_style": "panel",
+      "image_style": "matte",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck013_cobalt_canvas",
+    "name": "Cobalt Canvas (Study Guide Benchmark)",
+    "deck_id": "deck013",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Study Guide",
+    "subject": "Geography",
+    "mode": "light",
+    "scheme": "split",
+    "base_hue": 238.1,
+    "colors": {
+      "ink": "#181925",
+      "primary": "#1E229E",
+      "secondary": "#7C67A7",
+      "accent": "#6F9545",
+      "tint_a": "#F3F4F9",
+      "tint_b": "#E0E1F6",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F3F4F9",
+      "card_fill_alt": "#E0E1F6",
+      "neutral": "#F3F4F9",
+      "text_primary": "#181925",
+      "text_secondary": "#57586B",
+      "line": "#D0D0DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 17.43,
+      "onPrimary_on_primary": 11.81,
+      "onAccent_on_accent": 5.02,
+      "muted_on_bg": 6.97
+    },
+    "typography": {
+      "title_font": "Calibri",
+      "body_font": "Calibri",
+      "numeric_font": "Calibri"
+    },
+    "format": {
+      "cover_style": 8,
+      "title_style": "center",
+      "card_style": "glass",
+      "icon_style": "square",
+      "divider_style": 2,
+      "footer_style": "tag",
+      "bg_style": "panel",
+      "image_style": "shadow",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck014_vermilion_dawn",
+    "name": "Vermilion Dawn (Study Guide Benchmark)",
+    "deck_id": "deck014",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Study Guide",
+    "subject": "History",
+    "mode": "light",
+    "scheme": "complementary",
+    "base_hue": 10.6,
+    "colors": {
+      "ink": "#251B18",
+      "primary": "#783C30",
+      "secondary": "#B66776",
+      "accent": "#317685",
+      "tint_a": "#F8F6F6",
+      "tint_b": "#F6E6E3",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F8F6F6",
+      "card_fill_alt": "#F6E6E3",
+      "neutral": "#F8F6F6",
+      "text_primary": "#251B18",
+      "text_secondary": "#6B5B57",
+      "line": "#DCD2D0",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.82,
+      "onPrimary_on_primary": 8.44,
+      "onAccent_on_accent": 5.17,
+      "muted_on_bg": 6.44
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Arial",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 1,
+      "title_style": "kicker",
+      "card_style": "outline",
+      "icon_style": "circle",
+      "divider_style": 5,
+      "footer_style": "none",
+      "bg_style": "panel",
+      "image_style": "frame",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck015_emerald_noir",
+    "name": "Emerald Noir (Study Guide Benchmark)",
+    "deck_id": "deck015",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Study Guide",
+    "subject": "Geography",
+    "mode": "dark",
+    "scheme": "mono",
+    "base_hue": 148.1,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#848C88",
+      "secondary": "#5E8D74",
+      "accent": "#51AF90",
+      "tint_a": "#273B30",
+      "tint_b": "#32483D",
+      "alert": "#F43F5E",
+      "background": "#101E18",
+      "paper": "#101E18",
+      "card_fill": "#273B30",
+      "card_fill_alt": "#32483D",
+      "neutral": "#273B30",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B0BFB7",
+      "line": "#3F5A4C",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 15.88,
+      "onPrimary_on_primary": 5.05,
+      "onAccent_on_accent": 6.53,
+      "muted_on_bg": 8.99
+    },
+    "typography": {
+      "title_font": "Century Schoolbook",
+      "body_font": "Calibri",
+      "numeric_font": "Century Schoolbook"
+    },
+    "format": {
+      "cover_style": 4,
+      "title_style": "boxed",
+      "card_style": "solid",
+      "icon_style": "letter",
+      "divider_style": 3,
+      "footer_style": "left",
+      "bg_style": "panel",
+      "image_style": "plain",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck016_violet_mist",
+    "name": "Violet Mist (Study Guide Benchmark)",
+    "deck_id": "deck016",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Study Guide",
+    "subject": "Geography",
+    "mode": "tint",
+    "scheme": "split",
+    "base_hue": 285.6,
+    "colors": {
+      "ink": "#1D1221",
+      "primary": "#5F1477",
+      "secondary": "#C663B9",
+      "accent": "#67724B",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#EAD6F1",
+      "alert": "#DC2626",
+      "background": "#F0E2F5",
+      "paper": "#F0E2F5",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#EAD6F1",
+      "neutral": "#FFFFFF",
+      "text_primary": "#1D1221",
+      "text_secondary": "#624F69",
+      "line": "#D3BFD9",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 14.56,
+      "onPrimary_on_primary": 11.33,
+      "onAccent_on_accent": 5.14,
+      "muted_on_bg": 5.95
+    },
+    "typography": {
+      "title_font": "Segoe UI",
+      "body_font": "Calibri",
+      "numeric_font": "Segoe UI"
+    },
+    "format": {
+      "cover_style": 7,
+      "title_style": "sidebar",
+      "card_style": "glass",
+      "icon_style": "rounded",
+      "divider_style": 1,
+      "footer_style": "center",
+      "bg_style": "panel",
+      "image_style": "matte",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck017_marigold_ink",
+    "name": "Marigold Ink (Study Guide Benchmark)",
+    "deck_id": "deck017",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Study Guide",
+    "subject": "Economics",
+    "mode": "dark",
+    "scheme": "complementary",
+    "base_hue": 63.1,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#9B9F56",
+      "secondary": "#7F9068",
+      "accent": "#453DE2",
+      "tint_a": "#3A3B26",
+      "tint_b": "#474832",
+      "alert": "#F43F5E",
+      "background": "#212316",
+      "paper": "#212316",
+      "card_fill": "#3A3B26",
+      "card_fill_alt": "#474832",
+      "neutral": "#3A3B26",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#BFBFB0",
+      "line": "#595A3F",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 14.72,
+      "onPrimary_on_primary": 6.21,
+      "onAccent_on_accent": 6.96,
+      "muted_on_bg": 8.58
+    },
+    "typography": {
+      "title_font": "Times New Roman",
+      "body_font": "Arial",
+      "numeric_font": "Times New Roman"
+    },
+    "format": {
+      "cover_style": 10,
+      "title_style": "panel",
+      "card_style": "outline",
+      "icon_style": "square",
+      "divider_style": 4,
+      "footer_style": "tag",
+      "bg_style": "panel",
+      "image_style": "shadow",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck018_cyan_petal",
+    "name": "Cyan Petal (Study Guide Benchmark)",
+    "deck_id": "deck018",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Study Guide",
+    "subject": "Political Science",
+    "mode": "tint",
+    "scheme": "mono",
+    "base_hue": 200.6,
+    "colors": {
+      "ink": "#121C21",
+      "primary": "#287095",
+      "secondary": "#5F91AC",
+      "accent": "#209CDD",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#D2E3EB",
+      "alert": "#DC2626",
+      "background": "#ECF3F6",
+      "paper": "#ECF3F6",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#D2E3EB",
+      "neutral": "#FFFFFF",
+      "text_primary": "#121C21",
+      "text_secondary": "#4F6069",
+      "line": "#BFD0D9",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 15.42,
+      "onPrimary_on_primary": 5.47,
+      "onAccent_on_accent": 5.69,
+      "muted_on_bg": 5.83
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Calibri",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 3,
+      "title_style": "badge",
+      "card_style": "solid",
+      "icon_style": "circle",
+      "divider_style": 2,
+      "footer_style": "none",
+      "bg_style": "panel",
+      "image_style": "frame",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck019_rose_parchment",
+    "name": "Rose Parchment (Study Guide Benchmark)",
+    "deck_id": "deck019",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Study Guide",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 338.1,
+    "colors": {
+      "ink": "#25181D",
+      "primary": "#7D2646",
+      "secondary": "#B45A9C",
+      "accent": "#305493",
+      "tint_a": "#FAF4F6",
+      "tint_b": "#F1DDE4",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#FAF4F6",
+      "card_fill_alt": "#F1DDE4",
+      "neutral": "#FAF4F6",
+      "text_primary": "#25181D",
+      "text_secondary": "#6B575E",
+      "line": "#DCD0D5",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 17.11,
+      "onPrimary_on_primary": 9.38,
+      "onAccent_on_accent": 7.46,
+      "muted_on_bg": 6.67
+    },
+    "typography": {
+      "title_font": "Trebuchet MS",
+      "body_font": "Calibri",
+      "numeric_font": "Trebuchet MS"
+    },
+    "format": {
+      "cover_style": 6,
+      "title_style": "center",
+      "card_style": "glass",
+      "icon_style": "letter",
+      "divider_style": 5,
+      "footer_style": "left",
+      "bg_style": "panel",
+      "image_style": "plain",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck020_lime_lantern",
+    "name": "Lime Lantern (Study Guide Benchmark)",
+    "deck_id": "deck020",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Study Guide",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "analogous",
+    "base_hue": 115.7,
+    "colors": {
+      "ink": "#1B221B",
+      "primary": "#417B3D",
+      "secondary": "#87A372",
+      "accent": "#53A57D",
+      "tint_a": "#F6F8F6",
+      "tint_b": "#E6F0E5",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F6F8F6",
+      "card_fill_alt": "#E6F0E5",
+      "neutral": "#F6F8F6",
+      "text_primary": "#1B221B",
+      "text_secondary": "#5C675B",
+      "line": "#D3DAD3",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.26,
+      "onPrimary_on_primary": 5.09,
+      "onAccent_on_accent": 5.84,
+      "muted_on_bg": 5.92
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Arial",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 9,
+      "title_style": "kicker",
+      "card_style": "outline",
+      "icon_style": "rounded",
+      "divider_style": 3,
+      "footer_style": "center",
+      "bg_style": "panel",
+      "image_style": "matte",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck021_sapphire_tonic",
+    "name": "Sapphire Tonic (Visual Storybook Benchmark)",
+    "deck_id": "deck021",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Visual Storybook",
+    "subject": "History",
+    "mode": "tint",
+    "scheme": "mono",
+    "base_hue": 253.2,
+    "colors": {
+      "ink": "#151221",
+      "primary": "#34256A",
+      "secondary": "#7464AB",
+      "accent": "#3D1FA5",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#DEDAEC",
+      "alert": "#DC2626",
+      "background": "#E8E5F3",
+      "paper": "#E8E5F3",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#DEDAEC",
+      "neutral": "#FFFFFF",
+      "text_primary": "#151221",
+      "text_secondary": "#554F69",
+      "line": "#C5BFD9",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 14.85,
+      "onPrimary_on_primary": 12.97,
+      "onAccent_on_accent": 10.84,
+      "muted_on_bg": 6.25
+    },
+    "typography": {
+      "title_font": "Segoe UI",
+      "body_font": "Calibri",
+      "numeric_font": "Segoe UI"
+    },
+    "format": {
+      "cover_style": 3,
+      "title_style": "kicker",
+      "card_style": "glass",
+      "icon_style": "rounded",
+      "divider_style": 1,
+      "footer_style": "left",
+      "bg_style": "tint",
+      "image_style": "matte",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck022_ember_eclipse",
+    "name": "Ember Eclipse (Visual Storybook Benchmark)",
+    "deck_id": "deck022",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Visual Storybook",
+    "subject": "Economics",
+    "mode": "dark",
+    "scheme": "triadic",
+    "base_hue": 30.7,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#C6792A",
+      "secondary": "#A05F54",
+      "accent": "#61AC87",
+      "tint_a": "#422E19",
+      "tint_b": "#4A3928",
+      "alert": "#F43F5E",
+      "background": "#231710",
+      "paper": "#231710",
+      "card_fill": "#422E19",
+      "card_fill_alt": "#4A3928",
+      "neutral": "#422E19",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#C4B8AB",
+      "line": "#634D36",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.13,
+      "onPrimary_on_primary": 5.11,
+      "onAccent_on_accent": 6.43,
+      "muted_on_bg": 8.98
+    },
+    "typography": {
+      "title_font": "Times New Roman",
+      "body_font": "Arial",
+      "numeric_font": "Times New Roman"
+    },
+    "format": {
+      "cover_style": 6,
+      "title_style": "boxed",
+      "card_style": "outline",
+      "icon_style": "square",
+      "divider_style": 4,
+      "footer_style": "center",
+      "bg_style": "tint",
+      "image_style": "shadow",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck023_jade_harbor",
+    "name": "Jade Harbor (Visual Storybook Benchmark)",
+    "deck_id": "deck023",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Visual Storybook",
+    "subject": "Geography",
+    "mode": "light",
+    "scheme": "analogous",
+    "base_hue": 168.2,
+    "colors": {
+      "ink": "#1B2221",
+      "primary": "#2D554D",
+      "secondary": "#7CA7AF",
+      "accent": "#45A95B",
+      "tint_a": "#F7F8F8",
+      "tint_b": "#E6EEED",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F7F8F8",
+      "card_fill_alt": "#E6EEED",
+      "neutral": "#F7F8F8",
+      "text_primary": "#1B2221",
+      "text_secondary": "#5B6764",
+      "line": "#D3DAD8",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.19,
+      "onPrimary_on_primary": 8.34,
+      "onAccent_on_accent": 5.87,
+      "muted_on_bg": 5.88
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Calibri",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 9,
+      "title_style": "sidebar",
+      "card_style": "solid",
+      "icon_style": "circle",
+      "divider_style": 2,
+      "footer_style": "tag",
+      "bg_style": "tint",
+      "image_style": "frame",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck024_magenta_mist",
+    "name": "Magenta Mist (Visual Storybook Benchmark)",
+    "deck_id": "deck024",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Visual Storybook",
+    "subject": "History",
+    "mode": "tint",
+    "scheme": "split",
+    "base_hue": 315.7,
+    "colors": {
+      "ink": "#21121D",
+      "primary": "#73175B",
+      "secondary": "#B65277",
+      "accent": "#576B51",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#EDD3E6",
+      "alert": "#DC2626",
+      "background": "#F6E2F1",
+      "paper": "#F6E2F1",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#EDD3E6",
+      "neutral": "#FFFFFF",
+      "text_primary": "#21121D",
+      "text_secondary": "#694F62",
+      "line": "#D9BFD2",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 14.6,
+      "onPrimary_on_primary": 10.49,
+      "onAccent_on_accent": 5.79,
+      "muted_on_bg": 5.89
+    },
+    "typography": {
+      "title_font": "Trebuchet MS",
+      "body_font": "Calibri",
+      "numeric_font": "Trebuchet MS"
+    },
+    "format": {
+      "cover_style": 2,
+      "title_style": "panel",
+      "card_style": "glass",
+      "icon_style": "letter",
+      "divider_style": 5,
+      "footer_style": "none",
+      "bg_style": "tint",
+      "image_style": "plain",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck025_citron_twilight",
+    "name": "Citron Twilight (Visual Storybook Benchmark)",
+    "deck_id": "deck025",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Visual Storybook",
+    "subject": "Geography",
+    "mode": "dark",
+    "scheme": "complementary",
+    "base_hue": 88.2,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#779654",
+      "secondary": "#619A56",
+      "accent": "#8B46D9",
+      "tint_a": "#2C3424",
+      "tint_b": "#47533A",
+      "alert": "#F43F5E",
+      "background": "#1A2412",
+      "paper": "#1A2412",
+      "card_fill": "#2C3424",
+      "card_fill_alt": "#47533A",
+      "neutral": "#2C3424",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B8BFB0",
+      "line": "#4D5A3F",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 14.85,
+      "onPrimary_on_primary": 5.2,
+      "onAccent_on_accent": 5.28,
+      "muted_on_bg": 8.52
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Arial",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 5,
+      "title_style": "badge",
+      "card_style": "outline",
+      "icon_style": "rounded",
+      "divider_style": 3,
+      "footer_style": "left",
+      "bg_style": "tint",
+      "image_style": "matte",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck026_cobalt_petal",
+    "name": "Cobalt Petal (Visual Storybook Benchmark)",
+    "deck_id": "deck026",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Visual Storybook",
+    "subject": "Geography",
+    "mode": "tint",
+    "scheme": "analogous",
+    "base_hue": 225.7,
+    "colors": {
+      "ink": "#121521",
+      "primary": "#233F99",
+      "secondary": "#6695B4",
+      "accent": "#6833CC",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#DCE0ED",
+      "alert": "#DC2626",
+      "background": "#EAEDF9",
+      "paper": "#EAEDF9",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#DCE0ED",
+      "neutral": "#FFFFFF",
+      "text_primary": "#121521",
+      "text_secondary": "#4F5569",
+      "line": "#BFC5D9",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 15.57,
+      "onPrimary_on_primary": 9.36,
+      "onAccent_on_accent": 7.16,
+      "muted_on_bg": 6.34
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Calibri",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 8,
+      "title_style": "center",
+      "card_style": "solid",
+      "icon_style": "square",
+      "divider_style": 1,
+      "footer_style": "center",
+      "bg_style": "tint",
+      "image_style": "shadow",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck027_crimson_nocturne",
+    "name": "Crimson Nocturne (Visual Storybook Benchmark)",
+    "deck_id": "deck027",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Visual Storybook",
+    "subject": "Economics",
+    "mode": "dark",
+    "scheme": "split",
+    "base_hue": 358.2,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#A2383B",
+      "secondary": "#BA6A42",
+      "accent": "#4699E2",
+      "tint_a": "#401A1B",
+      "tint_b": "#5C3133",
+      "alert": "#F43F5E",
+      "background": "#1C1011",
+      "paper": "#1C1011",
+      "card_fill": "#401A1B",
+      "card_fill_alt": "#5C3133",
+      "neutral": "#401A1B",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#C4ABAC",
+      "line": "#633637",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 17.13,
+      "onPrimary_on_primary": 6.63,
+      "onAccent_on_accent": 5.73,
+      "muted_on_bg": 8.63
+    },
+    "typography": {
+      "title_font": "Bookman Old Style",
+      "body_font": "Arial",
+      "numeric_font": "Bookman Old Style"
+    },
+    "format": {
+      "cover_style": 1,
+      "title_style": "kicker",
+      "card_style": "glass",
+      "icon_style": "circle",
+      "divider_style": 4,
+      "footer_style": "tag",
+      "bg_style": "tint",
+      "image_style": "frame",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck028_emerald_glow",
+    "name": "Emerald Glow (Visual Storybook Benchmark)",
+    "deck_id": "deck028",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Visual Storybook",
+    "subject": "Political Science",
+    "mode": "tint",
+    "scheme": "complementary",
+    "base_hue": 135.7,
+    "colors": {
+      "ink": "#151E17",
+      "primary": "#3C774B",
+      "secondary": "#82AB9B",
+      "accent": "#A9328A",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#DEE8E0",
+      "alert": "#DC2626",
+      "background": "#ECF4EE",
+      "paper": "#ECF4EE",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#DEE8E0",
+      "neutral": "#FFFFFF",
+      "text_primary": "#151E17",
+      "text_secondary": "#546458",
+      "line": "#C4D4C8",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 15.24,
+      "onPrimary_on_primary": 5.34,
+      "onAccent_on_accent": 5.98,
+      "muted_on_bg": 5.61
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Arial",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 4,
+      "title_style": "boxed",
+      "card_style": "outline",
+      "icon_style": "letter",
+      "divider_style": 2,
+      "footer_style": "none",
+      "bg_style": "tint",
+      "image_style": "plain",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck029_indigo_abyss",
+    "name": "Indigo Abyss (Visual Storybook Benchmark)",
+    "deck_id": "deck029",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Visual Storybook",
+    "subject": "Political Science",
+    "mode": "dark",
+    "scheme": "mono",
+    "base_hue": 273.2,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#6F399B",
+      "secondary": "#6E4390",
+      "accent": "#C359E6",
+      "tint_a": "#332241",
+      "tint_b": "#402B51",
+      "alert": "#F43F5E",
+      "background": "#221428",
+      "paper": "#221428",
+      "card_fill": "#332241",
+      "card_fill_alt": "#402B51",
+      "neutral": "#332241",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B9ABC4",
+      "line": "#4F3663",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.17,
+      "onPrimary_on_primary": 7.68,
+      "onAccent_on_accent": 4.88,
+      "muted_on_bg": 8.08
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Calibri",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 7,
+      "title_style": "sidebar",
+      "card_style": "solid",
+      "icon_style": "rounded",
+      "divider_style": 5,
+      "footer_style": "left",
+      "bg_style": "tint",
+      "image_style": "matte",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck030_amber_slate",
+    "name": "Amber Slate (Visual Storybook Benchmark)",
+    "deck_id": "deck030",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Visual Storybook",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 50.7,
+    "colors": {
+      "ink": "#252318",
+      "primary": "#5C5322",
+      "secondary": "#A2AA83",
+      "accent": "#489A8D",
+      "tint_a": "#F6F5F2",
+      "tint_b": "#F0EDDD",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F6F5F2",
+      "card_fill_alt": "#F0EDDD",
+      "neutral": "#F6F5F2",
+      "text_primary": "#252318",
+      "text_secondary": "#6B6857",
+      "line": "#DCDAD0",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 15.76,
+      "onPrimary_on_primary": 7.73,
+      "onAccent_on_accent": 5.21,
+      "muted_on_bg": 5.61
+    },
+    "typography": {
+      "title_font": "Calibri",
+      "body_font": "Calibri",
+      "numeric_font": "Calibri"
+    },
+    "format": {
+      "cover_style": 10,
+      "title_style": "panel",
+      "card_style": "glass",
+      "icon_style": "square",
+      "divider_style": 3,
+      "footer_style": "center",
+      "bg_style": "tint",
+      "image_style": "shadow",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck031_teal_linen",
+    "name": "Teal Linen (Evidence and Data Review Benchmark)",
+    "deck_id": "deck031",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Evidence and Data Review",
+    "subject": "History",
+    "mode": "light",
+    "scheme": "complementary",
+    "base_hue": 188.2,
+    "colors": {
+      "ink": "#192224",
+      "primary": "#2E7581",
+      "secondary": "#6899CB",
+      "accent": "#BB422F",
+      "tint_a": "#F4F8F8",
+      "tint_b": "#E4F0F1",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F4F8F8",
+      "card_fill_alt": "#E4F0F1",
+      "neutral": "#F4F8F8",
+      "text_primary": "#192224",
+      "text_secondary": "#596769",
+      "line": "#D1DADB",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.21,
+      "onPrimary_on_primary": 5.28,
+      "onAccent_on_accent": 5.34,
+      "muted_on_bg": 5.88
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Calibri",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 4,
+      "title_style": "panel",
+      "card_style": "solid",
+      "icon_style": "square",
+      "divider_style": 1,
+      "footer_style": "left",
+      "bg_style": "plain",
+      "image_style": "shadow",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck032_magenta_gallery",
+    "name": "Magenta Gallery (Evidence and Data Review Benchmark)",
+    "deck_id": "deck032",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Evidence and Data Review",
+    "subject": "Economics",
+    "mode": "light",
+    "scheme": "mono",
+    "base_hue": 325.7,
+    "colors": {
+      "ink": "#25181F",
+      "primary": "#7B1750",
+      "secondary": "#B96394",
+      "accent": "#CF1E60",
+      "tint_a": "#F8EFF4",
+      "tint_b": "#F1E5EC",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F8EFF4",
+      "card_fill_alt": "#F1E5EC",
+      "neutral": "#F8EFF4",
+      "text_primary": "#25181F",
+      "text_secondary": "#6B5762",
+      "line": "#DCD0D7",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 17.09,
+      "onPrimary_on_primary": 10.09,
+      "onAccent_on_accent": 5.24,
+      "muted_on_bg": 6.64
+    },
+    "typography": {
+      "title_font": "Bookman Old Style",
+      "body_font": "Arial",
+      "numeric_font": "Bookman Old Style"
+    },
+    "format": {
+      "cover_style": 7,
+      "title_style": "badge",
+      "card_style": "glass",
+      "icon_style": "circle",
+      "divider_style": 4,
+      "footer_style": "center",
+      "bg_style": "plain",
+      "image_style": "frame",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck033_lime_haze",
+    "name": "Lime Haze (Evidence and Data Review Benchmark)",
+    "deck_id": "deck033",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Evidence and Data Review",
+    "subject": "Geography",
+    "mode": "tint",
+    "scheme": "triadic",
+    "base_hue": 103.3,
+    "colors": {
+      "ink": "#171E15",
+      "primary": "#396328",
+      "secondary": "#91A66C",
+      "accent": "#1F48B1",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#DAE4D6",
+      "alert": "#DC2626",
+      "background": "#EFF5ED",
+      "paper": "#EFF5ED",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#DAE4D6",
+      "neutral": "#FFFFFF",
+      "text_primary": "#171E15",
+      "text_secondary": "#586454",
+      "line": "#C9D4C4",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 15.37,
+      "onPrimary_on_primary": 7.02,
+      "onAccent_on_accent": 8.02,
+      "muted_on_bg": 5.63
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Arial",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 10,
+      "title_style": "center",
+      "card_style": "outline",
+      "icon_style": "letter",
+      "divider_style": 2,
+      "footer_style": "tag",
+      "bg_style": "plain",
+      "image_style": "plain",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck034_cobalt_parchment",
+    "name": "Cobalt Parchment (Evidence and Data Review Benchmark)",
+    "deck_id": "deck034",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Evidence and Data Review",
+    "subject": "History",
+    "mode": "light",
+    "scheme": "analogous",
+    "base_hue": 240.8,
+    "colors": {
+      "ink": "#191825",
+      "primary": "#20204D",
+      "secondary": "#7A4DC3",
+      "accent": "#1D6BA5",
+      "tint_a": "#F3F3F7",
+      "tint_b": "#E2E2F4",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F3F3F7",
+      "card_fill_alt": "#E2E2F4",
+      "neutral": "#F3F3F7",
+      "text_primary": "#191825",
+      "text_secondary": "#57576B",
+      "line": "#D0D0DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 17.52,
+      "onPrimary_on_primary": 15.27,
+      "onAccent_on_accent": 5.68,
+      "muted_on_bg": 7.05
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Calibri",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 3,
+      "title_style": "kicker",
+      "card_style": "solid",
+      "icon_style": "rounded",
+      "divider_style": 5,
+      "footer_style": "none",
+      "bg_style": "plain",
+      "image_style": "matte",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck035_ember_lantern",
+    "name": "Ember Lantern (Evidence and Data Review Benchmark)",
+    "deck_id": "deck035",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Evidence and Data Review",
+    "subject": "Geography",
+    "mode": "light",
+    "scheme": "split",
+    "base_hue": 43.3,
+    "colors": {
+      "ink": "#252118",
+      "primary": "#625126",
+      "secondary": "#B58267",
+      "accent": "#4923CE",
+      "tint_a": "#F7F7F4",
+      "tint_b": "#F4F0E5",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F7F7F4",
+      "card_fill_alt": "#F4F0E5",
+      "neutral": "#F7F7F4",
+      "text_primary": "#252118",
+      "text_secondary": "#6B6557",
+      "line": "#DCD9D0",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.04,
+      "onPrimary_on_primary": 7.71,
+      "onAccent_on_accent": 8.7,
+      "muted_on_bg": 5.79
+    },
+    "typography": {
+      "title_font": "Calibri",
+      "body_font": "Calibri",
+      "numeric_font": "Calibri"
+    },
+    "format": {
+      "cover_style": 6,
+      "title_style": "boxed",
+      "card_style": "glass",
+      "icon_style": "square",
+      "divider_style": 3,
+      "footer_style": "left",
+      "bg_style": "plain",
+      "image_style": "shadow",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck036_jade_meadow",
+    "name": "Jade Meadow (Evidence and Data Review Benchmark)",
+    "deck_id": "deck036",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Evidence and Data Review",
+    "subject": "Geography",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 155.8,
+    "colors": {
+      "ink": "#1B221F",
+      "primary": "#2C5B48",
+      "secondary": "#74997D",
+      "accent": "#791CB8",
+      "tint_a": "#F1F6F4",
+      "tint_b": "#E1EBE7",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F1F6F4",
+      "card_fill_alt": "#E1EBE7",
+      "neutral": "#F1F6F4",
+      "text_primary": "#1B221F",
+      "text_secondary": "#5B6762",
+      "line": "#D3DAD7",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.21,
+      "onPrimary_on_primary": 7.79,
+      "onAccent_on_accent": 7.86,
+      "muted_on_bg": 5.9
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Arial",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 9,
+      "title_style": "sidebar",
+      "card_style": "outline",
+      "icon_style": "circle",
+      "divider_style": 1,
+      "footer_style": "center",
+      "bg_style": "plain",
+      "image_style": "frame",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck037_violet_summit",
+    "name": "Violet Summit (Evidence and Data Review Benchmark)",
+    "deck_id": "deck037",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Evidence and Data Review",
+    "subject": "Economics",
+    "mode": "light",
+    "scheme": "analogous",
+    "base_hue": 293.3,
+    "colors": {
+      "ink": "#231825",
+      "primary": "#602668",
+      "secondary": "#C668AE",
+      "accent": "#BC3E81",
+      "tint_a": "#FAF7FA",
+      "tint_b": "#F2DCF5",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#FAF7FA",
+      "card_fill_alt": "#F2DCF5",
+      "neutral": "#FAF7FA",
+      "text_primary": "#231825",
+      "text_secondary": "#68576B",
+      "line": "#DBD0DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 17.09,
+      "onPrimary_on_primary": 10.64,
+      "onAccent_on_accent": 5.07,
+      "muted_on_bg": 6.64
+    },
+    "typography": {
+      "title_font": "Century Schoolbook",
+      "body_font": "Calibri",
+      "numeric_font": "Century Schoolbook"
+    },
+    "format": {
+      "cover_style": 2,
+      "title_style": "panel",
+      "card_style": "solid",
+      "icon_style": "letter",
+      "divider_style": 4,
+      "footer_style": "tag",
+      "bg_style": "plain",
+      "image_style": "plain",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck038_marigold_harbor",
+    "name": "Marigold Harbor (Evidence and Data Review Benchmark)",
+    "deck_id": "deck038",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Evidence and Data Review",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "split",
+    "base_hue": 75.8,
+    "colors": {
+      "ink": "#20221B",
+      "primary": "#3E452A",
+      "secondary": "#C6BD6D",
+      "accent": "#3450AA",
+      "tint_a": "#F9FAF6",
+      "tint_b": "#EBEFE0",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F9FAF6",
+      "card_fill_alt": "#EBEFE0",
+      "neutral": "#F9FAF6",
+      "text_primary": "#20221B",
+      "text_secondary": "#64675B",
+      "line": "#D8DAD3",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.08,
+      "onPrimary_on_primary": 10.05,
+      "onAccent_on_accent": 7.31,
+      "muted_on_bg": 5.78
+    },
+    "typography": {
+      "title_font": "Segoe UI",
+      "body_font": "Calibri",
+      "numeric_font": "Segoe UI"
+    },
+    "format": {
+      "cover_style": 5,
+      "title_style": "badge",
+      "card_style": "glass",
+      "icon_style": "rounded",
+      "divider_style": 2,
+      "footer_style": "none",
+      "bg_style": "plain",
+      "image_style": "matte",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck039_azure_orchard",
+    "name": "Azure Orchard (Evidence and Data Review Benchmark)",
+    "deck_id": "deck039",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Evidence and Data Review",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "complementary",
+    "base_hue": 208.3,
+    "colors": {
+      "ink": "#181F25",
+      "primary": "#1D466B",
+      "secondary": "#5D6EC5",
+      "accent": "#975F2C",
+      "tint_a": "#F1F4F8",
+      "tint_b": "#DCE8F4",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F1F4F8",
+      "card_fill_alt": "#DCE8F4",
+      "neutral": "#F1F4F8",
+      "text_primary": "#181F25",
+      "text_secondary": "#57616B",
+      "line": "#D0D7DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.65,
+      "onPrimary_on_primary": 9.81,
+      "onAccent_on_accent": 5.26,
+      "muted_on_bg": 6.31
+    },
+    "typography": {
+      "title_font": "Times New Roman",
+      "body_font": "Arial",
+      "numeric_font": "Times New Roman"
+    },
+    "format": {
+      "cover_style": 8,
+      "title_style": "center",
+      "card_style": "outline",
+      "icon_style": "square",
+      "divider_style": 5,
+      "footer_style": "left",
+      "bg_style": "plain",
+      "image_style": "shadow",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck040_rose_mist",
+    "name": "Rose Mist (Evidence and Data Review Benchmark)",
+    "deck_id": "deck040",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Evidence and Data Review",
+    "subject": "Political Science",
+    "mode": "tint",
+    "scheme": "mono",
+    "base_hue": 345.8,
+    "colors": {
+      "ink": "#211215",
+      "primary": "#863044",
+      "secondary": "#C96E83",
+      "accent": "#C62E52",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#F0D1D8",
+      "alert": "#DC2626",
+      "background": "#F5E6EA",
+      "paper": "#F5E6EA",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#F0D1D8",
+      "neutral": "#FFFFFF",
+      "text_primary": "#211215",
+      "text_secondary": "#694F55",
+      "line": "#D9BFC5",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 14.96,
+      "onPrimary_on_primary": 8.33,
+      "onAccent_on_accent": 5.37,
+      "muted_on_bg": 6.1
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Calibri",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 1,
+      "title_style": "kicker",
+      "card_style": "solid",
+      "icon_style": "circle",
+      "divider_style": 3,
+      "footer_style": "center",
+      "bg_style": "plain",
+      "image_style": "frame",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck041_fern_obsidian",
+    "name": "Fern Obsidian (Glossary Spotlight Benchmark)",
+    "deck_id": "deck041",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Glossary Spotlight",
+    "subject": "History",
+    "mode": "dark",
+    "scheme": "split",
+    "base_hue": 123.3,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#439C48",
+      "secondary": "#5B846C",
+      "accent": "#D06796",
+      "tint_a": "#2E412F",
+      "tint_b": "#354D37",
+      "alert": "#F43F5E",
+      "background": "#121B12",
+      "paper": "#121B12",
+      "card_fill": "#2E412F",
+      "card_fill_alt": "#354D37",
+      "neutral": "#2E412F",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B0BFB1",
+      "line": "#3F5A40",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.27,
+      "onPrimary_on_primary": 5.05,
+      "onAccent_on_accent": 5.02,
+      "muted_on_bg": 9.18
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Arial",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 5,
+      "title_style": "kicker",
+      "card_style": "outline",
+      "icon_style": "circle",
+      "divider_style": 1,
+      "footer_style": "left",
+      "bg_style": "panel",
+      "image_style": "frame",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck042_indigo_studio",
+    "name": "Indigo Studio (Glossary Spotlight Benchmark)",
+    "deck_id": "deck042",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Glossary Spotlight",
+    "subject": "Economics",
+    "mode": "light",
+    "scheme": "complementary",
+    "base_hue": 265.8,
+    "colors": {
+      "ink": "#1E1825",
+      "primary": "#472B6C",
+      "secondary": "#AB4FC3",
+      "accent": "#7DAB40",
+      "tint_a": "#F5F3F8",
+      "tint_b": "#E9E0F5",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F5F3F8",
+      "card_fill_alt": "#E9E0F5",
+      "neutral": "#F5F3F8",
+      "text_primary": "#1E1825",
+      "text_secondary": "#60576B",
+      "line": "#D5D0DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 17.32,
+      "onPrimary_on_primary": 11.48,
+      "onAccent_on_accent": 6.44,
+      "muted_on_bg": 6.83
+    },
+    "typography": {
+      "title_font": "Century Schoolbook",
+      "body_font": "Calibri",
+      "numeric_font": "Century Schoolbook"
+    },
+    "format": {
+      "cover_style": 8,
+      "title_style": "boxed",
+      "card_style": "solid",
+      "icon_style": "letter",
+      "divider_style": 4,
+      "footer_style": "center",
+      "bg_style": "panel",
+      "image_style": "plain",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck043_ember_breeze",
+    "name": "Ember Breeze (Glossary Spotlight Benchmark)",
+    "deck_id": "deck043",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Glossary Spotlight",
+    "subject": "Geography",
+    "mode": "tint",
+    "scheme": "mono",
+    "base_hue": 38.3,
+    "colors": {
+      "ink": "#211C12",
+      "primary": "#855D16",
+      "secondary": "#A78D5F",
+      "accent": "#C0851C",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#EEE7DA",
+      "alert": "#DC2626",
+      "background": "#F6F0E5",
+      "paper": "#F6F0E5",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#EEE7DA",
+      "neutral": "#FFFFFF",
+      "text_primary": "#211C12",
+      "text_secondary": "#695F4F",
+      "line": "#D9D0BF",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 14.94,
+      "onPrimary_on_primary": 5.87,
+      "onAccent_on_accent": 5.48,
+      "muted_on_bg": 5.53
+    },
+    "typography": {
+      "title_font": "Segoe UI",
+      "body_font": "Calibri",
+      "numeric_font": "Segoe UI"
+    },
+    "format": {
+      "cover_style": 1,
+      "title_style": "sidebar",
+      "card_style": "glass",
+      "icon_style": "rounded",
+      "divider_style": 2,
+      "footer_style": "tag",
+      "bg_style": "panel",
+      "image_style": "matte",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck044_teal_dawn",
+    "name": "Teal Dawn (Glossary Spotlight Benchmark)",
+    "deck_id": "deck044",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Glossary Spotlight",
+    "subject": "History",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 175.8,
+    "colors": {
+      "ink": "#192423",
+      "primary": "#224946",
+      "secondary": "#719CAE",
+      "accent": "#918B3C",
+      "tint_a": "#F5F8F8",
+      "tint_b": "#E5F2F1",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F5F8F8",
+      "card_fill_alt": "#E5F2F1",
+      "neutral": "#F5F8F8",
+      "text_primary": "#192423",
+      "text_secondary": "#596968",
+      "line": "#D1DBDB",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 15.93,
+      "onPrimary_on_primary": 9.96,
+      "onAccent_on_accent": 4.94,
+      "muted_on_bg": 5.76
+    },
+    "typography": {
+      "title_font": "Times New Roman",
+      "body_font": "Arial",
+      "numeric_font": "Times New Roman"
+    },
+    "format": {
+      "cover_style": 4,
+      "title_style": "panel",
+      "card_style": "outline",
+      "icon_style": "square",
+      "divider_style": 5,
+      "footer_style": "none",
+      "bg_style": "panel",
+      "image_style": "shadow",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck045_orchid_tonic",
+    "name": "Orchid Tonic (Glossary Spotlight Benchmark)",
+    "deck_id": "deck045",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Glossary Spotlight",
+    "subject": "Geography",
+    "mode": "tint",
+    "scheme": "analogous",
+    "base_hue": 313.4,
+    "colors": {
+      "ink": "#21121E",
+      "primary": "#7C1565",
+      "secondary": "#B27990",
+      "accent": "#8F3DBE",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#EED9EA",
+      "alert": "#DC2626",
+      "background": "#F7E0F2",
+      "paper": "#F7E0F2",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#EED9EA",
+      "neutral": "#FFFFFF",
+      "text_primary": "#21121E",
+      "text_secondary": "#694F63",
+      "line": "#D9BFD3",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 14.44,
+      "onPrimary_on_primary": 9.76,
+      "onAccent_on_accent": 5.87,
+      "muted_on_bg": 5.83
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Calibri",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 7,
+      "title_style": "badge",
+      "card_style": "solid",
+      "icon_style": "circle",
+      "divider_style": 3,
+      "footer_style": "left",
+      "bg_style": "panel",
+      "image_style": "frame",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck046_citron_midnight",
+    "name": "Citron Midnight (Glossary Spotlight Benchmark)",
+    "deck_id": "deck046",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Glossary Spotlight",
+    "subject": "Geography",
+    "mode": "dark",
+    "scheme": "mono",
+    "base_hue": 90.9,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#719252",
+      "secondary": "#788F62",
+      "accent": "#81AF56",
+      "tint_a": "#323F26",
+      "tint_b": "#414D36",
+      "alert": "#F43F5E",
+      "background": "#1D2815",
+      "paper": "#1D2815",
+      "card_fill": "#323F26",
+      "card_fill_alt": "#414D36",
+      "neutral": "#323F26",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B7BFB0",
+      "line": "#4C5A3F",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 14.18,
+      "onPrimary_on_primary": 4.92,
+      "onAccent_on_accent": 6.8,
+      "muted_on_bg": 8.12
+    },
+    "typography": {
+      "title_font": "Trebuchet MS",
+      "body_font": "Calibri",
+      "numeric_font": "Trebuchet MS"
+    },
+    "format": {
+      "cover_style": 10,
+      "title_style": "center",
+      "card_style": "glass",
+      "icon_style": "letter",
+      "divider_style": 1,
+      "footer_style": "center",
+      "bg_style": "panel",
+      "image_style": "plain",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck047_cobalt_gallery",
+    "name": "Cobalt Gallery (Glossary Spotlight Benchmark)",
+    "deck_id": "deck047",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Glossary Spotlight",
+    "subject": "Economics",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 228.4,
+    "colors": {
+      "ink": "#181B25",
+      "primary": "#36447D",
+      "secondary": "#6D98BA",
+      "accent": "#557C4C",
+      "tint_a": "#F0F1F8",
+      "tint_b": "#E3E6F4",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F0F1F8",
+      "card_fill_alt": "#E3E6F4",
+      "neutral": "#F0F1F8",
+      "text_primary": "#181B25",
+      "text_secondary": "#575B6B",
+      "line": "#D0D2DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 17.18,
+      "onPrimary_on_primary": 9.21,
+      "onAccent_on_accent": 4.8,
+      "muted_on_bg": 6.74
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Arial",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 3,
+      "title_style": "kicker",
+      "card_style": "outline",
+      "icon_style": "rounded",
+      "divider_style": 4,
+      "footer_style": "tag",
+      "bg_style": "panel",
+      "image_style": "matte",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck048_crimson_basalt",
+    "name": "Crimson Basalt (Glossary Spotlight Benchmark)",
+    "deck_id": "deck048",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Glossary Spotlight",
+    "subject": "Political Science",
+    "mode": "dark",
+    "scheme": "analogous",
+    "base_hue": 5.9,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#C53D2E",
+      "secondary": "#A47751",
+      "accent": "#C49B41",
+      "tint_a": "#42221E",
+      "tint_b": "#4E2D2A",
+      "alert": "#F43F5E",
+      "background": "#1D0E0D",
+      "paper": "#1D0E0D",
+      "card_fill": "#42221E",
+      "card_fill_alt": "#4E2D2A",
+      "neutral": "#42221E",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#C4ADAB",
+      "line": "#633A36",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 17.29,
+      "onPrimary_on_primary": 5.15,
+      "onAccent_on_accent": 6.72,
+      "muted_on_bg": 8.84
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Calibri",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 6,
+      "title_style": "boxed",
+      "card_style": "solid",
+      "icon_style": "square",
+      "divider_style": 2,
+      "footer_style": "none",
+      "bg_style": "panel",
+      "image_style": "shadow",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck049_emerald_parchment",
+    "name": "Emerald Parchment (Glossary Spotlight Benchmark)",
+    "deck_id": "deck049",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Glossary Spotlight",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "split",
+    "base_hue": 143.4,
+    "colors": {
+      "ink": "#1B221E",
+      "primary": "#265D3B",
+      "secondary": "#8CAF8D",
+      "accent": "#95313C",
+      "tint_a": "#F6F8F7",
+      "tint_b": "#E2EBE5",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F6F8F7",
+      "card_fill_alt": "#E2EBE5",
+      "neutral": "#F6F8F7",
+      "text_primary": "#1B221E",
+      "text_secondary": "#5B6760",
+      "line": "#D3DAD5",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.23,
+      "onPrimary_on_primary": 7.75,
+      "onAccent_on_accent": 7.55,
+      "muted_on_bg": 5.91
+    },
+    "typography": {
+      "title_font": "Bookman Old Style",
+      "body_font": "Arial",
+      "numeric_font": "Bookman Old Style"
+    },
+    "format": {
+      "cover_style": 9,
+      "title_style": "sidebar",
+      "card_style": "glass",
+      "icon_style": "circle",
+      "divider_style": 5,
+      "footer_style": "left",
+      "bg_style": "panel",
+      "image_style": "frame",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck050_magenta_lantern",
+    "name": "Magenta Lantern (Glossary Spotlight Benchmark)",
+    "deck_id": "deck050",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Glossary Spotlight",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "complementary",
+    "base_hue": 330.9,
+    "colors": {
+      "ink": "#25181E",
+      "primary": "#87194E",
+      "secondary": "#BF5864",
+      "accent": "#4BA378",
+      "tint_a": "#FAF6F8",
+      "tint_b": "#F0DEE7",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#FAF6F8",
+      "card_fill_alt": "#F0DEE7",
+      "neutral": "#FAF6F8",
+      "text_primary": "#25181E",
+      "text_secondary": "#6B5761",
+      "line": "#DCD0D6",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 17.1,
+      "onPrimary_on_primary": 9.21,
+      "onAccent_on_accent": 5.64,
+      "muted_on_bg": 6.64
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Arial",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 2,
+      "title_style": "panel",
+      "card_style": "outline",
+      "icon_style": "letter",
+      "divider_style": 3,
+      "footer_style": "center",
+      "bg_style": "panel",
+      "image_style": "plain",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck051_amber_breeze",
+    "name": "Amber Breeze (Exam Revision Pack Benchmark)",
+    "deck_id": "deck051",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Exam Revision Pack",
+    "subject": "History",
+    "mode": "tint",
+    "scheme": "analogous",
+    "base_hue": 58.4,
+    "colors": {
+      "ink": "#1E1E15",
+      "primary": "#6C6A3F",
+      "secondary": "#C3A06A",
+      "accent": "#995A32",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#E3E2D5",
+      "alert": "#DC2626",
+      "background": "#F4F3EA",
+      "paper": "#F4F3EA",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#E3E2D5",
+      "neutral": "#FFFFFF",
+      "text_primary": "#1E1E15",
+      "text_secondary": "#646354",
+      "line": "#D4D3C4",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 15.06,
+      "onPrimary_on_primary": 5.57,
+      "onAccent_on_accent": 5.44,
+      "muted_on_bg": 5.46
+    },
+    "typography": {
+      "title_font": "Trebuchet MS",
+      "body_font": "Calibri",
+      "numeric_font": "Trebuchet MS"
+    },
+    "format": {
+      "cover_style": 6,
+      "title_style": "panel",
+      "card_style": "glass",
+      "icon_style": "letter",
+      "divider_style": 1,
+      "footer_style": "left",
+      "bg_style": "tint",
+      "image_style": "plain",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck052_cyan_summit",
+    "name": "Cyan Summit (Exam Revision Pack Benchmark)",
+    "deck_id": "deck052",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Exam Revision Pack",
+    "subject": "Economics",
+    "mode": "light",
+    "scheme": "split",
+    "base_hue": 195.9,
+    "colors": {
+      "ink": "#192124",
+      "primary": "#28748F",
+      "secondary": "#7EB9B3",
+      "accent": "#9C2D47",
+      "tint_a": "#F5F7F8",
+      "tint_b": "#E5EFF2",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F5F7F8",
+      "card_fill_alt": "#E5EFF2",
+      "neutral": "#F5F7F8",
+      "text_primary": "#192124",
+      "text_secondary": "#596569",
+      "line": "#D1D9DB",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.35,
+      "onPrimary_on_primary": 5.27,
+      "onAccent_on_accent": 7.29,
+      "muted_on_bg": 6.02
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Arial",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 9,
+      "title_style": "badge",
+      "card_style": "outline",
+      "icon_style": "rounded",
+      "divider_style": 4,
+      "footer_style": "center",
+      "bg_style": "tint",
+      "image_style": "matte",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck053_rose_harbor",
+    "name": "Rose Harbor (Exam Revision Pack Benchmark)",
+    "deck_id": "deck053",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Exam Revision Pack",
+    "subject": "Geography",
+    "mode": "light",
+    "scheme": "complementary",
+    "base_hue": 333.4,
+    "colors": {
+      "ink": "#25181E",
+      "primary": "#581A36",
+      "secondary": "#BE444D",
+      "accent": "#476F5E",
+      "tint_a": "#F8F0F4",
+      "tint_b": "#F4E0E9",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F8F0F4",
+      "card_fill_alt": "#F4E0E9",
+      "neutral": "#F8F0F4",
+      "text_primary": "#25181E",
+      "text_secondary": "#6B5760",
+      "line": "#DCD0D6",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 17.1,
+      "onPrimary_on_primary": 13.0,
+      "onAccent_on_accent": 5.67,
+      "muted_on_bg": 6.65
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Calibri",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 2,
+      "title_style": "center",
+      "card_style": "solid",
+      "icon_style": "square",
+      "divider_style": 2,
+      "footer_style": "tag",
+      "bg_style": "tint",
+      "image_style": "shadow",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck054_fern_nocturne",
+    "name": "Fern Nocturne (Exam Revision Pack Benchmark)",
+    "deck_id": "deck054",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Exam Revision Pack",
+    "subject": "History",
+    "mode": "dark",
+    "scheme": "mono",
+    "base_hue": 125.9,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#7A8C7C",
+      "secondary": "#66916A",
+      "accent": "#5EB266",
+      "tint_a": "#253527",
+      "tint_b": "#39523C",
+      "alert": "#F43F5E",
+      "background": "#0E1B0E",
+      "paper": "#0E1B0E",
+      "card_fill": "#253527",
+      "card_fill_alt": "#39523C",
+      "neutral": "#253527",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B0BFB1",
+      "line": "#3F5A41",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.4,
+      "onPrimary_on_primary": 4.86,
+      "onAccent_on_accent": 6.66,
+      "muted_on_bg": 9.25
+    },
+    "typography": {
+      "title_font": "Bookman Old Style",
+      "body_font": "Arial",
+      "numeric_font": "Bookman Old Style"
+    },
+    "format": {
+      "cover_style": 5,
+      "title_style": "kicker",
+      "card_style": "glass",
+      "icon_style": "circle",
+      "divider_style": 5,
+      "footer_style": "none",
+      "bg_style": "tint",
+      "image_style": "frame",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck055_sapphire_atlas",
+    "name": "Sapphire Atlas (Exam Revision Pack Benchmark)",
+    "deck_id": "deck055",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Exam Revision Pack",
+    "subject": "Geography",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 248.4,
+    "colors": {
+      "ink": "#1A1825",
+      "primary": "#2A1C7F",
+      "secondary": "#7386C7",
+      "accent": "#4C7952",
+      "tint_a": "#F6F5FA",
+      "tint_b": "#E3E1F0",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F6F5FA",
+      "card_fill_alt": "#E3E1F0",
+      "neutral": "#F6F5FA",
+      "text_primary": "#1A1825",
+      "text_secondary": "#5A576B",
+      "line": "#D2D0DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 17.48,
+      "onPrimary_on_primary": 13.37,
+      "onAccent_on_accent": 5.04,
+      "muted_on_bg": 6.98
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Arial",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 8,
+      "title_style": "boxed",
+      "card_style": "outline",
+      "icon_style": "letter",
+      "divider_style": 3,
+      "footer_style": "left",
+      "bg_style": "tint",
+      "image_style": "plain",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck056_vermilion_mist",
+    "name": "Vermilion Mist (Exam Revision Pack Benchmark)",
+    "deck_id": "deck056",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Exam Revision Pack",
+    "subject": "Geography",
+    "mode": "tint",
+    "scheme": "complementary",
+    "base_hue": 25.9,
+    "colors": {
+      "ink": "#211812",
+      "primary": "#7F4316",
+      "secondary": "#BEAA5B",
+      "accent": "#2A74AD",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#EADCD1",
+      "alert": "#DC2626",
+      "background": "#F8EEE7",
+      "paper": "#F8EEE7",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#EADCD1",
+      "neutral": "#FFFFFF",
+      "text_primary": "#211812",
+      "text_secondary": "#695A4F",
+      "line": "#D9CABF",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 15.26,
+      "onPrimary_on_primary": 7.73,
+      "onAccent_on_accent": 5.0,
+      "muted_on_bg": 5.79
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Calibri",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 1,
+      "title_style": "sidebar",
+      "card_style": "solid",
+      "icon_style": "rounded",
+      "divider_style": 1,
+      "footer_style": "center",
+      "bg_style": "tint",
+      "image_style": "matte",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck057_jade_haze",
+    "name": "Jade Haze (Exam Revision Pack Benchmark)",
+    "deck_id": "deck057",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Exam Revision Pack",
+    "subject": "Economics",
+    "mode": "tint",
+    "scheme": "mono",
+    "base_hue": 163.4,
+    "colors": {
+      "ink": "#151E1C",
+      "primary": "#2E594D",
+      "secondary": "#70A898",
+      "accent": "#309B93",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#D7E4E0",
+      "alert": "#DC2626",
+      "background": "#ECF3F1",
+      "paper": "#ECF3F1",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#D7E4E0",
+      "neutral": "#FFFFFF",
+      "text_primary": "#151E1C",
+      "text_secondary": "#54645F",
+      "line": "#C4D4CF",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 15.11,
+      "onPrimary_on_primary": 7.92,
+      "onAccent_on_accent": 5.17,
+      "muted_on_bg": 5.54
+    },
+    "typography": {
+      "title_font": "Calibri",
+      "body_font": "Calibri",
+      "numeric_font": "Calibri"
+    },
+    "format": {
+      "cover_style": 4,
+      "title_style": "panel",
+      "card_style": "glass",
+      "icon_style": "square",
+      "divider_style": 4,
+      "footer_style": "tag",
+      "bg_style": "tint",
+      "image_style": "shadow",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck058_orchid_canvas",
+    "name": "Orchid Canvas (Exam Revision Pack Benchmark)",
+    "deck_id": "deck058",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Exam Revision Pack",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 301.0,
+    "colors": {
+      "ink": "#251825",
+      "primary": "#731A72",
+      "secondary": "#984EC0",
+      "accent": "#919243",
+      "tint_a": "#FAF6FA",
+      "tint_b": "#F2E1F2",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#FAF6FA",
+      "card_fill_alt": "#F2E1F2",
+      "neutral": "#FAF6FA",
+      "text_primary": "#251825",
+      "text_secondary": "#6B576A",
+      "line": "#DCD0DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.99,
+      "onPrimary_on_primary": 9.91,
+      "onAccent_on_accent": 5.3,
+      "muted_on_bg": 6.57
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Arial",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 7,
+      "title_style": "badge",
+      "card_style": "outline",
+      "icon_style": "circle",
+      "divider_style": 2,
+      "footer_style": "none",
+      "bg_style": "tint",
+      "image_style": "frame",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck059_citron_dawn",
+    "name": "Citron Dawn (Exam Revision Pack Benchmark)",
+    "deck_id": "deck059",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Exam Revision Pack",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "analogous",
+    "base_hue": 83.5,
+    "colors": {
+      "ink": "#1F221B",
+      "primary": "#52613A",
+      "secondary": "#8AA881",
+      "accent": "#B39828",
+      "tint_a": "#F8F8F7",
+      "tint_b": "#EBF0E3",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F8F8F7",
+      "card_fill_alt": "#EBF0E3",
+      "neutral": "#F8F8F7",
+      "text_primary": "#1F221B",
+      "text_secondary": "#62675B",
+      "line": "#D7DAD3",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.12,
+      "onPrimary_on_primary": 6.71,
+      "onAccent_on_accent": 6.17,
+      "muted_on_bg": 5.82
+    },
+    "typography": {
+      "title_font": "Century Schoolbook",
+      "body_font": "Calibri",
+      "numeric_font": "Century Schoolbook"
+    },
+    "format": {
+      "cover_style": 10,
+      "title_style": "center",
+      "card_style": "solid",
+      "icon_style": "letter",
+      "divider_style": 5,
+      "footer_style": "left",
+      "bg_style": "tint",
+      "image_style": "plain",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck060_azure_slate",
+    "name": "Azure Slate (Exam Revision Pack Benchmark)",
+    "deck_id": "deck060",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Exam Revision Pack",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "split",
+    "base_hue": 216.0,
+    "colors": {
+      "ink": "#181D25",
+      "primary": "#1B3050",
+      "secondary": "#696CC0",
+      "accent": "#888F4D",
+      "tint_a": "#F6F7F9",
+      "tint_b": "#E7ECF3",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F6F7F9",
+      "card_fill_alt": "#E7ECF3",
+      "neutral": "#F6F7F9",
+      "text_primary": "#181D25",
+      "text_secondary": "#575F6B",
+      "line": "#D0D5DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.92,
+      "onPrimary_on_primary": 13.25,
+      "onAccent_on_accent": 5.04,
+      "muted_on_bg": 6.45
+    },
+    "typography": {
+      "title_font": "Segoe UI",
+      "body_font": "Calibri",
+      "numeric_font": "Segoe UI"
+    },
+    "format": {
+      "cover_style": 3,
+      "title_style": "kicker",
+      "card_style": "glass",
+      "icon_style": "rounded",
+      "divider_style": 3,
+      "footer_style": "center",
+      "bg_style": "tint",
+      "image_style": "matte",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck061_crimson_tonic",
+    "name": "Crimson Tonic (Roadmap Narrative Benchmark)",
+    "deck_id": "deck061",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Roadmap Narrative",
+    "subject": "History",
+    "mode": "tint",
+    "scheme": "triadic",
+    "base_hue": 353.5,
+    "colors": {
+      "ink": "#211214",
+      "primary": "#A41C2B",
+      "secondary": "#B9688F",
+      "accent": "#3846B9",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#EBD4D6",
+      "alert": "#DC2626",
+      "background": "#F5E2E4",
+      "paper": "#F5E2E4",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#EBD4D6",
+      "neutral": "#FFFFFF",
+      "text_primary": "#211214",
+      "text_secondary": "#694F52",
+      "line": "#D9BFC2",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 14.54,
+      "onPrimary_on_primary": 7.56,
+      "onAccent_on_accent": 7.65,
+      "muted_on_bg": 5.94
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Calibri",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 7,
+      "title_style": "kicker",
+      "card_style": "solid",
+      "icon_style": "rounded",
+      "divider_style": 1,
+      "footer_style": "left",
+      "bg_style": "plain",
+      "image_style": "matte",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck062_emerald_gallery",
+    "name": "Emerald Gallery (Roadmap Narrative Benchmark)",
+    "deck_id": "deck062",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Roadmap Narrative",
+    "subject": "Economics",
+    "mode": "light",
+    "scheme": "analogous",
+    "base_hue": 141.0,
+    "colors": {
+      "ink": "#1B221D",
+      "primary": "#2C6B42",
+      "secondary": "#77AC9D",
+      "accent": "#2BBFB5",
+      "tint_a": "#F2F6F3",
+      "tint_b": "#E2EEE6",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F2F6F3",
+      "card_fill_alt": "#E2EEE6",
+      "neutral": "#F2F6F3",
+      "text_primary": "#1B221D",
+      "text_secondary": "#5B675F",
+      "line": "#D3DAD5",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.24,
+      "onPrimary_on_primary": 6.39,
+      "onAccent_on_accent": 7.64,
+      "muted_on_bg": 5.92
+    },
+    "typography": {
+      "title_font": "Calibri",
+      "body_font": "Calibri",
+      "numeric_font": "Calibri"
+    },
+    "format": {
+      "cover_style": 10,
+      "title_style": "boxed",
+      "card_style": "glass",
+      "icon_style": "square",
+      "divider_style": 4,
+      "footer_style": "center",
+      "bg_style": "plain",
+      "image_style": "shadow",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck063_orchid_bloom",
+    "name": "Orchid Bloom (Roadmap Narrative Benchmark)",
+    "deck_id": "deck063",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Roadmap Narrative",
+    "subject": "Geography",
+    "mode": "tint",
+    "scheme": "split",
+    "base_hue": 308.5,
+    "colors": {
+      "ink": "#21121F",
+      "primary": "#821C74",
+      "secondary": "#A362B6",
+      "accent": "#66A244",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#EFD9EC",
+      "alert": "#DC2626",
+      "background": "#F8E5F5",
+      "paper": "#F8E5F5",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#EFD9EC",
+      "neutral": "#FFFFFF",
+      "text_primary": "#21121F",
+      "text_secondary": "#694F65",
+      "line": "#D9BFD5",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 14.96,
+      "onPrimary_on_primary": 8.87,
+      "onAccent_on_accent": 5.65,
+      "muted_on_bg": 6.03
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Arial",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 3,
+      "title_style": "sidebar",
+      "card_style": "outline",
+      "icon_style": "circle",
+      "divider_style": 2,
+      "footer_style": "tag",
+      "bg_style": "plain",
+      "image_style": "frame",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck064_amber_mist",
+    "name": "Amber Mist (Roadmap Narrative Benchmark)",
+    "deck_id": "deck064",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Roadmap Narrative",
+    "subject": "History",
+    "mode": "tint",
+    "scheme": "complementary",
+    "base_hue": 51.0,
+    "colors": {
+      "ink": "#211F12",
+      "primary": "#786E2E",
+      "secondary": "#A07F60",
+      "accent": "#1A30AB",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#EFEBD6",
+      "alert": "#DC2626",
+      "background": "#F8F5E3",
+      "paper": "#F8F5E3",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#EFEBD6",
+      "neutral": "#FFFFFF",
+      "text_primary": "#211F12",
+      "text_secondary": "#69654F",
+      "line": "#D9D5BF",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 15.09,
+      "onPrimary_on_primary": 5.16,
+      "onAccent_on_accent": 10.22,
+      "muted_on_bg": 5.36
+    },
+    "typography": {
+      "title_font": "Century Schoolbook",
+      "body_font": "Calibri",
+      "numeric_font": "Century Schoolbook"
+    },
+    "format": {
+      "cover_style": 6,
+      "title_style": "panel",
+      "card_style": "solid",
+      "icon_style": "letter",
+      "divider_style": 5,
+      "footer_style": "none",
+      "bg_style": "plain",
+      "image_style": "plain",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck065_teal_lantern",
+    "name": "Teal Lantern (Roadmap Narrative Benchmark)",
+    "deck_id": "deck065",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Roadmap Narrative",
+    "subject": "Geography",
+    "mode": "light",
+    "scheme": "mono",
+    "base_hue": 183.5,
+    "colors": {
+      "ink": "#192324",
+      "primary": "#1B565A",
+      "secondary": "#5EA6AB",
+      "accent": "#2C9CC3",
+      "tint_a": "#F6F9FA",
+      "tint_b": "#E2EDEE",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F6F9FA",
+      "card_fill_alt": "#E2EDEE",
+      "neutral": "#F6F9FA",
+      "text_primary": "#192324",
+      "text_secondary": "#596869",
+      "line": "#D1DBDB",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.06,
+      "onPrimary_on_primary": 8.32,
+      "onAccent_on_accent": 5.51,
+      "muted_on_bg": 5.82
+    },
+    "typography": {
+      "title_font": "Segoe UI",
+      "body_font": "Calibri",
+      "numeric_font": "Segoe UI"
+    },
+    "format": {
+      "cover_style": 9,
+      "title_style": "badge",
+      "card_style": "glass",
+      "icon_style": "rounded",
+      "divider_style": 3,
+      "footer_style": "left",
+      "bg_style": "plain",
+      "image_style": "matte",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck066_magenta_basalt",
+    "name": "Magenta Basalt (Roadmap Narrative Benchmark)",
+    "deck_id": "deck066",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Roadmap Narrative",
+    "subject": "Geography",
+    "mode": "dark",
+    "scheme": "split",
+    "base_hue": 326.0,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#AA3577",
+      "secondary": "#AC4AA5",
+      "accent": "#4AC2BA",
+      "tint_a": "#4C233A",
+      "tint_b": "#4E2A3E",
+      "alert": "#F43F5E",
+      "background": "#2B1725",
+      "paper": "#2B1725",
+      "card_fill": "#4C233A",
+      "card_fill_alt": "#4E2A3E",
+      "neutral": "#4C233A",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#C4ABB9",
+      "line": "#633650",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 15.48,
+      "onPrimary_on_primary": 6.03,
+      "onAccent_on_accent": 8.05,
+      "muted_on_bg": 7.89
+    },
+    "typography": {
+      "title_font": "Times New Roman",
+      "body_font": "Arial",
+      "numeric_font": "Times New Roman"
+    },
+    "format": {
+      "cover_style": 2,
+      "title_style": "center",
+      "card_style": "outline",
+      "icon_style": "square",
+      "divider_style": 1,
+      "footer_style": "center",
+      "bg_style": "plain",
+      "image_style": "shadow",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck067_citron_summit",
+    "name": "Citron Summit (Roadmap Narrative Benchmark)",
+    "deck_id": "deck067",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Roadmap Narrative",
+    "subject": "Economics",
+    "mode": "light",
+    "scheme": "complementary",
+    "base_hue": 98.5,
+    "colors": {
+      "ink": "#1E221B",
+      "primary": "#446D2E",
+      "secondary": "#84A984",
+      "accent": "#8428B7",
+      "tint_a": "#F3F6F1",
+      "tint_b": "#EAF2E6",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F3F6F1",
+      "card_fill_alt": "#EAF2E6",
+      "neutral": "#F3F6F1",
+      "text_primary": "#1E221B",
+      "text_secondary": "#5F675B",
+      "line": "#D5DAD3",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.16,
+      "onPrimary_on_primary": 6.05,
+      "onAccent_on_accent": 7.07,
+      "muted_on_bg": 5.87
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Calibri",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 5,
+      "title_style": "kicker",
+      "card_style": "solid",
+      "icon_style": "circle",
+      "divider_style": 4,
+      "footer_style": "tag",
+      "bg_style": "plain",
+      "image_style": "frame",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck068_sapphire_glow",
+    "name": "Sapphire Glow (Roadmap Narrative Benchmark)",
+    "deck_id": "deck068",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Roadmap Narrative",
+    "subject": "Political Science",
+    "mode": "tint",
+    "scheme": "mono",
+    "base_hue": 246.0,
+    "colors": {
+      "ink": "#131221",
+      "primary": "#24198A",
+      "secondary": "#716AB5",
+      "accent": "#4135B1",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#D1CEED",
+      "alert": "#DC2626",
+      "background": "#EBEAF7",
+      "paper": "#EBEAF7",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#D1CEED",
+      "neutral": "#FFFFFF",
+      "text_primary": "#131221",
+      "text_secondary": "#524F69",
+      "line": "#C2BFD9",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 15.53,
+      "onPrimary_on_primary": 13.28,
+      "onAccent_on_accent": 8.86,
+      "muted_on_bg": 6.58
+    },
+    "typography": {
+      "title_font": "Trebuchet MS",
+      "body_font": "Calibri",
+      "numeric_font": "Trebuchet MS"
+    },
+    "format": {
+      "cover_style": 8,
+      "title_style": "boxed",
+      "card_style": "glass",
+      "icon_style": "letter",
+      "divider_style": 2,
+      "footer_style": "none",
+      "bg_style": "plain",
+      "image_style": "plain",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck069_vermilion_noir",
+    "name": "Vermilion Noir (Roadmap Narrative Benchmark)",
+    "deck_id": "deck069",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Roadmap Narrative",
+    "subject": "Political Science",
+    "mode": "dark",
+    "scheme": "triadic",
+    "base_hue": 13.5,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#C7765D",
+      "secondary": "#A73848",
+      "accent": "#55AB69",
+      "tint_a": "#45251C",
+      "tint_b": "#54362D",
+      "alert": "#F43F5E",
+      "background": "#2D1C1A",
+      "paper": "#2D1C1A",
+      "card_fill": "#45251C",
+      "card_fill_alt": "#54362D",
+      "neutral": "#45251C",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#C4B1AB",
+      "line": "#634036",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 15.0,
+      "onPrimary_on_primary": 5.12,
+      "onAccent_on_accent": 6.15,
+      "muted_on_bg": 7.91
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Arial",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 1,
+      "title_style": "sidebar",
+      "card_style": "outline",
+      "icon_style": "rounded",
+      "divider_style": 5,
+      "footer_style": "left",
+      "bg_style": "plain",
+      "image_style": "matte",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck070_emerald_twilight",
+    "name": "Emerald Twilight (Roadmap Narrative Benchmark)",
+    "deck_id": "deck070",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Roadmap Narrative",
+    "subject": "Political Science",
+    "mode": "dark",
+    "scheme": "analogous",
+    "base_hue": 151.1,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#4BAD7E",
+      "secondary": "#549A5F",
+      "accent": "#49B6C2",
+      "tint_a": "#253C31",
+      "tint_b": "#395145",
+      "alert": "#F43F5E",
+      "background": "#161E19",
+      "paper": "#161E19",
+      "card_fill": "#253C31",
+      "card_fill_alt": "#395145",
+      "neutral": "#253C31",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B0BFB8",
+      "line": "#3F5A4D",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 15.71,
+      "onPrimary_on_primary": 6.28,
+      "onAccent_on_accent": 7.25,
+      "muted_on_bg": 8.91
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Calibri",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 4,
+      "title_style": "panel",
+      "card_style": "solid",
+      "icon_style": "square",
+      "divider_style": 3,
+      "footer_style": "center",
+      "bg_style": "plain",
+      "image_style": "shadow",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck071_violet_terrace",
+    "name": "Violet Terrace (Compare and Contrast Brief Benchmark)",
+    "deck_id": "deck071",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Compare and Contrast Brief",
+    "subject": "History",
+    "mode": "light",
+    "scheme": "mono",
+    "base_hue": 288.6,
+    "colors": {
+      "ink": "#221825",
+      "primary": "#581169",
+      "secondary": "#A547BB",
+      "accent": "#B521D8",
+      "tint_a": "#F7F4F8",
+      "tint_b": "#F1E7F3",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F7F4F8",
+      "card_fill_alt": "#F1E7F3",
+      "neutral": "#F7F4F8",
+      "text_primary": "#221825",
+      "text_secondary": "#67576B",
+      "line": "#DAD0DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 17.14,
+      "onPrimary_on_primary": 12.36,
+      "onAccent_on_accent": 5.03,
+      "muted_on_bg": 6.66
+    },
+    "typography": {
+      "title_font": "Times New Roman",
+      "body_font": "Arial",
+      "numeric_font": "Times New Roman"
+    },
+    "format": {
+      "cover_style": 8,
+      "title_style": "panel",
+      "card_style": "outline",
+      "icon_style": "square",
+      "divider_style": 1,
+      "footer_style": "left",
+      "bg_style": "panel",
+      "image_style": "shadow",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck072_marigold_studio",
+    "name": "Marigold Studio (Compare and Contrast Brief Benchmark)",
+    "deck_id": "deck072",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Compare and Contrast Brief",
+    "subject": "Economics",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 66.1,
+    "colors": {
+      "ink": "#22221B",
+      "primary": "#45472C",
+      "secondary": "#8DA374",
+      "accent": "#32757D",
+      "tint_a": "#F8F9F6",
+      "tint_b": "#F1F2E8",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F8F9F6",
+      "card_fill_alt": "#F1F2E8",
+      "neutral": "#F8F9F6",
+      "text_primary": "#22221B",
+      "text_secondary": "#66675B",
+      "line": "#D9DAD3",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.0,
+      "onPrimary_on_primary": 9.59,
+      "onAccent_on_accent": 5.28,
+      "muted_on_bg": 5.74
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Calibri",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 1,
+      "title_style": "badge",
+      "card_style": "solid",
+      "icon_style": "circle",
+      "divider_style": 4,
+      "footer_style": "center",
+      "bg_style": "panel",
+      "image_style": "frame",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck073_cyan_canvas",
+    "name": "Cyan Canvas (Compare and Contrast Brief Benchmark)",
+    "deck_id": "deck073",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Compare and Contrast Brief",
+    "subject": "Geography",
+    "mode": "light",
+    "scheme": "analogous",
+    "base_hue": 203.6,
+    "colors": {
+      "ink": "#182025",
+      "primary": "#1C6A9B",
+      "secondary": "#4A66BE",
+      "accent": "#1B1EB4",
+      "tint_a": "#F3F6F8",
+      "tint_b": "#E4EDF4",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F3F6F8",
+      "card_fill_alt": "#E4EDF4",
+      "neutral": "#F3F6F8",
+      "text_primary": "#182025",
+      "text_secondary": "#57636B",
+      "line": "#D0D8DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.51,
+      "onPrimary_on_primary": 5.86,
+      "onAccent_on_accent": 11.1,
+      "muted_on_bg": 6.17
+    },
+    "typography": {
+      "title_font": "Trebuchet MS",
+      "body_font": "Calibri",
+      "numeric_font": "Trebuchet MS"
+    },
+    "format": {
+      "cover_style": 4,
+      "title_style": "center",
+      "card_style": "glass",
+      "icon_style": "letter",
+      "divider_style": 2,
+      "footer_style": "tag",
+      "bg_style": "panel",
+      "image_style": "plain",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck074_crimson_dawn",
+    "name": "Crimson Dawn (Compare and Contrast Brief Benchmark)",
+    "deck_id": "deck074",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Compare and Contrast Brief",
+    "subject": "History",
+    "mode": "light",
+    "scheme": "split",
+    "base_hue": 351.1,
+    "colors": {
+      "ink": "#25181A",
+      "primary": "#9A2133",
+      "secondary": "#CE836E",
+      "accent": "#4AB36F",
+      "tint_a": "#F7F1F2",
+      "tint_b": "#F3E1E4",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F7F1F2",
+      "card_fill_alt": "#F3E1E4",
+      "neutral": "#F7F1F2",
+      "text_primary": "#25181A",
+      "text_secondary": "#6B575A",
+      "line": "#DCD0D2",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 17.15,
+      "onPrimary_on_primary": 7.96,
+      "onAccent_on_accent": 6.6,
+      "muted_on_bg": 6.7
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Arial",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 7,
+      "title_style": "kicker",
+      "card_style": "outline",
+      "icon_style": "rounded",
+      "divider_style": 5,
+      "footer_style": "none",
+      "bg_style": "panel",
+      "image_style": "matte",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck075_fern_breeze",
+    "name": "Fern Breeze (Compare and Contrast Brief Benchmark)",
+    "deck_id": "deck075",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Compare and Contrast Brief",
+    "subject": "Geography",
+    "mode": "tint",
+    "scheme": "complementary",
+    "base_hue": 118.6,
+    "colors": {
+      "ink": "#151E15",
+      "primary": "#436F42",
+      "secondary": "#93AE81",
+      "accent": "#B41FB8",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#DFEADF",
+      "alert": "#DC2626",
+      "background": "#E5F2E4",
+      "paper": "#E5F2E4",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#DFEADF",
+      "neutral": "#FFFFFF",
+      "text_primary": "#151E15",
+      "text_secondary": "#546454",
+      "line": "#C5D4C4",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 14.78,
+      "onPrimary_on_primary": 5.85,
+      "onAccent_on_accent": 5.48,
+      "muted_on_bg": 5.45
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Calibri",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 10,
+      "title_style": "boxed",
+      "card_style": "solid",
+      "icon_style": "square",
+      "divider_style": 3,
+      "footer_style": "left",
+      "bg_style": "panel",
+      "image_style": "shadow",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck076_sapphire_eclipse",
+    "name": "Sapphire Eclipse (Compare and Contrast Brief Benchmark)",
+    "deck_id": "deck076",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Compare and Contrast Brief",
+    "subject": "Geography",
+    "mode": "dark",
+    "scheme": "analogous",
+    "base_hue": 256.1,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#6142B5",
+      "secondary": "#773C99",
+      "accent": "#618AE5",
+      "tint_a": "#29233B",
+      "tint_b": "#342A4E",
+      "alert": "#F43F5E",
+      "background": "#181123",
+      "paper": "#181123",
+      "card_fill": "#29233B",
+      "card_fill_alt": "#342A4E",
+      "neutral": "#29233B",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B2ABC4",
+      "line": "#423663",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.95,
+      "onPrimary_on_primary": 7.11,
+      "onAccent_on_accent": 5.2,
+      "muted_on_bg": 8.32
+    },
+    "typography": {
+      "title_font": "Bookman Old Style",
+      "body_font": "Arial",
+      "numeric_font": "Bookman Old Style"
+    },
+    "format": {
+      "cover_style": 3,
+      "title_style": "sidebar",
+      "card_style": "glass",
+      "icon_style": "circle",
+      "divider_style": 1,
+      "footer_style": "center",
+      "bg_style": "panel",
+      "image_style": "frame",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck077_ember_gallery",
+    "name": "Ember Gallery (Compare and Contrast Brief Benchmark)",
+    "deck_id": "deck077",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Compare and Contrast Brief",
+    "subject": "Economics",
+    "mode": "light",
+    "scheme": "split",
+    "base_hue": 33.6,
+    "colors": {
+      "ink": "#251F18",
+      "primary": "#4C361B",
+      "secondary": "#9F9C79",
+      "accent": "#3A32B7",
+      "tint_a": "#F8F7F5",
+      "tint_b": "#F2E8DC",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F8F7F5",
+      "card_fill_alt": "#F2E8DC",
+      "neutral": "#F8F7F5",
+      "text_primary": "#251F18",
+      "text_secondary": "#6B6257",
+      "line": "#DCD7D0",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.31,
+      "onPrimary_on_primary": 11.35,
+      "onAccent_on_accent": 9.05,
+      "muted_on_bg": 5.98
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Arial",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 6,
+      "title_style": "panel",
+      "card_style": "outline",
+      "icon_style": "letter",
+      "divider_style": 4,
+      "footer_style": "tag",
+      "bg_style": "panel",
+      "image_style": "plain",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck078_azure_horizon",
+    "name": "Azure Horizon (Compare and Contrast Brief Benchmark)",
+    "deck_id": "deck078",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Compare and Contrast Brief",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "complementary",
+    "base_hue": 211.1,
+    "colors": {
+      "ink": "#181E25",
+      "primary": "#184C83",
+      "secondary": "#5BA3B0",
+      "accent": "#C77721",
+      "tint_a": "#F2F6F9",
+      "tint_b": "#E4ECF4",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F2F6F9",
+      "card_fill_alt": "#E4ECF4",
+      "neutral": "#F2F6F9",
+      "text_primary": "#181E25",
+      "text_secondary": "#57616B",
+      "line": "#D0D6DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.78,
+      "onPrimary_on_primary": 8.75,
+      "onAccent_on_accent": 5.05,
+      "muted_on_bg": 6.31
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Calibri",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 9,
+      "title_style": "badge",
+      "card_style": "solid",
+      "icon_style": "rounded",
+      "divider_style": 2,
+      "footer_style": "none",
+      "bg_style": "panel",
+      "image_style": "matte",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck079_orchid_parchment",
+    "name": "Orchid Parchment (Compare and Contrast Brief Benchmark)",
+    "deck_id": "deck079",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Compare and Contrast Brief",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "mono",
+    "base_hue": 308.6,
+    "colors": {
+      "ink": "#251823",
+      "primary": "#641E5A",
+      "secondary": "#B24DA4",
+      "accent": "#B1289E",
+      "tint_a": "#F9F3F8",
+      "tint_b": "#F3E1F1",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F9F3F8",
+      "card_fill_alt": "#F3E1F1",
+      "neutral": "#F9F3F8",
+      "text_primary": "#251823",
+      "text_secondary": "#6B5768",
+      "line": "#DCD0DB",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 17.02,
+      "onPrimary_on_primary": 11.2,
+      "onAccent_on_accent": 5.73,
+      "muted_on_bg": 6.59
+    },
+    "typography": {
+      "title_font": "Calibri",
+      "body_font": "Calibri",
+      "numeric_font": "Calibri"
+    },
+    "format": {
+      "cover_style": 2,
+      "title_style": "center",
+      "card_style": "glass",
+      "icon_style": "square",
+      "divider_style": 5,
+      "footer_style": "left",
+      "bg_style": "panel",
+      "image_style": "shadow",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck080_citron_lantern",
+    "name": "Citron Lantern (Compare and Contrast Brief Benchmark)",
+    "deck_id": "deck080",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Compare and Contrast Brief",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 86.1,
+    "colors": {
+      "ink": "#1F221B",
+      "primary": "#43552B",
+      "secondary": "#719D66",
+      "accent": "#982D6A",
+      "tint_a": "#F8F9F7",
+      "tint_b": "#EAEEE5",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F8F9F7",
+      "card_fill_alt": "#EAEEE5",
+      "neutral": "#F8F9F7",
+      "text_primary": "#1F221B",
+      "text_secondary": "#62675B",
+      "line": "#D7DAD3",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.12,
+      "onPrimary_on_primary": 8.16,
+      "onAccent_on_accent": 7.2,
+      "muted_on_bg": 5.82
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Arial",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 5,
+      "title_style": "kicker",
+      "card_style": "outline",
+      "icon_style": "circle",
+      "divider_style": 3,
+      "footer_style": "center",
+      "bg_style": "panel",
+      "image_style": "frame",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck081_azure_meadow",
+    "name": "Azure Meadow (Lesson Plan Benchmark)",
+    "deck_id": "deck081",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Lesson Plan",
+    "subject": "History",
+    "mode": "light",
+    "scheme": "complementary",
+    "base_hue": 223.6,
+    "colors": {
+      "ink": "#181C25",
+      "primary": "#344B8A",
+      "secondary": "#665DC2",
+      "accent": "#806827",
+      "tint_a": "#F3F5F8",
+      "tint_b": "#DAE1F2",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F3F5F8",
+      "card_fill_alt": "#DAE1F2",
+      "neutral": "#F3F5F8",
+      "text_primary": "#181C25",
+      "text_secondary": "#575C6B",
+      "line": "#D0D3DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 17.05,
+      "onPrimary_on_primary": 8.34,
+      "onAccent_on_accent": 5.35,
+      "muted_on_bg": 6.67
+    },
+    "typography": {
+      "title_font": "Bookman Old Style",
+      "body_font": "Arial",
+      "numeric_font": "Bookman Old Style"
+    },
+    "format": {
+      "cover_style": 9,
+      "title_style": "kicker",
+      "card_style": "glass",
+      "icon_style": "circle",
+      "divider_style": 1,
+      "footer_style": "left",
+      "bg_style": "tint",
+      "image_style": "frame",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck082_crimson_petal",
+    "name": "Crimson Petal (Lesson Plan Benchmark)",
+    "deck_id": "deck082",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Lesson Plan",
+    "subject": "Economics",
+    "mode": "tint",
+    "scheme": "mono",
+    "base_hue": 1.1,
+    "colors": {
+      "ink": "#211212",
+      "primary": "#91211F",
+      "secondary": "#AC6D6B",
+      "accent": "#B72F2D",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#EED3D2",
+      "alert": "#DC2626",
+      "background": "#F8E9E8",
+      "paper": "#F8E9E8",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#EED3D2",
+      "neutral": "#FFFFFF",
+      "text_primary": "#211212",
+      "text_secondary": "#694F4F",
+      "line": "#D9C0BF",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 15.36,
+      "onPrimary_on_primary": 8.6,
+      "onAccent_on_accent": 6.07,
+      "muted_on_bg": 6.29
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Arial",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 2,
+      "title_style": "boxed",
+      "card_style": "outline",
+      "icon_style": "letter",
+      "divider_style": 4,
+      "footer_style": "center",
+      "bg_style": "tint",
+      "image_style": "plain",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck083_emerald_abyss",
+    "name": "Emerald Abyss (Lesson Plan Benchmark)",
+    "deck_id": "deck083",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Lesson Plan",
+    "subject": "Geography",
+    "mode": "dark",
+    "scheme": "triadic",
+    "base_hue": 138.7,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#4AA666",
+      "secondary": "#4D7F6F",
+      "accent": "#D27449",
+      "tint_a": "#293C2F",
+      "tint_b": "#2F4436",
+      "alert": "#F43F5E",
+      "background": "#1B2721",
+      "paper": "#1B2721",
+      "card_fill": "#293C2F",
+      "card_fill_alt": "#2F4436",
+      "neutral": "#293C2F",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B0BFB5",
+      "line": "#3F5A47",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 14.27,
+      "onPrimary_on_primary": 5.75,
+      "onAccent_on_accent": 5.25,
+      "muted_on_bg": 8.07
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Calibri",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 5,
+      "title_style": "sidebar",
+      "card_style": "solid",
+      "icon_style": "rounded",
+      "divider_style": 2,
+      "footer_style": "tag",
+      "bg_style": "tint",
+      "image_style": "matte",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck084_violet_orchard",
+    "name": "Violet Orchard (Lesson Plan Benchmark)",
+    "deck_id": "deck084",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Lesson Plan",
+    "subject": "History",
+    "mode": "light",
+    "scheme": "analogous",
+    "base_hue": 286.2,
+    "colors": {
+      "ink": "#221825",
+      "primary": "#7C2596",
+      "secondary": "#C36AB7",
+      "accent": "#4B30C1",
+      "tint_a": "#F6F3F6",
+      "tint_b": "#EEE1F2",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F6F3F6",
+      "card_fill_alt": "#EEE1F2",
+      "neutral": "#F6F3F6",
+      "text_primary": "#221825",
+      "text_secondary": "#66576B",
+      "line": "#D9D0DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 17.14,
+      "onPrimary_on_primary": 8.2,
+      "onAccent_on_accent": 8.43,
+      "muted_on_bg": 6.69
+    },
+    "typography": {
+      "title_font": "Calibri",
+      "body_font": "Calibri",
+      "numeric_font": "Calibri"
+    },
+    "format": {
+      "cover_style": 8,
+      "title_style": "panel",
+      "card_style": "glass",
+      "icon_style": "square",
+      "divider_style": 5,
+      "footer_style": "none",
+      "bg_style": "tint",
+      "image_style": "shadow",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck085_amber_atlas",
+    "name": "Amber Atlas (Lesson Plan Benchmark)",
+    "deck_id": "deck085",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Lesson Plan",
+    "subject": "Geography",
+    "mode": "light",
+    "scheme": "split",
+    "base_hue": 58.7,
+    "colors": {
+      "ink": "#22221B",
+      "primary": "#73712E",
+      "secondary": "#C39854",
+      "accent": "#2F72B0",
+      "tint_a": "#F8F8F6",
+      "tint_b": "#EEEEE2",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F8F8F6",
+      "card_fill_alt": "#EEEEE2",
+      "neutral": "#F8F8F6",
+      "text_primary": "#22221B",
+      "text_secondary": "#67665B",
+      "line": "#DADAD3",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.0,
+      "onPrimary_on_primary": 5.08,
+      "onAccent_on_accent": 5.05,
+      "muted_on_bg": 5.79
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Arial",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 1,
+      "title_style": "badge",
+      "card_style": "outline",
+      "icon_style": "circle",
+      "divider_style": 3,
+      "footer_style": "left",
+      "bg_style": "tint",
+      "image_style": "frame",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck086_cyan_obsidian",
+    "name": "Cyan Obsidian (Lesson Plan Benchmark)",
+    "deck_id": "deck086",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Lesson Plan",
+    "subject": "Geography",
+    "mode": "dark",
+    "scheme": "triadic",
+    "base_hue": 191.2,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#38A8C1",
+      "secondary": "#587872",
+      "accent": "#D063BB",
+      "tint_a": "#283D41",
+      "tint_b": "#304B51",
+      "alert": "#F43F5E",
+      "background": "#101919",
+      "paper": "#101919",
+      "card_fill": "#283D41",
+      "card_fill_alt": "#304B51",
+      "neutral": "#283D41",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#ADBEC3",
+      "line": "#395960",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.5,
+      "onPrimary_on_primary": 6.25,
+      "onAccent_on_accent": 5.13,
+      "muted_on_bg": 9.3
+    },
+    "typography": {
+      "title_font": "Century Schoolbook",
+      "body_font": "Calibri",
+      "numeric_font": "Century Schoolbook"
+    },
+    "format": {
+      "cover_style": 4,
+      "title_style": "center",
+      "card_style": "solid",
+      "icon_style": "letter",
+      "divider_style": 1,
+      "footer_style": "center",
+      "bg_style": "tint",
+      "image_style": "plain",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck087_magenta_noir",
+    "name": "Magenta Noir (Lesson Plan Benchmark)",
+    "deck_id": "deck087",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Lesson Plan",
+    "subject": "Economics",
+    "mode": "dark",
+    "scheme": "analogous",
+    "base_hue": 328.7,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#BB2F78",
+      "secondary": "#B944AC",
+      "accent": "#C663D1",
+      "tint_a": "#472336",
+      "tint_b": "#562E43",
+      "alert": "#F43F5E",
+      "background": "#261119",
+      "paper": "#261119",
+      "card_fill": "#472336",
+      "card_fill_alt": "#562E43",
+      "neutral": "#472336",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#C4ABB8",
+      "line": "#63364E",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.47,
+      "onPrimary_on_primary": 5.54,
+      "onAccent_on_accent": 5.06,
+      "muted_on_bg": 8.38
+    },
+    "typography": {
+      "title_font": "Segoe UI",
+      "body_font": "Calibri",
+      "numeric_font": "Segoe UI"
+    },
+    "format": {
+      "cover_style": 7,
+      "title_style": "kicker",
+      "card_style": "glass",
+      "icon_style": "rounded",
+      "divider_style": 4,
+      "footer_style": "tag",
+      "bg_style": "tint",
+      "image_style": "matte",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck088_lime_twilight",
+    "name": "Lime Twilight (Lesson Plan Benchmark)",
+    "deck_id": "deck088",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Lesson Plan",
+    "subject": "Political Science",
+    "mode": "dark",
+    "scheme": "split",
+    "base_hue": 106.2,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#858B83",
+      "secondary": "#829664",
+      "accent": "#9780D5",
+      "tint_a": "#293325",
+      "tint_b": "#384933",
+      "alert": "#F43F5E",
+      "background": "#1C2318",
+      "paper": "#1C2318",
+      "card_fill": "#293325",
+      "card_fill_alt": "#384933",
+      "neutral": "#293325",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B3BFB0",
+      "line": "#455A3F",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 14.88,
+      "onPrimary_on_primary": 4.99,
+      "onAccent_on_accent": 5.27,
+      "muted_on_bg": 8.44
+    },
+    "typography": {
+      "title_font": "Times New Roman",
+      "body_font": "Arial",
+      "numeric_font": "Times New Roman"
+    },
+    "format": {
+      "cover_style": 10,
+      "title_style": "boxed",
+      "card_style": "outline",
+      "icon_style": "square",
+      "divider_style": 2,
+      "footer_style": "none",
+      "bg_style": "tint",
+      "image_style": "shadow",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck089_crimson_dawn_2",
+    "name": "Crimson Dawn 2 (Lesson Plan Benchmark)",
+    "deck_id": "deck089",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Lesson Plan",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "complementary",
+    "base_hue": 3.7,
+    "colors": {
+      "ink": "#251918",
+      "primary": "#511D1A",
+      "secondary": "#BE7A47",
+      "accent": "#3CAAB1",
+      "tint_a": "#F7F1F1",
+      "tint_b": "#F2E3E2",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F7F1F1",
+      "card_fill_alt": "#F2E3E2",
+      "neutral": "#F7F1F1",
+      "text_primary": "#251918",
+      "text_secondary": "#6B5857",
+      "line": "#DCD1D0",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 17.06,
+      "onPrimary_on_primary": 13.63,
+      "onAccent_on_accent": 6.28,
+      "muted_on_bg": 6.65
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Calibri",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 3,
+      "title_style": "sidebar",
+      "card_style": "solid",
+      "icon_style": "circle",
+      "divider_style": 5,
+      "footer_style": "left",
+      "bg_style": "tint",
+      "image_style": "frame",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck090_vermilion_nocturne",
+    "name": "Vermilion Nocturne (Lesson Plan Benchmark)",
+    "deck_id": "deck090",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Lesson Plan",
+    "subject": "Political Science",
+    "mode": "dark",
+    "scheme": "mono",
+    "base_hue": 21.2,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#D26A30",
+      "secondary": "#B3673E",
+      "accent": "#D37F51",
+      "tint_a": "#41291C",
+      "tint_b": "#50382B",
+      "alert": "#F43F5E",
+      "background": "#1D160F",
+      "paper": "#1D160F",
+      "card_fill": "#41291C",
+      "card_fill_alt": "#50382B",
+      "neutral": "#41291C",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#C4B4AB",
+      "line": "#634636",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.51,
+      "onPrimary_on_primary": 4.84,
+      "onAccent_on_accent": 5.74,
+      "muted_on_bg": 8.91
+    },
+    "typography": {
+      "title_font": "Trebuchet MS",
+      "body_font": "Calibri",
+      "numeric_font": "Trebuchet MS"
+    },
+    "format": {
+      "cover_style": 6,
+      "title_style": "panel",
+      "card_style": "glass",
+      "icon_style": "letter",
+      "divider_style": 3,
+      "footer_style": "center",
+      "bg_style": "tint",
+      "image_style": "plain",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck091_jade_linen",
+    "name": "Jade Linen (Keynote Style Talk Benchmark)",
+    "deck_id": "deck091",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Keynote Style Talk",
+    "subject": "History",
+    "mode": "light",
+    "scheme": "split",
+    "base_hue": 168.7,
+    "colors": {
+      "ink": "#1B2221",
+      "primary": "#346D62",
+      "secondary": "#79A68D",
+      "accent": "#C63198",
+      "tint_a": "#F2F6F5",
+      "tint_b": "#DEEEEB",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F2F6F5",
+      "card_fill_alt": "#DEEEEB",
+      "neutral": "#F2F6F5",
+      "text_primary": "#1B2221",
+      "text_secondary": "#5B6765",
+      "line": "#D3DAD8",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.19,
+      "onPrimary_on_primary": 5.98,
+      "onAccent_on_accent": 4.89,
+      "muted_on_bg": 5.88
+    },
+    "typography": {
+      "title_font": "Century Schoolbook",
+      "body_font": "Calibri",
+      "numeric_font": "Century Schoolbook"
+    },
+    "format": {
+      "cover_style": 10,
+      "title_style": "panel",
+      "card_style": "solid",
+      "icon_style": "letter",
+      "divider_style": 1,
+      "footer_style": "left",
+      "bg_style": "plain",
+      "image_style": "plain",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck092_orchid_glow",
+    "name": "Orchid Glow (Keynote Style Talk Benchmark)",
+    "deck_id": "deck092",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Keynote Style Talk",
+    "subject": "Economics",
+    "mode": "tint",
+    "scheme": "complementary",
+    "base_hue": 306.2,
+    "colors": {
+      "ink": "#211220",
+      "primary": "#89227F",
+      "secondary": "#C05E92",
+      "accent": "#4B7C50",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#F0D6EE",
+      "alert": "#DC2626",
+      "background": "#F8E9F6",
+      "paper": "#F8E9F6",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#F0D6EE",
+      "neutral": "#FFFFFF",
+      "text_primary": "#211220",
+      "text_secondary": "#694F66",
+      "line": "#D9BFD6",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 15.34,
+      "onPrimary_on_primary": 8.08,
+      "onAccent_on_accent": 4.89,
+      "muted_on_bg": 6.18
+    },
+    "typography": {
+      "title_font": "Segoe UI",
+      "body_font": "Calibri",
+      "numeric_font": "Segoe UI"
+    },
+    "format": {
+      "cover_style": 3,
+      "title_style": "badge",
+      "card_style": "glass",
+      "icon_style": "rounded",
+      "divider_style": 4,
+      "footer_style": "center",
+      "bg_style": "plain",
+      "image_style": "matte",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck093_jade_basalt",
+    "name": "Jade Basalt (Keynote Style Talk Benchmark)",
+    "deck_id": "deck093",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Keynote Style Talk",
+    "subject": "Geography",
+    "mode": "dark",
+    "scheme": "mono",
+    "base_hue": 153.7,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#459572",
+      "secondary": "#598873",
+      "accent": "#54BFA5",
+      "tint_a": "#263830",
+      "tint_b": "#3A5449",
+      "alert": "#F43F5E",
+      "background": "#131E18",
+      "paper": "#131E18",
+      "card_fill": "#263830",
+      "card_fill_alt": "#3A5449",
+      "neutral": "#263830",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#B0BFB9",
+      "line": "#3F5A4E",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 15.8,
+      "onPrimary_on_primary": 4.8,
+      "onAccent_on_accent": 7.77,
+      "muted_on_bg": 8.97
+    },
+    "typography": {
+      "title_font": "Times New Roman",
+      "body_font": "Arial",
+      "numeric_font": "Times New Roman"
+    },
+    "format": {
+      "cover_style": 6,
+      "title_style": "center",
+      "card_style": "outline",
+      "icon_style": "square",
+      "divider_style": 2,
+      "footer_style": "tag",
+      "bg_style": "plain",
+      "image_style": "shadow",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck094_azure_parchment",
+    "name": "Azure Parchment (Keynote Style Talk Benchmark)",
+    "deck_id": "deck094",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Keynote Style Talk",
+    "subject": "History",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 211.2,
+    "colors": {
+      "ink": "#181E25",
+      "primary": "#133D6A",
+      "secondary": "#4EA4B4",
+      "accent": "#B03771",
+      "tint_a": "#F7F9FA",
+      "tint_b": "#E4EAF0",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F7F9FA",
+      "card_fill_alt": "#E4EAF0",
+      "neutral": "#F7F9FA",
+      "text_primary": "#181E25",
+      "text_secondary": "#57606B",
+      "line": "#D0D6DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#FFFFFF"
+    },
+    "contrast": {
+      "text_on_bg": 16.78,
+      "onPrimary_on_primary": 11.03,
+      "onAccent_on_accent": 5.78,
+      "muted_on_bg": 6.38
+    },
+    "typography": {
+      "title_font": "Cambria",
+      "body_font": "Calibri",
+      "numeric_font": "Cambria"
+    },
+    "format": {
+      "cover_style": 9,
+      "title_style": "kicker",
+      "card_style": "solid",
+      "icon_style": "circle",
+      "divider_style": 5,
+      "footer_style": "none",
+      "bg_style": "plain",
+      "image_style": "frame",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck095_rose_obsidian",
+    "name": "Rose Obsidian (Keynote Style Talk Benchmark)",
+    "deck_id": "deck095",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Keynote Style Talk",
+    "subject": "Geography",
+    "mode": "dark",
+    "scheme": "analogous",
+    "base_hue": 348.8,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#AC4659",
+      "secondary": "#8B5145",
+      "accent": "#E08447",
+      "tint_a": "#3E1D23",
+      "tint_b": "#5C323A",
+      "alert": "#F43F5E",
+      "background": "#291417",
+      "paper": "#291417",
+      "card_fill": "#3E1D23",
+      "card_fill_alt": "#5C323A",
+      "neutral": "#3E1D23",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#C4ABB0",
+      "line": "#63363E",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.06,
+      "onPrimary_on_primary": 5.56,
+      "onAccent_on_accent": 6.27,
+      "muted_on_bg": 8.12
+    },
+    "typography": {
+      "title_font": "Trebuchet MS",
+      "body_font": "Calibri",
+      "numeric_font": "Trebuchet MS"
+    },
+    "format": {
+      "cover_style": 2,
+      "title_style": "boxed",
+      "card_style": "glass",
+      "icon_style": "letter",
+      "divider_style": 3,
+      "footer_style": "left",
+      "bg_style": "plain",
+      "image_style": "plain",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck096_teal_noir",
+    "name": "Teal Noir (Keynote Style Talk Benchmark)",
+    "deck_id": "deck096",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Keynote Style Talk",
+    "subject": "Geography",
+    "mode": "dark",
+    "scheme": "mono",
+    "base_hue": 181.3,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#32B6B9",
+      "secondary": "#438A8B",
+      "accent": "#58BBBE",
+      "tint_a": "#1F3838",
+      "tint_b": "#2C4A4A",
+      "alert": "#F43F5E",
+      "background": "#121C1D",
+      "paper": "#121C1D",
+      "card_fill": "#1F3838",
+      "card_fill_alt": "#2C4A4A",
+      "neutral": "#1F3838",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#ADC2C3",
+      "line": "#395F60",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.03,
+      "onPrimary_on_primary": 7.07,
+      "onAccent_on_accent": 7.68,
+      "muted_on_bg": 9.33
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Arial",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 5,
+      "title_style": "sidebar",
+      "card_style": "outline",
+      "icon_style": "rounded",
+      "divider_style": 1,
+      "footer_style": "center",
+      "bg_style": "plain",
+      "image_style": "matte",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck097_indigo_summit",
+    "name": "Indigo Summit (Keynote Style Talk Benchmark)",
+    "deck_id": "deck097",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Keynote Style Talk",
+    "subject": "Economics",
+    "mode": "light",
+    "scheme": "triadic",
+    "base_hue": 268.8,
+    "colors": {
+      "ink": "#1E1825",
+      "primary": "#441577",
+      "secondary": "#857FB4",
+      "accent": "#47B47B",
+      "tint_a": "#F4F2F6",
+      "tint_b": "#EBE5F2",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F4F2F6",
+      "card_fill_alt": "#EBE5F2",
+      "neutral": "#F4F2F6",
+      "text_primary": "#1E1825",
+      "text_secondary": "#61576B",
+      "line": "#D6D0DC",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 17.32,
+      "onPrimary_on_primary": 12.97,
+      "onAccent_on_accent": 6.7,
+      "muted_on_bg": 6.81
+    },
+    "typography": {
+      "title_font": "Arial",
+      "body_font": "Calibri",
+      "numeric_font": "Arial"
+    },
+    "format": {
+      "cover_style": 8,
+      "title_style": "panel",
+      "card_style": "solid",
+      "icon_style": "square",
+      "divider_style": 4,
+      "footer_style": "tag",
+      "bg_style": "plain",
+      "image_style": "shadow",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck098_ember_harbor",
+    "name": "Ember Harbor (Keynote Style Talk Benchmark)",
+    "deck_id": "deck098",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Keynote Style Talk",
+    "subject": "Political Science",
+    "mode": "light",
+    "scheme": "analogous",
+    "base_hue": 41.3,
+    "colors": {
+      "ink": "#252118",
+      "primary": "#5B4719",
+      "secondary": "#AD7155",
+      "accent": "#8DAA41",
+      "tint_a": "#F7F6F2",
+      "tint_b": "#F2ECDE",
+      "alert": "#DC2626",
+      "background": "#FFFFFF",
+      "paper": "#FFFFFF",
+      "card_fill": "#F7F6F2",
+      "card_fill_alt": "#F2ECDE",
+      "neutral": "#F7F6F2",
+      "text_primary": "#252118",
+      "text_secondary": "#6B6557",
+      "line": "#DCD9D0",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.04,
+      "onPrimary_on_primary": 8.9,
+      "onAccent_on_accent": 6.6,
+      "muted_on_bg": 5.79
+    },
+    "typography": {
+      "title_font": "Bookman Old Style",
+      "body_font": "Arial",
+      "numeric_font": "Bookman Old Style"
+    },
+    "format": {
+      "cover_style": 1,
+      "title_style": "badge",
+      "card_style": "glass",
+      "icon_style": "circle",
+      "divider_style": 2,
+      "footer_style": "none",
+      "bg_style": "plain",
+      "image_style": "frame",
+      "density": "dense"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck099_teal_nocturne",
+    "name": "Teal Nocturne (Keynote Style Talk Benchmark)",
+    "deck_id": "deck099",
+    "family": "B",
+    "source": "training_dataset",
+    "purpose": "Keynote Style Talk",
+    "subject": "Political Science",
+    "mode": "dark",
+    "scheme": "split",
+    "base_hue": 188.8,
+    "colors": {
+      "ink": "#F4F6F8",
+      "primary": "#4E919D",
+      "secondary": "#4277AF",
+      "accent": "#CEA559",
+      "tint_a": "#213336",
+      "tint_b": "#2D484C",
+      "alert": "#F43F5E",
+      "background": "#101819",
+      "paper": "#101819",
+      "card_fill": "#213336",
+      "card_fill_alt": "#2D484C",
+      "neutral": "#213336",
+      "text_primary": "#F4F6F8",
+      "text_secondary": "#ADBFC3",
+      "line": "#395A60",
+      "onPrimary": "#1A1A1A",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 16.61,
+      "onPrimary_on_primary": 4.86,
+      "onAccent_on_accent": 7.58,
+      "muted_on_bg": 9.44
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Arial",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 4,
+      "title_style": "center",
+      "card_style": "outline",
+      "icon_style": "letter",
+      "divider_style": 5,
+      "footer_style": "left",
+      "bg_style": "plain",
+      "image_style": "plain",
+      "density": "balanced"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  },
+  {
+    "id": "preset_deck100_magenta_glow",
+    "name": "Magenta Glow (Keynote Style Talk Benchmark)",
+    "deck_id": "deck100",
+    "family": "A",
+    "source": "training_dataset",
+    "purpose": "Keynote Style Talk",
+    "subject": "Political Science",
+    "mode": "tint",
+    "scheme": "complementary",
+    "base_hue": 326.3,
+    "colors": {
+      "ink": "#21121A",
+      "primary": "#692B4E",
+      "secondary": "#BC44B3",
+      "accent": "#44B576",
+      "tint_a": "#FFFFFF",
+      "tint_b": "#ECD7E2",
+      "alert": "#DC2626",
+      "background": "#F6E4EE",
+      "paper": "#F6E4EE",
+      "card_fill": "#FFFFFF",
+      "card_fill_alt": "#ECD7E2",
+      "neutral": "#FFFFFF",
+      "text_primary": "#21121A",
+      "text_secondary": "#694F5D",
+      "line": "#D9BFCE",
+      "onPrimary": "#FFFFFF",
+      "onAccent": "#1A1A1A"
+    },
+    "contrast": {
+      "text_on_bg": 14.79,
+      "onPrimary_on_primary": 10.21,
+      "onAccent_on_accent": 6.73,
+      "muted_on_bg": 6.0
+    },
+    "typography": {
+      "title_font": "Georgia",
+      "body_font": "Calibri",
+      "numeric_font": "Georgia"
+    },
+    "format": {
+      "cover_style": 7,
+      "title_style": "kicker",
+      "card_style": "solid",
+      "icon_style": "rounded",
+      "divider_style": 3,
+      "footer_style": "center",
+      "bg_style": "plain",
+      "image_style": "matte",
+      "density": "airy"
+    },
+    "grid": {
+      "eyebrow_y": 0.45,
+      "title_y": 0.85,
+      "accent_tick_y": 1.72,
+      "content_start_y": 1.95,
+      "footer_y": 7.05
+    }
+  }
+]

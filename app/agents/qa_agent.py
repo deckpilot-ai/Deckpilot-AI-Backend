@@ -265,6 +265,10 @@ class PresentationQAAgent:
                         lead_slides[lead].add(idx)
 
             takeaway = _clean(slide.takeaway)
+            if "\u2014" in title or "—" in title or any("\u2014" in b or "—" in b for b in body_parts) or "\u2014" in takeaway or "—" in takeaway:
+                issues.append(cls._issue("excessive_punctuation", ValidationSeverity.LOW, ValidationCategory.CONTENT, idx, "Text contains an em dash; use a hyphen '-' instead", sid))
+            if not _clean(slide.speaker_notes):
+                issues.append(cls._issue("missing_notes", ValidationSeverity.MEDIUM, ValidationCategory.TECHNICAL, idx, f"Slide {idx} lacks substantive speaker notes", sid))
             if takeaway and (any(_similar(takeaway, b) >= 0.88 for b in body_parts) or _similar(takeaway, title) >= 0.9):
                 issues.append(cls._issue("duplicate_takeaway", ValidationSeverity.MEDIUM, ValidationCategory.CONTENT, idx, "Takeaway repeats the title or a bullet", sid))
             if len(body.split()) >= 12:

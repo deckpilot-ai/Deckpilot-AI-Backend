@@ -101,7 +101,10 @@ class ImageMatcher:
             score += 3.0
         elif image_type == "chart" and any(w in slide_lower for w in ("seats", "representation", "numbers", "data", "statistics", "percentage", "population")):
             score += 3.0
-        elif image_type in ("artefact", "photograph") and any(w in slide_lower for w in ("sadan", "bhavan", "building", "hall", "monument", "constitution", "emblem", "carving", "architecture")):
+        elif (
+            image_type == "artefact"
+            or (image_type == "photograph" and any(w in caption_lower for w in ("monument", "statue", "sculpture", "building", "hall", "carving", "emblem", "architecture", "temple", "relic", "pillar")))
+        ) and any(w in slide_lower for w in ("sadan", "bhavan", "building", "hall", "monument", "constitution", "emblem", "carving", "architecture", "temple", "relic")):
             score += 2.5
 
         # 3. Keyword / Entity Token Overlap
@@ -113,12 +116,21 @@ class ImageMatcher:
                     if (st in ct or ct in st) and len(min(st, ct, key=len)) >= 4:
                         sub_matches += 1
             score += sub_matches * 1.5
+        elif len(intersection) == 1:
+            # Single keyword overlap alone must not trigger match without strong specificity (>= 7 chars)
+            token = next(iter(intersection))
+            if len(token) >= 7:
+                score += 2.0
+            elif len(token) >= 5:
+                score += 1.4  # Single 5-6 letter token (e.g. 'ruler') stays below 1.5 threshold
+            else:
+                score += 0.8
         else:
             for token in intersection:
                 if len(token) >= 6:
                     score += 3.0
                 elif len(token) >= 4:
-                    score += 2.2
+                    score += 2.0
                 else:
                     score += 1.0
 

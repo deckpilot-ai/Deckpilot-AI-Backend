@@ -156,9 +156,16 @@ class CollisionDetectionEngine:
                         )
                     continue
 
-                # Check if one box legitimately contains the other (e.g. text or badge inside card container)
-                if (box_a.kind in ("card", "shape", "footer") and box_b.kind in ("text", "icon", "badge", "image", "shape", "footer") and box_a.contains(box_b)) or \
-                   (box_b.kind in ("card", "shape", "footer") and box_a.kind in ("text", "icon", "badge", "image", "shape", "footer") and box_b.contains(box_a)) or \
+                # Check if one box legitimately contains the other (e.g. text, badge, or inner card/container inside outer card container)
+                is_mat_container_pair = any(
+                    (t_a in box_a.name.lower() and t_b in box_b.name.lower()) or (t_b in box_a.name.lower() and t_a in box_b.name.lower())
+                    for t_a, t_b in [("mat", "container"), ("frame", "container"), ("mat", "photo"), ("frame", "photo"), ("canvas", "card")]
+                )
+                if is_mat_container_pair:
+                    continue
+
+                if (box_a.kind in ("card", "shape", "footer", "background") and box_b.kind in ("card", "text", "icon", "badge", "image", "shape", "footer") and box_a.contains(box_b, margin=0.15)) or \
+                   (box_b.kind in ("card", "shape", "footer", "background") and box_a.kind in ("card", "text", "icon", "badge", "image", "shape", "footer") and box_b.contains(box_a, margin=0.15)) or \
                    (box_a.kind == "badge" and box_b.kind in ("icon", "text") and box_a.contains(box_b)) or \
                    (box_b.kind == "badge" and box_a.kind in ("icon", "text") and box_b.contains(box_a)):
                     continue

@@ -21,6 +21,10 @@ LAYOUTS = (
     "icon_cards_3", "icon_cards_4_grid", "icon_rows", "stat_trio", "stat_hero",
     "compare_2col", "process_flow", "timeline_h", "chart_with_takeaway", "table_focus",
     "quote_big", "half_bleed_image", "closing_dark",
+    # 21 benchmark archetypes from deck_training_dataset
+    "cover", "agenda", "questions", "divider", "bullets_image", "bullets_cards",
+    "bullets_numbered", "stat", "stat_row", "statement", "gallery", "glossary",
+    "terms_cards", "facts", "activities", "summary",
 )
 
 DECK_DESIGN_SYSTEM_PROMPT = """
@@ -92,7 +96,7 @@ def strip_citations(text: str) -> str:
 
 def clean_text(value: Any) -> str:
     cleaned = strip_citations(str(value or ""))
-    cleaned = cleaned.replace("\u2014", " - ").replace("**", "").replace("Â·", " • ").replace("â€”", " - ").replace("", "")
+    cleaned = cleaned.replace("\u2014", " - ").replace("—", " - ").replace("**", "").replace("Â·", " • ").replace("â€”", " - ")
     return re.sub(r"[ \t]+", " ", cleaned).strip()
 
 

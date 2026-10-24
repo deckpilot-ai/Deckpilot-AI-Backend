@@ -3,9 +3,7 @@
 import json
 import logging
 import os
-from typing import Any
-
-from app.core.config import settings
+from typing import Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
@@ -155,8 +153,8 @@ BUILTIN_PRESETS: list[dict[str, Any]] = [
 class DesignPresetRegistry:
     """Manages persistent custom design presets extracted from PPT files."""
 
-    _memory_cache: dict[str, dict[str, Any]] = {}
-    _initialized: bool = False
+    _memory_cache: ClassVar[dict[str, dict[str, Any]]] = {}
+    _initialized: ClassVar[bool] = False
 
     @classmethod
     def _ensure_init(cls) -> None:
@@ -166,6 +164,18 @@ class DesignPresetRegistry:
         # Load builtins
         for p in BUILTIN_PRESETS:
             cls._memory_cache[p["id"]] = p
+
+        # Load bundled training dataset presets if present
+        resource_path = os.path.join(os.path.dirname(__file__), "..", "resources", "training_dataset_presets.json")
+        if os.path.exists(resource_path):
+            try:
+                with open(resource_path, "r", encoding="utf-8") as f:
+                    dataset_presets = json.load(f)
+                    for dp in dataset_presets:
+                        if isinstance(dp, dict) and "id" in dp:
+                            cls._memory_cache[dp["id"]] = dp
+            except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
+                logger.warning("Could not load bundled training presets: %s", e)
 
         # Load persisted presets from disk
         if os.path.exists(PRESETS_DIR):
@@ -177,7 +187,7 @@ class DesignPresetRegistry:
                             data = json.load(f)
                             if "id" in data:
                                 cls._memory_cache[data["id"]] = data
-                    except Exception as e:
+                    except (OSError, json.JSONDecodeError, KeyError, ValueError) as e:
                         logger.warning("Could not load preset file %s: %s", fname, e)
         cls._initialized = True
 
@@ -198,7 +208,7 @@ class DesignPresetRegistry:
             with open(fpath, "w", encoding="utf-8") as f:
                 json.dump(preset_data, f, indent=2)
             logger.info("Persisted design preset %s to %s", preset_id, fpath)
-        except Exception as e:
+        except OSError as e:
             logger.warning("Failed to persist preset %s to disk: %s", preset_id, e)
 
         return preset_data
@@ -212,3 +222,63 @@ class DesignPresetRegistry:
     def list_presets(cls) -> list[dict[str, Any]]:
         cls._ensure_init()
         return list(cls._memory_cache.values())
+
+    @classmethod
+    def find_presets(
+        cls,
+        purpose: str = "",
+        mode: str = "",
+        scheme: str = "",
+        subject: str = "",
+    ) -> list[dict[str, Any]]:
+        """Filter presets by purpose, mode, scheme, or subject."""
+        cls._ensure_init()
+        results = []
+        p_clean = purpose.lower().replace("-", " ").replace("_", " ").strip()
+        m_clean = mode.lower().strip()
+        s_clean = scheme.lower().strip()
+        subj_clean = subject.lower().strip()
+
+        for p in cls._memory_cache.values():
+            if p_clean:
+                p_purp = str(p.get("purpose", "")).lower().replace("-", " ").replace("_", " ").strip()
+                if not p_purp or (p_clean not in p_purp and p_purp not in p_clean):
+                    continue
+            if m_clean and p.get("mode", "").lower() != m_clean:
+                continue
+            if s_clean and p.get("scheme", "").lower() != s_clean:
+                continue
+            if subj_clean:
+                p_subj = str(p.get("subject", "")).lower().strip()
+                if not p_subj or (subj_clean not in p_subj and p_subj not in subj_clean):
+                    continue
+            results.append(p)
+        return results
+
+    @classmethod
+    def get_best_preset_for_request(
+        cls,
+        topic: str,
+        purpose: str = "",
+        mode: str = "",
+    ) -> dict[str, Any] | None:
+        """Find the most relevant benchmark preset for a user topic and purpose."""
+        cls._ensure_init()
+        matches = cls.find_presets(purpose=purpose, mode=mode)
+        if matches:
+            # Check subject alignment with topic
+            t_lower = topic.lower()
+            for m in matches:
+                subj = str(m.get("subject", "")).lower()
+                if subj and subj in t_lower:
+                    return m
+            return matches[0]
+
+        # Fallback to mode match
+        if mode:
+            mode_matches = cls.find_presets(mode=mode)
+            if mode_matches:
+                return mode_matches[0]
+
+        all_presets = cls.list_presets()
+        return all_presets[0] if all_presets else None

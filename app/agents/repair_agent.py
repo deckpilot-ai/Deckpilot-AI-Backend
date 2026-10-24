@@ -26,7 +26,7 @@ from app.services.text_measurement import TextMeasurementService
 
 def _clean_text(text: Any) -> str:
     value = strip_citations(str(text or ""))
-    value = value.replace("Â·", " • ").replace("â€”", " - ").replace("", "")
+    value = value.replace("\u2014", " - ").replace("—", " - ").replace("Â·", " • ").replace("â€”", " - ")
     value = re.sub(r"\b(\w{3,})\s+\1\b", r"\1", value, flags=re.IGNORECASE)
     value = re.sub(r"([!?.,])\1+", r"\1", value)
     return re.sub(r"\s+", " ", value).strip()

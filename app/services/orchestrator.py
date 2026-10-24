@@ -52,6 +52,7 @@ from app.services.provider_router import ProviderRouter
 from app.services.renderer import PPTXRenderer
 from app.services.storage import storage_service
 from app.services.ws_manager import ws_manager
+from app.services.training_exemplar_service import TrainingExemplarService
 from app.tools.image_intelligence import ImageIntelligence
 from app.tools.reference_ppt_analyzer import ReferencePPTAnalyzer
 
@@ -645,6 +646,13 @@ class JobOrchestrator:
                         f"- Respond with valid JSON matching structure: {{'deckTitle': '{goal.topic}', 'slides': [...]}}"
                     )
 
+                few_shot_planner = TrainingExemplarService.get_planner_few_shot(
+                    purpose=str(getattr(goal, "presentation_type", "")),
+                    topic=goal.topic,
+                )
+                if few_shot_planner:
+                    planner_prompt += f"\n{few_shot_planner}\n"
+
                 _emit("deck_planner", "running", f"Structuring storyline across {target_slide_count} slides...")
 
                 deck_spec = None
@@ -792,6 +800,8 @@ class JobOrchestrator:
                         f"Preserve each planned topic and slideId exactly.\n"
                         f"Planned Slides Batch: {json.dumps(batch_slides)}"
                     )
+                    few_shot_writer = TrainingExemplarService.get_writer_few_shot()
+                    writer_batch_prompt += f"\n{few_shot_writer}\n"
 
                     writer_out = await asyncio.wait_for(
                         ProviderRouter.call_llm(

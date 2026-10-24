@@ -387,12 +387,40 @@ class StorylineAgent:
     ) -> LayoutFamily:
         # Check explicit layout hint first
         if hint:
+            h_clean = hint.lower().strip()
+            dataset_mapping = {
+                "cover": LayoutFamily.HERO,
+                "agenda": LayoutFamily.ROADMAP,
+                "roadmap": LayoutFamily.ROADMAP,
+                "questions": LayoutFamily.BIG_QUESTIONS,
+                "big_questions": LayoutFamily.BIG_QUESTIONS,
+                "divider": LayoutFamily.SECTION_DIVIDER,
+                "section_divider": LayoutFamily.SECTION_DIVIDER,
+                "bullets_image": LayoutFamily.TEXT_IMAGE,
+                "bullets_cards": LayoutFamily.CARD_GRID,
+                "bullets_numbered": LayoutFamily.A10_NUMBERED_PROCESS,
+                "two_column": LayoutFamily.TWO_COLUMN,
+                "stat": LayoutFamily.BIG_NUMBERS,
+                "stat_row": LayoutFamily.METRICS_GRID,
+                "quote": LayoutFamily.QUOTE,
+                "statement": LayoutFamily.HERO,
+                "image_focus": LayoutFamily.IMAGE_FOCUS,
+                "gallery": LayoutFamily.IMAGE_FOCUS,
+                "glossary": LayoutFamily.CARD_GRID,
+                "terms_cards": LayoutFamily.CARD_GRID,
+                "facts": LayoutFamily.CARD_GRID,
+                "activities": LayoutFamily.CARD_GRID,
+                "summary": LayoutFamily.A17_CLOSING_TAKEAWAYS,
+                "closing": LayoutFamily.CLOSING,
+            }
+            if h_clean in dataset_mapping:
+                return dataset_mapping[h_clean]
             for lf in LayoutFamily:
-                if lf.value.lower() == hint.lower() or lf.name.lower() == hint.lower():
+                if lf.value.lower() == h_clean or lf.name.lower() == h_clean:
                     return lf
-            if hint.lower() in ("bar_chart", "metrics", "chart"):
+            if h_clean in ("bar_chart", "metrics", "chart"):
                 return LayoutFamily.CHART_FOCUS
-            if hint.lower() in ("roadmap", "process_steps"):
+            if h_clean in ("roadmap", "process_steps"):
                 return LayoutFamily.PROCESS_STEPS
 
         if index == 0 and total_slides > 1:
