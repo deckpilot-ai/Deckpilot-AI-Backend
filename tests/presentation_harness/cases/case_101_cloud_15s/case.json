@@ -1,0 +1,18 @@
+{
+  "case_id": "case_101_cloud_15s",
+  "domain": "cloud",
+  "source_type": "data_heavy_kpi",
+  "target_slides": 15,
+  "prompt": "15 slides professional presentation covering strategic overview, key drivers, analytical frameworks, and execution roadmap for Cloud.",
+  "sources": [],
+  "expected_rules": {
+    "min_slides": 14,
+    "max_slides": 17,
+    "requires_timeline": false,
+    "requires_source_images": false,
+    "minimum_source_utilization": 0.0,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

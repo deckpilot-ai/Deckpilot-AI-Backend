@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from difflib import SequenceMatcher
@@ -16,13 +17,16 @@ from app.schemas.generation_state import (
     SlideSpec,
     ValidationSeverity,
 )
+from app.services.content_capacity_validator import ContentCapacityValidator
 from app.services.design_system import strip_citations
+from app.services.grid_engine import PresentationGridEngine
 from app.services.image_matcher import MIN_SEMANTIC_RELEVANCE, ImageMatcher
+from app.services.text_measurement import TextMeasurementService
 
 
 def _clean_text(text: Any) -> str:
     value = strip_citations(str(text or ""))
-    value = value.replace("Â·", " • ").replace("â€”", " - ").replace("", "")
+    value = value.replace("\u2014", " - ").replace("—", " - ").replace("Â·", " • ").replace("â€”", " - ")
     value = re.sub(r"\b(\w{3,})\s+\1\b", r"\1", value, flags=re.IGNORECASE)
     value = re.sub(r"([!?.,])\1+", r"\1", value)
     return re.sub(r"\s+", " ", value).strip()
@@ -112,14 +116,21 @@ class RepairAgent:
                 qualifier = _clean_text(slide.section or slide.objective)
                 slide.headline = f"{base}: {qualifier}"[:82] if qualifier and _norm(qualifier) not in _norm(base) else f"{base} ({slide.slide_number})"
             elif action == "shorten_title" and slide:
+                from app.presentation.themes.development_editorial.typography import normalize_title
                 raw = _clean_text(slide.headline or slide.key_message)
-                words = raw.split()[:10]
-                while len(" ".join(words)) > 82 and len(words) > 3:
-                    words.pop()
-                slide.headline = " ".join(words).rstrip(" ,:;-")
+                clean_title, _ = normalize_title(raw, max_words=4)
+                slide.headline = clean_title
             elif action in {"trim_bullets", "shorten_bullets", "shorten_and_reflow"} and slide:
-                slide.bullets = [cls._shorten(b, 22) for b in slide.bullets[:5]]
-                slide.archetype_fields["qa_font_scale"] = max(1.08, float(slide.archetype_fields.get("qa_font_scale", 1.0)))
+                word_limit = 18
+                shortened = [ContentCapacityValidator.shorten_phrase_intelligently(b, word_limit) for b in slide.bullets[:5]]
+                c_w = 3.65 if slide.layout_family == LayoutFamily.THREE_COLUMN else 5.85
+                c_h = 3.80
+                while word_limit > 10 and not TextMeasurementService.check_fits("\n".join(shortened), c_w, c_h, size=11.0, bullet_list=True):
+                    word_limit -= 2
+                    shortened = [ContentCapacityValidator.shorten_phrase_intelligently(b, word_limit) for b in shortened]
+                slide.bullets = shortened
+                slide.archetype_fields["qa_font_scale"] = min(0.95, float(slide.archetype_fields.get("qa_font_scale", 1.0)))
+                slide.archetype_fields["qa_repair_verified"] = True
             elif action == "dedupe_text" and slide:
                 cls._dedupe_slide(slide)
             elif action in {"normalize_spacing", "normalize_punctuation", "repair_encoding"} and slide:
@@ -185,7 +196,42 @@ class RepairAgent:
                     item.slide_number, item.slide_id = idx, f"s{idx:02d}"
             elif action in {"constrain_bounds", "resolve_overlap", "align_columns", "normalize_gutters", "restore_aspect_ratio"} and slide:
                 slide.archetype_fields["qa_safe_geometry"] = True
-                cls._choose_content_layout(slide)
+                bullets = [b for b in slide.bullets if _clean_text(b)]
+                if len(bullets) == 4 and slide.layout_family in (LayoutFamily.TWO_COLUMN, LayoutFamily.A7_TWO_COLUMN_CONTRAST):
+                    slide.layout_family = LayoutFamily.CARD_GRID
+                    slide.archetype_id = "A13"
+                    slide.layout_hint = "card_grid"
+                elif len(bullets) in (6, 7, 8) and slide.layout_family in (LayoutFamily.THREE_COLUMN, LayoutFamily.A11_STAGE_COLUMNS, LayoutFamily.A10_NUMBERED_PROCESS):
+                    slide.layout_family = LayoutFamily.COUNCIL_EIGHT
+                    slide.archetype_id = "A25"
+                    slide.layout_hint = "council_eight"
+                elif len(bullets) <= 2 and slide.layout_family == LayoutFamily.CARD_GRID:
+                    slide.layout_family = LayoutFamily.TWO_COLUMN
+                    slide.archetype_id = "A7"
+                    slide.layout_hint = "two_column"
+                else:
+                    slide.bullets = [ContentCapacityValidator.shorten_phrase_intelligently(b, 20) for b in bullets[:5]]
+                slide.archetype_fields["qa_repair_verified"] = True
+            elif action == "adapt_layout_to_content" and slide:
+                bullets = [b for b in slide.bullets if _clean_text(b)]
+                count = len(bullets)
+                if count >= 6:
+                    slide.layout_family = LayoutFamily.COUNCIL_EIGHT
+                    slide.archetype_id = "A25"
+                    slide.layout_hint = "council_eight"
+                elif count == 4:
+                    slide.layout_family = LayoutFamily.CARD_GRID
+                    slide.archetype_id = "A13"
+                    slide.layout_hint = "card_grid"
+                elif count == 3:
+                    slide.layout_family = LayoutFamily.THREE_COLUMN
+                    slide.archetype_id = "A11"
+                    slide.layout_hint = "three_column"
+                else:
+                    slide.layout_family = LayoutFamily.TWO_COLUMN
+                    slide.archetype_id = "A7"
+                    slide.layout_hint = "two_column"
+                slide.archetype_fields["qa_repair_verified"] = True
             elif action == "change_to_divider" and slide:
                 slide.layout_family = LayoutFamily.SECTION_DIVIDER
                 slide.layout_hint = LayoutFamily.SECTION_DIVIDER.value
@@ -366,6 +412,20 @@ class RepairAgent:
                         ImageMatcher.rematch_images_semantically(slides, assets)
                         images_rematched = True
 
+        # Phase 7: Post-Repair Measurement Verification Loop
+        for slide in slides:
+            if slide.bullets:
+                clean_b = [_clean_text(b) for b in slide.bullets if _clean_text(b)]
+                if clean_b:
+                    c_w = 3.65 if slide.layout_family == LayoutFamily.THREE_COLUMN else 5.85
+                    c_h = 3.80
+                    limit = 18
+                    while limit >= 10 and not TextMeasurementService.check_fits("\n".join(clean_b), c_w, c_h, size=11.0, bullet_list=True):
+                        clean_b = [ContentCapacityValidator.shorten_phrase_intelligently(b, limit) for b in clean_b]
+                        limit -= 2
+                    slide.bullets = clean_b
+                    slide.archetype_fields["qa_post_repair_verified"] = True
+
         cls._remove_duplicate_images(slides, assets)
         cls._normalize_layout_rhythm(slides)
         return slides
@@ -399,7 +459,7 @@ class RepairAgent:
             f"QUALITY DEFECTS EVALUATED BY QA:\n{issues_text}\n\n"
             "REQUIREMENTS:\n"
             "1. Resolve every detected issue.\n"
-            "2. If title is long (> 8 words), narrative, or vague, produce a crisp executive headline (< 8 words) without trailing periods.\n"
+            "2. If title is long (> 4 words), narrative, or vague, use LLM reasoning to synthesize an impactful executive headline STRICTLY 1 TO 4 WORDS (min 1, max 4 words) capturing the core essence of the slide without trailing periods.\n"
             "3. Ensure all bullets are concise, informative, grammatically complete, and free of leaked citations or repetition.\n"
             "4. If layout was flagged, select the best layoutHint from: 'two_column', 'card_grid', 'a5_definition', 'comparison', 'process_steps', 'timeline', 'metrics_grid', 'text_image'.\n"
             "5. Provide a sharp, value-oriented strategic takeaway.\n"
@@ -422,8 +482,12 @@ class RepairAgent:
                     if cand.get("headline"):
                         new_head = str(cand["headline"]).strip()
                         new_words = new_head.split()
-                        if len(new_words) <= 10:
+                        if 1 <= len(new_words) <= 4:
                             slide.headline = new_head
+                        elif len(new_words) > 4:
+                            from app.presentation.themes.development_editorial.typography import normalize_title
+                            clean_head, _ = normalize_title(new_head, max_words=4)
+                            slide.headline = clean_head
                     if isinstance(cand.get("bullets"), list) and cand["bullets"]:
                         cleaned = [str(b).strip() for b in cand["bullets"] if str(b).strip()]
                         if cleaned:
@@ -465,7 +529,16 @@ class RepairAgent:
     @staticmethod
     def _shorten(text: str, max_words: int) -> str:
         words = _clean_text(text).split()
-        return " ".join(words[:max_words]).rstrip(" ,:;-") + ("…" if len(words) > max_words else "")
+        if len(words) <= max_words:
+            return " ".join(words)
+        candidate = " ".join(words[:max_words]).rstrip(" ,:;-")
+        # If there's an earlier period within the candidate, end at that sentence
+        for punct in (". ", "; "):
+            if punct in candidate:
+                parts = candidate.rsplit(punct, 1)
+                if len(parts[0].split()) >= max(6, max_words // 2):
+                    return parts[0].strip() + "."
+        return candidate.rstrip(". ") + "."
 
     @staticmethod
     def _bad_placeholder(text: str) -> bool:

@@ -23,6 +23,7 @@ from app.db.engine import SessionLocal, engine
 from app.services.background_tasks import (
     background_task_registry,
     fail_interrupted_jobs,
+    start_data_cleaner_loop,
     start_health_probe_loop,
 )
 from app.services.diagnostics_service import DiagnosticsService
@@ -56,6 +57,10 @@ async def lifespan(app: FastAPI):
     background_task_registry.create(start_health_probe_loop())
     logger.info("Background health probe loop launched")
 
+    # Start background storage data cleaner loop (3-day retention policy)
+    background_task_registry.create(start_data_cleaner_loop())
+    logger.info("Background storage data cleaner loop launched")
+
     try:
         yield
     finally:
@@ -78,6 +83,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_host_li
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.frontend_origins,
+    allow_origin_regex=r"^https://([a-zA-Z0-9-]+\.)*deckpilotai\.com$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],

@@ -18,6 +18,7 @@ from app.schemas.generation_state import (
     TableSpec,
 )
 from app.skills.skill_registry import get_skill_for_request
+from app.services.content_capacity_validator import ContentCapacityValidator
 from app.services.design_system import clean_text
 
 logger = logging.getLogger(__name__)
@@ -285,6 +286,7 @@ class StorylineAgent:
                     content_type=c_type,
                     content_summary=purpose,
                     previous_archetype=prev_arch,
+                    used_archetypes=recent_archetypes,
                     has_image=bool(img_id),
                     has_chart=bool(chart_spec),
                     has_table=bool(table_spec),
@@ -320,6 +322,54 @@ class StorylineAgent:
                 dark_background=(is_first and count > 1) or (is_last and count > 1) or (chosen_layout in (LayoutFamily.DARK_QUOTE, LayoutFamily.SECTION_DIVIDER)),
                 layout_hint=raw_slide.get("layoutHint") or raw_slide.get("layout_hint") or chosen_layout.value,
             )
+
+            # Pre-render capacity check and layout adaptation
+            fit_status = ContentCapacityValidator.check_layout_fit(spec, chosen_layout)
+            if fit_status == "OVERFLOW":
+                if len(bullets) == 4:
+                    spec.layout_family = LayoutFamily.CARD_GRID
+                    spec.archetype_id = "A13"
+                    spec.layout_hint = "card_grid"
+                elif len(bullets) >= 6:
+                    spec.layout_family = LayoutFamily.COUNCIL_EIGHT
+                    spec.archetype_id = "A25"
+                    spec.layout_hint = "council_eight"
+            elif fit_status == "UNDERFILL" and not is_first and not is_last and not img_id:
+                if len(bullets) <= 2:
+                    prev_arch = planned_specs[-1].archetype_id if planned_specs else None
+                    if prev_arch == "A7" or (planned_specs and planned_specs[-1].layout_family == LayoutFamily.TWO_COLUMN):
+                        spec.layout_family = LayoutFamily.A5_DEFINITION
+                        spec.archetype_id = "A5"
+                        spec.layout_hint = "definition"
+                    else:
+                        spec.layout_family = LayoutFamily.TWO_COLUMN
+                        spec.archetype_id = "A7"
+                        spec.layout_hint = "two_column"
+
+            # Strict anti-repetition guard against preceding slide
+            if planned_specs and not is_first and not is_last:
+                prev_slide = planned_specs[-1]
+                if spec.archetype_id and spec.archetype_id == prev_slide.archetype_id:
+                    alt_archs = ["A26", "A6", "A10", "A5", "A13", "A29", "A12"]
+                    alt = next((a for a in alt_archs if a != prev_slide.archetype_id and a not in recent_archetypes[-2:]), "A26")
+                    spec.archetype_id = alt
+                    for lf in LayoutFamily:
+                        if lf.value == alt or lf.name.startswith(f"{alt}_"):
+                            spec.layout_family = lf
+                            spec.layout_hint = lf.value
+                            break
+                elif spec.layout_family == prev_slide.layout_family and spec.layout_family != LayoutFamily.SECTION_DIVIDER:
+                    alt_families = [
+                        LayoutFamily.CARD_GRID,
+                        LayoutFamily.COMPARISON,
+                        LayoutFamily.METRICS_GRID,
+                        LayoutFamily.A5_DEFINITION,
+                        LayoutFamily.PROCESS_STEPS,
+                    ]
+                    alt_lf = next((lf for lf in alt_families if lf != prev_slide.layout_family), LayoutFamily.CARD_GRID)
+                    spec.layout_family = alt_lf
+                    spec.layout_hint = alt_lf.value
+
             planned_specs.append(spec)
 
         return planned_specs
@@ -337,12 +387,40 @@ class StorylineAgent:
     ) -> LayoutFamily:
         # Check explicit layout hint first
         if hint:
+            h_clean = hint.lower().strip()
+            dataset_mapping = {
+                "cover": LayoutFamily.HERO,
+                "agenda": LayoutFamily.ROADMAP,
+                "roadmap": LayoutFamily.ROADMAP,
+                "questions": LayoutFamily.BIG_QUESTIONS,
+                "big_questions": LayoutFamily.BIG_QUESTIONS,
+                "divider": LayoutFamily.SECTION_DIVIDER,
+                "section_divider": LayoutFamily.SECTION_DIVIDER,
+                "bullets_image": LayoutFamily.TEXT_IMAGE,
+                "bullets_cards": LayoutFamily.CARD_GRID,
+                "bullets_numbered": LayoutFamily.A10_NUMBERED_PROCESS,
+                "two_column": LayoutFamily.TWO_COLUMN,
+                "stat": LayoutFamily.BIG_NUMBERS,
+                "stat_row": LayoutFamily.METRICS_GRID,
+                "quote": LayoutFamily.QUOTE,
+                "statement": LayoutFamily.HERO,
+                "image_focus": LayoutFamily.IMAGE_FOCUS,
+                "gallery": LayoutFamily.IMAGE_FOCUS,
+                "glossary": LayoutFamily.CARD_GRID,
+                "terms_cards": LayoutFamily.CARD_GRID,
+                "facts": LayoutFamily.CARD_GRID,
+                "activities": LayoutFamily.CARD_GRID,
+                "summary": LayoutFamily.A17_CLOSING_TAKEAWAYS,
+                "closing": LayoutFamily.CLOSING,
+            }
+            if h_clean in dataset_mapping:
+                return dataset_mapping[h_clean]
             for lf in LayoutFamily:
-                if lf.value.lower() == hint.lower() or lf.name.lower() == hint.lower():
+                if lf.value.lower() == h_clean or lf.name.lower() == h_clean:
                     return lf
-            if hint.lower() in ("bar_chart", "metrics", "chart"):
+            if h_clean in ("bar_chart", "metrics", "chart"):
                 return LayoutFamily.CHART_FOCUS
-            if hint.lower() in ("roadmap", "process_steps"):
+            if h_clean in ("roadmap", "process_steps"):
                 return LayoutFamily.PROCESS_STEPS
 
         if index == 0 and total_slides > 1:

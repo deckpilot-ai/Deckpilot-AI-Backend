@@ -1,0 +1,1 @@
+8 slides quantum computing principles: superposition, entanglement, qubit decoherence, and error mitigation.

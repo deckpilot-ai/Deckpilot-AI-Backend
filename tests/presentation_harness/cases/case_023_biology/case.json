@@ -1,0 +1,20 @@
+{
+  "case_id": "case_023_biology",
+  "domain": "biology",
+  "source_type": "pdf_plus_prompt",
+  "target_slides": 8,
+  "prompt": "8 slides on cellular respiration, mitochondrial ATP synthesis, and metabolic regulation.",
+  "sources": [
+    "NCERT SSC 0908-Understanding Society Grade 9 (3).pdf"
+  ],
+  "expected_rules": {
+    "min_slides": 7,
+    "max_slides": 10,
+    "requires_timeline": false,
+    "requires_source_images": true,
+    "minimum_source_utilization": 0.65,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

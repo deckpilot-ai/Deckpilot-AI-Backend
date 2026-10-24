@@ -176,7 +176,7 @@ You must provide two parts in your response:
 Rules:
 - Honor any requested slide count exactly (e.g. if the user asked for 10 slides, provide 10; if they asked for 22 slides, provide all 22 slides across logical chapters).
 - If no slide count is specified, determine the optimal count based on topic depth (typically 5 to 10 slides).
-- Action headlines MUST convey a conclusive insight, not just a category name.
+- Action headlines MUST convey a conclusive insight strictly in 1 to 4 words (min 1, max 4 words). Move detailed narrative explanations into keyTakeaways.
 """
 
 DECK_PLANNER_SYSTEM_PROMPT = """You are Deck Architect at deckpilotAI. Your job is to plan an executive-level presentation outline tailored specifically to the user's prompt and attached reference facts.
@@ -190,7 +190,7 @@ You must output a strictly valid JSON object matching this schema:
     {
       "slideId": "s01",
       "purpose": "Specific teaching or communication purpose, appropriate to the subject",
-      "message": "Action-oriented headline summarizing this slide's core takeaway",
+      "message": "Impactful 1-4 word headline (strictly 1 to 4 words) capturing this slide's core essence",
       "layoutHint": "hero | big_questions | timeline_band | council_eight | two_highways | forts_quote_emblem | concept_definition_image | stepped_value_chain | two_column | concept | diagram_hierarchy | saptanga | dark_quote | quote | comparison | card_grid | metrics_grid | image_focus | closing | legacy"
     }
   ]
@@ -204,6 +204,9 @@ Rules:
 3. NEVER use generic placeholder words like 'Lorem ipsum' or 'Strategic Milestone'. Every slide purpose and message MUST directly reflect the user's specific domain, company, or request.
 4. Consulting layout hints include: 'hero', 'big_questions', 'timeline_band', 'council_eight', 'two_highways', 'forts_quote_emblem', 'concept_definition_image', 'stepped_value_chain', 'timeline_columns', 'timeline', 'two_column', 'concept', 'diagram_hierarchy', 'saptanga', 'dark_quote', 'quote', 'comparison', 'card_grid', 'metrics_grid', 'process_steps', 'image_focus', 'closing', 'legacy'.
 5. USER DIRECTIVE & OUTLINE ADHERENCE: If the user provided specific slide topics, slide titles, explicit slide-by-slide outlines, custom bullet points, or numbered sections in their prompt, YOU MUST ADHERE STRICTLY to the user's provided structure, topics, and sequence. Never replace the user's explicit topics with generic placeholders.
+6. SLIDE HEADLINE MANDATE: The main headline of every slide MUST NOT exceed 4 words (strictly 1 to 4 words; min 1, max 4 words). Make it punchy, bold, impactful, and memorable (e.g., 'Comparing Countries', 'Finite Oil Reserves', 'Model Power Lifecycle', 'The Road Ahead'). Place all secondary context and questions in slide purpose or body.
+7. LAYOUT VARIETY & ALTERNATION: Alternate layouts dynamically. Never assign the exact same layout archetype to consecutive content slides (e.g., if slide 3 is 'bullets_cards', slide 4 must be 'bullets_image', 'two_column', 'stat', or 'bullets_numbered').
+8. BENCHMARK LAYOUT ARSENAL: Select from the 21 benchmark archetypes: 'cover', 'agenda', 'roadmap', 'questions', 'divider', 'bullets_image', 'bullets_cards', 'bullets_numbered', 'two_column', 'stat', 'stat_row', 'quote', 'statement', 'image_focus', 'gallery', 'glossary', 'terms_cards', 'facts', 'activities', 'summary', 'closing'.
 """
 
 SLIDE_WRITER_SYSTEM_PROMPT = """You are a subject-aware Slide Writer at deckpilotAI. Your job is to formulate high-impact, scannable slide content for each slide in the planned presentation.
@@ -213,7 +216,7 @@ You must output a strictly valid JSON object with the following structure:
   "slides": [
     {
       "slideId": "s01",
-      "headline": "Clear topic-specific headline (max 12 words)",
+      "headline": "Impactful headline strictly 1 to 4 words (min 1, max 4 words)",
       "bullets": [
         "Evidence: A concise point supported by the source.",
         "Explanation: What the evidence means for this topic.",
@@ -233,15 +236,17 @@ You must output a strictly valid JSON object with the following structure:
 }
 
 Rules:
-1. Use up to 6 concise source-backed bullet points as the layout requires. Never pad missing evidence.
+1. Use 3 to 5 concise source-backed bullet points as the layout requires. Never pad missing evidence.
 2. Use short topic-specific lead-ins where helpful, such as Evidence:, Cause:, Role:, or Example:.
 3. Include only numbers explicitly present in the supplied sources or user brief. Omit unsupported metrics.
 4. Keep bullets under 20 words for maximum visual scannability.
 5. Whenever a source figure, map, sculpture, coin, or illustration from the grounded data matches the slide's topic, assign its imageArtifactId and imageCaption.
-6. ALWAYS populate speakerNotes with 2-4 substantive sentences to guide the presenter. Never leave it empty.
+6. ALWAYS populate speakerNotes with 2-4 substantive sentences to guide the presenter and cite source pages. Never leave it empty.
 7. Include metrics[] only for data-heavy slides (financial, KPI, market-size). Omit for narrative/conceptual slides.
 8. NEVER output raw file citations, filenames, page links, or document anchors like '(source data.pdf#page=15)' or '(source.pdf)' in the visible headline, bullets, or takeaway. Express all evidence directly in clean, natural presentation language. Place specific page citations inside speakerNotes.
 9. USER-SPECIFIED DETAILS: If the user provided specific facts, numbers, bullets, comparison points, or custom takeaways in the prompt, incorporate those exact user-specified details into the corresponding slides.
+10. SLIDE TITLE CONSTRAINT: Every slide headline MUST be strictly 1 to 4 words (minimum 1 word, maximum 4 words). It must be punchy, bold, and impactful, capturing the essence of the slide at a glance. Place all detailed narrative explanations and questions in subtitle, takeaway, or bullets.
+11. NO EM DASHES: Do NOT output em dashes ('—' or '\\u2014'). Always use a standard hyphen ('-') with spaces.
 """
 
 BRAND_STYLE_SYSTEM_PROMPT = """You are Visual Design Director at deckpilotAI. Select a tailored corporate palette and typography hierarchy suited to the presentation topic.

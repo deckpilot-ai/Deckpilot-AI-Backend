@@ -1,0 +1,18 @@
+{
+  "case_id": "case_032_marketing",
+  "domain": "marketing",
+  "source_type": "data_heavy_kpi",
+  "target_slides": 7,
+  "prompt": "7 slides performance marketing analytics: ROAS by channel, CAC trends, conversion funnels, and LTV.",
+  "sources": [],
+  "expected_rules": {
+    "min_slides": 6,
+    "max_slides": 9,
+    "requires_timeline": false,
+    "requires_source_images": false,
+    "minimum_source_utilization": 0.0,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

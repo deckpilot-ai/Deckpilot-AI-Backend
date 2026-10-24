@@ -1,0 +1,18 @@
+{
+  "case_id": "case_025_biology",
+  "domain": "biology",
+  "source_type": "prompt_only",
+  "target_slides": 12,
+  "prompt": "12 slides genetic engineering CRISPR-Cas9 precision editing, ethical guardrails, and agriculture applications.",
+  "sources": [],
+  "expected_rules": {
+    "min_slides": 11,
+    "max_slides": 14,
+    "requires_timeline": false,
+    "requires_source_images": false,
+    "minimum_source_utilization": 0.0,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

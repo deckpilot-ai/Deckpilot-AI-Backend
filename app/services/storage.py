@@ -88,6 +88,65 @@ class StorageService:
             if file_path.exists():
                 file_path.unlink()
 
+    def list_objects(self, prefix: str = "") -> list[dict[str, Any]]:
+        """List objects in R2 or local storage under prefix.
+        
+        Returns a list of dicts: [{'key': str, 'size': int, 'last_modified': datetime|float}]
+        """
+        results: list[dict[str, Any]] = []
+        if self.use_r2 and self.s3_client:
+            continuation_token = None
+            while True:
+                kwargs: dict[str, Any] = {"Bucket": self.bucket, "Prefix": prefix}
+                if continuation_token:
+                    kwargs["ContinuationToken"] = continuation_token
+                resp = self.s3_client.list_objects_v2(**kwargs)
+                for obj in resp.get("Contents", []):
+                    results.append({
+                        "key": obj["Key"],
+                        "size": obj["Size"],
+                        "last_modified": obj["LastModified"],
+                    })
+                if resp.get("IsTruncated"):
+                    continuation_token = resp.get("NextContinuationToken")
+                else:
+                    break
+        else:
+            clean_prefix = prefix.lstrip("/\\")
+            search_dir = (self.local_storage_dir / clean_prefix) if clean_prefix else self.local_storage_dir
+            if search_dir.exists():
+                for p in search_dir.rglob("*"):
+                    if p.is_file():
+                        rel_key = str(p.relative_to(self.local_storage_dir)).replace("\\", "/")
+                        stat = p.stat()
+                        results.append({
+                            "key": rel_key,
+                            "size": stat.st_size,
+                            "last_modified": stat.st_mtime,
+                        })
+        return results
+
+    def delete_objects(self, keys: list[str]) -> int:
+        """Delete multiple objects from R2 or local storage in bulk. Returns count deleted."""
+        if not keys:
+            return 0
+        deleted_count = 0
+        if self.use_r2 and self.s3_client:
+            chunk_size = 1000
+            for i in range(0, len(keys), chunk_size):
+                chunk = keys[i : i + chunk_size]
+                delete_payload = {"Objects": [{"Key": k} for k in chunk], "Quiet": True}
+                resp = self.s3_client.delete_objects(Bucket=self.bucket, Delete=delete_payload)
+                deleted_count += len(chunk) - len(resp.get("Errors", []))
+        else:
+            for k in keys:
+                try:
+                    self.delete_object(k)
+                    deleted_count += 1
+                except Exception:
+                    pass
+        return deleted_count
+
     def generate_presigned_download_url(self, key: str, expires_in: int = 3600, filename: str | None = None) -> str:
         """Generate a presigned download URL for an object with optional Content-Disposition."""
         if self.use_r2 and self.s3_client:

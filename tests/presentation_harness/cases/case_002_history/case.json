@@ -1,0 +1,20 @@
+{
+  "case_id": "case_002_history",
+  "domain": "history",
+  "source_type": "pdf_plus_prompt",
+  "target_slides": 10,
+  "prompt": "10 slides summarizing Harappan urban planning, craft technology, and trade routes from attached NCERT chapter.",
+  "sources": [
+    "NCERT-Bricks-Beads-and-Bones.pdf"
+  ],
+  "expected_rules": {
+    "min_slides": 9,
+    "max_slides": 12,
+    "requires_timeline": true,
+    "requires_source_images": true,
+    "minimum_source_utilization": 0.65,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

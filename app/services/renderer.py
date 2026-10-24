@@ -21,6 +21,9 @@ from app.schemas.generation_state import (
 )
 from app.services.archetype_renderer import ArchetypeRenderer, _split_title_body
 from app.services.design_system import clean_text, default_brand, normalize_brand
+from app.services.content_capacity_validator import ContentCapacityValidator
+from app.services.grid_engine import PresentationGridEngine
+from app.services.text_measurement import TextMeasurementService
 from app.tools.chart_engine import ChartEngine
 from app.tools.diagram_engine import DiagramEngine
 from app.tools.image_intelligence import ImageIntelligence
@@ -48,12 +51,15 @@ class PPTXRenderer:
     SLIDE_HEIGHT = Inches(7.5)
 
     @staticmethod
-    def _fits(text, w, h, size=13, bullet_list=False):
-        capacity = max(1, int((w - 0.04 - (0.23 if bullet_list else 0)) * 72 / (size * 0.56)))
-        paragraphs = clean_text(text).split("\n")
-        lines = sum(max(1, math.ceil(len(line) / capacity)) for line in paragraphs)
-        spacing = max(0, len(paragraphs) - 1) * 5 if bullet_list else 0
-        return ((lines * size * 1.25 + spacing) / 72 + 0.06) - 0.02 <= h
+    def _fits(text, w, h, size=13, bullet_list=False, font_name="Segoe UI"):
+        return TextMeasurementService.check_fits(
+            text=text,
+            w=w,
+            h=h,
+            size=float(size),
+            font_name=font_name,
+            bullet_list=bullet_list,
+        )
 
     @classmethod
     def _shape(cls, slide, kind, x, y, w, h, color, name="card", corner_radius=0.08):
@@ -107,17 +113,17 @@ class PPTXRenderer:
         floor = 18 if title and size >= 24 else min(int(round(size)), 11)
         curr_size = int(round(size))
         while True:
-            if cls._fits(text, w, h, curr_size, bullet_list):
+            if cls._fits(text, w, h, curr_size, bullet_list, font_name=font_name):
                 break
             if curr_size <= floor:
                 # Text exceeds budget at floor size — trim text progressively until it fits
                 if bullet_list:
                     lines_list = text.split("\n")
-                    while len(lines_list) > 1 and not cls._fits("\n".join(lines_list), w, h, floor, bullet_list):
+                    while len(lines_list) > 1 and not cls._fits("\n".join(lines_list), w, h, floor, bullet_list, font_name=font_name):
                         lines_list.pop()
                     text = "\n".join(lines_list)
-                if not cls._fits(text, w, h, floor, bullet_list):
-                    while len(text) > 20 and not cls._fits(text + "…", w, h, floor, bullet_list):
+                if not cls._fits(text, w, h, floor, bullet_list, font_name=font_name):
+                    while len(text) > 20 and not cls._fits(text + "…", w, h, floor, bullet_list, font_name=font_name):
                         text = text[:-10].rstrip()
                     text = text.rstrip() + "…"
                 curr_size = floor
@@ -222,14 +228,16 @@ class PPTXRenderer:
             size = 16
             floor = 13
 
-        while size > floor and not cls._fits(text, text_w, h - 0.4, size, bullet_list):
+        while size > floor and not cls._fits(text, text_w, h - 0.4, size, bullet_list, font_name=font_name):
             size -= 1
 
-        capacity = max(1, int((text_w - 0.04 - (0.23 if bullet_list else 0)) * 72 / (size * 0.56)))
-        paragraphs = clean_text(text).split("\n")
-        lines = sum(max(1, math.ceil(len(line) / capacity)) for line in paragraphs)
-        spacing = max(0, len(paragraphs) - 1) * 5 if bullet_list else 0
-        actual_h = (lines * size * 1.25 + spacing) / 72 + 0.46
+        actual_h = TextMeasurementService.calculate_text_height(
+            text=text,
+            width_in=text_w,
+            font_name=font_name,
+            font_size_pt=float(size),
+            bullet_list=bullet_list,
+        ) + 0.46
         card_h = h if fixed_height else min(h, max(1.2, actual_h))
 
         cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, card_h, fill, "card")
@@ -286,19 +294,26 @@ class PPTXRenderer:
         title_font = design_system.typography.title_font.name
         body_font = design_system.typography.body_font.name
 
+        slide_specs = ContentCapacityValidator.validate_and_fix(slide_specs, design_system)
+
         for index, slide_data in enumerate(slide_specs):
             cls._active_font_scale = max(1.0, min(1.3, float(slide_data.archetype_fields.get("qa_font_scale", 1.0))))
             slide = prs.slides.add_slide(prs.slide_layouts[6])
             layout = slide_data.layout_family
             arch_id = getattr(slide_data, "archetype_id", None)
-            if not arch_id and hasattr(layout, "value") and str(layout.value).startswith("A") and str(layout.value)[1:].isdigit():
+            from app.presentation.themes.development_editorial.theme import DevelopmentEditorialTheme
+            from app.presentation.themes.federalism_editorial.theme import FederalismEditorialTheme
+            if not arch_id and hasattr(layout, "value") and (str(layout.value).startswith("A") or str(layout.value).startswith("L") or str(layout.value).startswith("F")):
                 arch_id = str(layout.value)
-            if not arch_id and isinstance(slide_data.layout_hint, str) and slide_data.layout_hint.upper().startswith("A"):
+            if not arch_id and isinstance(slide_data.layout_hint, str):
                 cand = slide_data.layout_hint.upper()
-                if cand[1:].isdigit():
+                if cand.startswith("A") and cand[1:].isdigit():
+                    arch_id = cand
+                elif cand.startswith("L") or cand.startswith("F"):
                     arch_id = cand
 
-            is_standalone_cover = layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.A1_TITLE_BLOB, LayoutFamily.A2_TITLE_SPLIT, LayoutFamily.A3_DIVIDER_HERO, LayoutFamily.A17_CLOSING_TAKEAWAYS) or arch_id in ("A1", "A2", "A3", "A17")
+            is_editorial_layout = bool(arch_id and (arch_id.startswith("L") or arch_id.startswith("F")))
+            is_standalone_cover = is_editorial_layout or layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.A1_TITLE_BLOB, LayoutFamily.A2_TITLE_SPLIT, LayoutFamily.A3_DIVIDER_HERO, LayoutFamily.A17_CLOSING_TAKEAWAYS) or arch_id in ("A1", "A2", "A3", "A17", "F01", "F13", "F24")
             dark = slide_data.dark_background or (layout in (LayoutFamily.HERO, LayoutFamily.CLOSING, LayoutFamily.DARK_QUOTE, LayoutFamily.A17_CLOSING_TAKEAWAYS) and design_system.subject_domain != "markets") or arch_id in ("A1", "A3", "A17")
 
             slide.background.fill.solid()
@@ -318,24 +333,26 @@ class PPTXRenderer:
 
             from app.services.archetype_renderer import ArchetypeRenderer, _split_title_body
 
-            # Eyebrow & Title & Accent Tick (Skip for custom cover/divider archetypes)
-            if not is_standalone_cover:
-                cls._text(slide, eyebrow.upper(), 0.6, 0.45, 12.1, 0.32, primary if not dark else accent, body_font, 12, bold=True)
-                cls._text(slide, title, 0.6, 0.78, 12.1, 1.05, fg, title_font, 28, title=True)
+            # Eyebrow & Title & Accent Tick (Skip for custom cover/divider archetypes and editorial layouts)
+            if not is_standalone_cover and not is_editorial_layout:
+                cls._text(slide, eyebrow.upper(), 0.6, 0.45, 12.1, 0.28, primary if not dark else accent, body_font, 12, bold=True, name="slide-eyebrow")
+                cls._text(slide, title, 0.6, 0.78, 12.1, 1.05, fg, title_font, 28, title=True, name="slide-title")
                 cls._shape(slide, MSO_SHAPE.RECTANGLE, 0.6, 1.88, 0.6, 0.06, accent if not dark else tint(primary, 0.6), "accent-tick")
 
             # Footer
-            if not is_standalone_cover:
+            if not is_standalone_cover and not is_editorial_layout:
                 norm_deck = re.sub(r"\W+", "", deck_title).lower()
                 norm_eyebrow = re.sub(r"\W+", "", eyebrow).lower()
                 footer_text = deck_title.upper() if norm_deck == norm_eyebrow else f"{deck_title.upper()} / {eyebrow.upper()}"
-                cls._text(slide, footer_text[:140], 0.6, 7.05, 11.4, 0.28, body_col, body_font, 9.5)
+                cls._text(slide, footer_text[:140], 0.6, 7.05, 11.4, 0.28, body_col, body_font, 9.5, name="slide-footer")
 
-            # Persistent Page Number Pill
+            # Persistent Page Number Pill Colors
             pill_bg = tint(ink, 0.28) if dark else tint(primary, 0.12)
             pill_fg = white if dark else ink
-            cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
-            cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True)
+            can_archetype = bool(arch_id and ArchetypeRenderer.can_render(arch_id))
+            if not is_editorial_layout and not can_archetype:
+                cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
+                cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True, name="page-number-text")
 
             # Speaker Notes
             notes = slide_data.speaker_notes or f"Presenter guidance for Slide {index + 1}: {title}"
@@ -345,47 +362,30 @@ class PPTXRenderer:
             if not arch_id:
                 layout_to_arch = {
                     LayoutFamily.A1_TITLE_BLOB: "A1",
-                    LayoutFamily.HERO: "A1",
                     LayoutFamily.A2_TITLE_SPLIT: "A2",
-                    LayoutFamily.TITLE_SUBTITLE: "A2",
                     LayoutFamily.A3_DIVIDER_HERO: "A3",
-                    LayoutFamily.SECTION_DIVIDER: "A3",
                     LayoutFamily.A4_ROADMAP_AGENDA: "A4",
                     LayoutFamily.A5_DEFINITION: "A5",
                     LayoutFamily.A6_TWO_ENTITY_COMPARISON: "A6",
-                    LayoutFamily.COMPARISON: "A6",
                     LayoutFamily.A7_TWO_COLUMN_CONTRAST: "A7",
-                    LayoutFamily.TWO_COLUMN: "A7",
                     LayoutFamily.A8_STAT_IMAGE_HIGHLIGHT: "A8",
-                    LayoutFamily.BIG_NUMBERS: "A8",
                     LayoutFamily.A9_PROCESS_CHAIN: "A9",
                     LayoutFamily.A10_NUMBERED_PROCESS: "A10",
-                    LayoutFamily.PROCESS_STEPS: "A10",
-                    LayoutFamily.ROADMAP: "A10",
                     LayoutFamily.A11_STAGE_COLUMNS: "A11",
-                    LayoutFamily.THREE_COLUMN: "A11",
                     LayoutFamily.A12_BEFORE_AFTER: "A12",
-                    LayoutFamily.BEFORE_AFTER: "A12",
                     LayoutFamily.A13_ICON_GRID: "A13",
-                    LayoutFamily.CARD_GRID: "A13",
                     LayoutFamily.A14_CHART_INSIGHT: "A14",
-                    LayoutFamily.CHART_FOCUS: "A14",
                     LayoutFamily.A15_DUAL_STAT_COMPARISON: "A15",
                     LayoutFamily.A16_NATIVE_TABLE: "A16",
-                    LayoutFamily.TABLE_FOCUS: "A16",
                     LayoutFamily.A17_CLOSING_TAKEAWAYS: "A17",
-                    LayoutFamily.CLOSING: "A17",
                     LayoutFamily.A18_RECAP_CHECKLIST: "A18",
                     LayoutFamily.A19_GLOSSARY_GRID: "A19",
                     LayoutFamily.A20_ORG_HIERARCHY: "A20",
                     LayoutFamily.A21_KPI_CLUSTER: "A21",
-                    LayoutFamily.METRICS_GRID: "A21",
                     LayoutFamily.A22_HUB_SPOKE: "A22",
-                    LayoutFamily.ARCHITECTURE_DIAGRAM: "A22",
                     LayoutFamily.A23_VERTICAL_PIPELINE: "A23",
                     LayoutFamily.A24_TIMELINE_BAND: "A24",
                     LayoutFamily.TIMELINE_BAND: "A24",
-                    LayoutFamily.TIMELINE: "A24",
                     LayoutFamily.A25_COUNCIL_EIGHT: "A25",
                     LayoutFamily.COUNCIL_EIGHT: "A25",
                     LayoutFamily.A26_TWO_HIGHWAYS: "A26",
@@ -394,8 +394,6 @@ class PPTXRenderer:
                     LayoutFamily.FORTS_QUOTE_EMBLEM: "A27",
                     LayoutFamily.A28_CONCEPT_DEFINITION_IMAGE: "A28",
                     LayoutFamily.CONCEPT_DEFINITION_IMAGE: "A28",
-                    LayoutFamily.IMAGE_FOCUS: "A28",
-                    LayoutFamily.TEXT_IMAGE: "A28",
                     LayoutFamily.A29_BIG_QUESTIONS: "A29",
                     LayoutFamily.BIG_QUESTIONS: "A29",
                     LayoutFamily.A30_STEPPED_VALUE_CHAIN: "A30",
@@ -411,8 +409,9 @@ class PPTXRenderer:
             if arch_id and ArchetypeRenderer.can_render(arch_id):
                 if ArchetypeRenderer.render(slide, arch_id, slide_data, design_system, image_bytes, cls):
                     # Redraw page pill on top to ensure never obscured
-                    cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
-                    cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True)
+                    if not is_editorial_layout:
+                        cls._shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, 12.15, 6.95, 0.55, 0.35, pill_bg, "page-pill", corner_radius=0.25)
+                        cls._text(slide, str(index + 1), 12.15, 6.95, 0.55, 0.35, pill_fg, body_font, 10.5, bold=True, center=True, name="page-number-text")
                     continue
 
             # --- Layout Routing ---
@@ -647,12 +646,18 @@ class PPTXRenderer:
                 count = len(items)
                 cols = 2 if count == 4 else min(count, 3) or 1
                 rows = math.ceil(count / cols) or 1
-                h_card = (3.65 - 0.35 * (rows - 1)) / rows
-                w_card = (12.1 - 0.35 * (cols - 1)) / cols
-                for j, item in enumerate(items):
-                    x_c = 0.6 + (j % cols) * (w_card + 0.35)
-                    y_c = 2.4 + (j // cols) * (h_card + 0.35)
-                    cls._card(slide, item, x_c, y_c, w_card, h_card, fill, body_col, primary, body_font, j + 1, fixed_height=True)
+                slots = PresentationGridEngine.compute_card_grid(
+                    cols=cols,
+                    rows=rows,
+                    margin_left=0.6,
+                    content_top=2.25,
+                    total_w=12.133,
+                    total_h=4.20,
+                    gutter_x=0.35,
+                    gutter_y=0.35,
+                )
+                for j, (item, slot) in enumerate(zip(items, slots)):
+                    cls._card(slide, item, slot.x, slot.y, slot.w, slot.h, fill, body_col, primary, body_font, j + 1, fixed_height=True)
 
             else:
                 # If image_bytes is present, prioritize visual framed layout with rich typographic hierarchy
@@ -732,22 +737,45 @@ class PPTXRenderer:
                     # compact cards used by API clients and regression tests.
                     midpoint = max(1, math.ceil(len(bullets) / 2))
                     groups = [bullets] if len(bullets) <= 1 else [bullets[:midpoint], bullets[midpoint:]]
-                    for j, group in enumerate(groups):
-                        if group:
-                            card_width = 12.1 if len(groups) == 1 else 5.875
+                    if len(groups) == 1:
+                        if groups[0]:
                             cls._card(
                                 slide,
-                                "\n".join(group),
-                                0.6 + j * 6.225,
+                                "\n".join(groups[0]),
+                                0.6,
                                 2.25,
-                                card_width,
-                                4.0,
+                                12.133,
+                                4.20,
                                 fill,
                                 body_col,
                                 accent,
                                 body_font,
                                 fixed_height=True,
                             )
+                    else:
+                        slots = PresentationGridEngine.compute_equal_columns(
+                            count=2,
+                            margin_left=0.6,
+                            content_top=2.25,
+                            total_w=12.133,
+                            height=4.20,
+                            gap=0.35,
+                        )
+                        for j, (group, slot) in enumerate(zip(groups, slots)):
+                            if group:
+                                cls._card(
+                                    slide,
+                                    "\n".join(group),
+                                    slot.x,
+                                    slot.y,
+                                    slot.w,
+                                    slot.h,
+                                    fill,
+                                    body_col,
+                                    accent,
+                                    body_font,
+                                    fixed_height=True,
+                                )
 
             # Speaker Notes
             notes = slide_data.speaker_notes or f"Presenter guidance for Slide {index + 1}: {title}"
@@ -800,6 +828,8 @@ class PPTXRenderer:
             ds.colors.primary = brand["colors"]["primary"]
             ds.colors.accent = brand["colors"]["accent"]
             ds.colors.neutral = brand["colors"]["neutral"]
+            if "ink" in brand.get("colors", {}):
+                ds.colors.ink = brand["colors"]["ink"]
 
         available_assets = None
         if source_images:

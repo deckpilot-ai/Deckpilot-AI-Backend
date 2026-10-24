@@ -271,3 +271,66 @@ async def start_health_probe_loop() -> None:
             logger.warning("Health probe loop iteration encountered error", exc_info=True)
 
         await asyncio.sleep(HEALTH_PROBE_INTERVAL_SECONDS)
+
+
+async def start_data_cleaner_loop() -> None:
+    """Background coroutine that runs the document data cleaner policy with distributed locking."""
+    from app.core.config import settings
+    from app.db.engine import SessionLocal
+    from app.services.data_cleaner import DataCleanerService
+
+    if not settings.storage_cleaner_enabled:
+        logger.info("Storage DataCleaner loop disabled in settings")
+        return
+
+    logger.info(
+        "Starting Storage DataCleaner loop (retention=%d days, interval=%dh, instance=%s)",
+        settings.storage_cleaner_retention_days,
+        settings.storage_cleaner_interval_hours,
+        INSTANCE_ID,
+    )
+
+    # Initial brief delay after startup to let app and db connections settle
+    await asyncio.sleep(20)
+
+    # Apply native R2 bucket lifecycle rules for scratch/tmp prefixes if R2 is configured
+    try:
+        DataCleanerService.apply_r2_bucket_lifecycle_configuration()
+    except Exception as e:
+        logger.debug("R2 lifecycle configuration notice: %s", e)
+
+    interval_seconds = max(3600, settings.storage_cleaner_interval_hours * 3600)
+
+    while True:
+        try:
+            with SessionLocal() as db:
+                locked = SystemLock.acquire(
+                    db=db,
+                    lock_name="storage_data_cleaner",
+                    locked_by=INSTANCE_ID,
+                    lease_seconds=interval_seconds - 60,
+                )
+
+                if locked:
+                    logger.info("Acquired storage_data_cleaner lock; executing data cleaner policy...")
+                    report = await asyncio.to_thread(
+                        DataCleanerService.run_cleanup_policy,
+                        db=db,
+                        retention_days=settings.storage_cleaner_retention_days,
+                        dry_run=False,
+                    )
+                    logger.info(
+                        "Storage DataCleaner run completed: pruned %s unused images, %s orphan objects, freed %s bytes",
+                        report.get("unused_images_deleted", 0),
+                        report.get("orphan_r2_objects_deleted", 0),
+                        report.get("bytes_reclaimed", 0),
+                    )
+                else:
+                    logger.debug("Storage DataCleaner cycle skipped: lock held by another instance")
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.warning("Storage DataCleaner loop iteration encountered error", exc_info=True)
+
+        await asyncio.sleep(interval_seconds)
+

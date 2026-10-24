@@ -16,6 +16,15 @@ LAYOUTS = (
     "dark_quote", "legacy", "two_column_definition",
     "A1", "A2", "A3", "A4", "A5", "A6", "A8", "A10", "A11", "A13", "A14", "A15",
     "A16", "A17", "A18", "A24", "A25", "A26", "A27", "A28", "A29", "A30",
+    # 17 canonical layouts from deckpilot-skill
+    "title_dark", "section_divider", "agenda_numbered", "two_col_text_visual",
+    "icon_cards_3", "icon_cards_4_grid", "icon_rows", "stat_trio", "stat_hero",
+    "compare_2col", "process_flow", "timeline_h", "chart_with_takeaway", "table_focus",
+    "quote_big", "half_bleed_image", "closing_dark",
+    # 21 benchmark archetypes from deck_training_dataset
+    "cover", "agenda", "questions", "divider", "bullets_image", "bullets_cards",
+    "bullets_numbered", "stat", "stat_row", "statement", "gallery", "glossary",
+    "terms_cards", "facts", "activities", "summary",
 )
 
 DECK_DESIGN_SYSTEM_PROMPT = """
@@ -40,6 +49,9 @@ excerpt. Unsupported special content is omitted by the application.
 Use concise, source-backed bullets; no fixed minimum count and no filler.
 The renderer owns typography, components and geometry. QA must not claim
 full visual inspection unless every slide was actually rendered and inspected.
+Every slide headline MUST be strictly 1 to 4 words (minimum 1, maximum 4 words)
+and must be impactful and concise, capturing the essence of the slide. Secondary
+context, questions, and evidence belong strictly in subtitle or body bullets.
 """
 
 PALETTES = {
@@ -84,7 +96,7 @@ def strip_citations(text: str) -> str:
 
 def clean_text(value: Any) -> str:
     cleaned = strip_citations(str(value or ""))
-    cleaned = cleaned.replace("\u2014", " - ").replace("**", "").replace("Â·", " • ").replace("â€”", " - ").replace("", "")
+    cleaned = cleaned.replace("\u2014", " - ").replace("—", " - ").replace("**", "").replace("Â·", " • ").replace("â€”", " - ")
     return re.sub(r"[ \t]+", " ", cleaned).strip()
 
 

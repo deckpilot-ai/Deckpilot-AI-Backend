@@ -1,0 +1,737 @@
+[
+  {
+    "case_id": "case_001_history",
+    "domain": "history",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_002_history",
+    "domain": "history",
+    "target_slides": 10,
+    "source_type": "pdf_plus_prompt",
+    "has_sources": true
+  },
+  {
+    "case_id": "case_003_history",
+    "domain": "history",
+    "target_slides": 12,
+    "source_type": "pdf_timelines",
+    "has_sources": true
+  },
+  {
+    "case_id": "case_004_history",
+    "domain": "history",
+    "target_slides": 6,
+    "source_type": "vague_user_prompt",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_005_history",
+    "domain": "history",
+    "target_slides": 15,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_006_artificial_intelligence",
+    "domain": "artificial_intelligence",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_007_artificial_intelligence",
+    "domain": "artificial_intelligence",
+    "target_slides": 8,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_008_artificial_intelligence",
+    "domain": "artificial_intelligence",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_009_artificial_intelligence",
+    "domain": "artificial_intelligence",
+    "target_slides": 5,
+    "source_type": "vague_user_prompt",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_010_technology",
+    "domain": "technology",
+    "target_slides": 6,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_011_cloud",
+    "domain": "cloud",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_012_cybersecurity",
+    "domain": "cybersecurity",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_013_technology",
+    "domain": "technology",
+    "target_slides": 7,
+    "source_type": "docx_source",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_014_finance",
+    "domain": "finance",
+    "target_slides": 8,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_015_economics",
+    "domain": "economics",
+    "target_slides": 10,
+    "source_type": "pdf_plus_prompt",
+    "has_sources": true
+  },
+  {
+    "case_id": "case_016_finance",
+    "domain": "finance",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_017_economics",
+    "domain": "economics",
+    "target_slides": 6,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_018_strategy",
+    "domain": "strategy",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_019_business",
+    "domain": "business",
+    "target_slides": 7,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_020_corporate_reports",
+    "domain": "corporate_reports",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_021_case_studies",
+    "domain": "case_studies",
+    "target_slides": 6,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_022_healthcare",
+    "domain": "healthcare",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_023_biology",
+    "domain": "biology",
+    "target_slides": 8,
+    "source_type": "pdf_plus_prompt",
+    "has_sources": true
+  },
+  {
+    "case_id": "case_024_healthcare",
+    "domain": "healthcare",
+    "target_slides": 6,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_025_biology",
+    "domain": "biology",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_026_physics",
+    "domain": "physics",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_027_chemistry",
+    "domain": "chemistry",
+    "target_slides": 6,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_028_science",
+    "domain": "science",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_029_physics",
+    "domain": "physics",
+    "target_slides": 7,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_030_marketing",
+    "domain": "marketing",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_031_product_presentations",
+    "domain": "product_presentations",
+    "target_slides": 6,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_032_marketing",
+    "domain": "marketing",
+    "target_slides": 7,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_033_education",
+    "domain": "education",
+    "target_slides": 10,
+    "source_type": "pdf_plus_prompt",
+    "has_sources": true
+  },
+  {
+    "case_id": "case_034_research",
+    "domain": "research",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_035_training",
+    "domain": "training",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_036_project_updates",
+    "domain": "project_updates",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_037_history_5s",
+    "domain": "history",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_038_history_8s",
+    "domain": "history",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_039_history_10s",
+    "domain": "history",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_040_history_12s",
+    "domain": "history",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_041_history_15s",
+    "domain": "history",
+    "target_slides": 15,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_042_history_20s",
+    "domain": "history",
+    "target_slides": 20,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_043_geography_5s",
+    "domain": "geography",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_044_geography_8s",
+    "domain": "geography",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_045_geography_10s",
+    "domain": "geography",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_046_geography_12s",
+    "domain": "geography",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_047_geography_15s",
+    "domain": "geography",
+    "target_slides": 15,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_048_geography_20s",
+    "domain": "geography",
+    "target_slides": 20,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_049_economics_5s",
+    "domain": "economics",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_050_economics_8s",
+    "domain": "economics",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_051_economics_10s",
+    "domain": "economics",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_052_economics_12s",
+    "domain": "economics",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_053_economics_15s",
+    "domain": "economics",
+    "target_slides": 15,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_054_economics_20s",
+    "domain": "economics",
+    "target_slides": 20,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_055_science_5s",
+    "domain": "science",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_056_science_8s",
+    "domain": "science",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_057_science_10s",
+    "domain": "science",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_058_science_12s",
+    "domain": "science",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_059_science_15s",
+    "domain": "science",
+    "target_slides": 15,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_060_science_20s",
+    "domain": "science",
+    "target_slides": 20,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_061_biology_5s",
+    "domain": "biology",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_062_biology_8s",
+    "domain": "biology",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_063_biology_10s",
+    "domain": "biology",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_064_biology_12s",
+    "domain": "biology",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_065_biology_15s",
+    "domain": "biology",
+    "target_slides": 15,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_066_biology_20s",
+    "domain": "biology",
+    "target_slides": 20,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_067_physics_5s",
+    "domain": "physics",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_068_physics_8s",
+    "domain": "physics",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_069_physics_10s",
+    "domain": "physics",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_070_physics_12s",
+    "domain": "physics",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_071_physics_15s",
+    "domain": "physics",
+    "target_slides": 15,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_072_physics_20s",
+    "domain": "physics",
+    "target_slides": 20,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_073_chemistry_5s",
+    "domain": "chemistry",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_074_chemistry_8s",
+    "domain": "chemistry",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_075_chemistry_10s",
+    "domain": "chemistry",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_076_chemistry_12s",
+    "domain": "chemistry",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_077_chemistry_15s",
+    "domain": "chemistry",
+    "target_slides": 15,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_078_chemistry_20s",
+    "domain": "chemistry",
+    "target_slides": 20,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_079_technology_5s",
+    "domain": "technology",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_080_technology_8s",
+    "domain": "technology",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_081_technology_10s",
+    "domain": "technology",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_082_technology_12s",
+    "domain": "technology",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_083_technology_15s",
+    "domain": "technology",
+    "target_slides": 15,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_084_technology_20s",
+    "domain": "technology",
+    "target_slides": 20,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_085_artificial_intelligence_5s",
+    "domain": "artificial_intelligence",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_086_artificial_intelligence_8s",
+    "domain": "artificial_intelligence",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_087_artificial_intelligence_10s",
+    "domain": "artificial_intelligence",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_088_artificial_intelligence_12s",
+    "domain": "artificial_intelligence",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_089_artificial_intelligence_15s",
+    "domain": "artificial_intelligence",
+    "target_slides": 15,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_090_artificial_intelligence_20s",
+    "domain": "artificial_intelligence",
+    "target_slides": 20,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_091_cybersecurity_5s",
+    "domain": "cybersecurity",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_092_cybersecurity_8s",
+    "domain": "cybersecurity",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_093_cybersecurity_10s",
+    "domain": "cybersecurity",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_094_cybersecurity_12s",
+    "domain": "cybersecurity",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_095_cybersecurity_15s",
+    "domain": "cybersecurity",
+    "target_slides": 15,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_096_cybersecurity_20s",
+    "domain": "cybersecurity",
+    "target_slides": 20,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_097_cloud_5s",
+    "domain": "cloud",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_098_cloud_8s",
+    "domain": "cloud",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_099_cloud_10s",
+    "domain": "cloud",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_100_cloud_12s",
+    "domain": "cloud",
+    "target_slides": 12,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_101_cloud_15s",
+    "domain": "cloud",
+    "target_slides": 15,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_102_cloud_20s",
+    "domain": "cloud",
+    "target_slides": 20,
+    "source_type": "data_heavy_kpi",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_103_finance_5s",
+    "domain": "finance",
+    "target_slides": 5,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_104_finance_8s",
+    "domain": "finance",
+    "target_slides": 8,
+    "source_type": "prompt_only",
+    "has_sources": false
+  },
+  {
+    "case_id": "case_105_finance_10s",
+    "domain": "finance",
+    "target_slides": 10,
+    "source_type": "prompt_only",
+    "has_sources": false
+  }
+]

@@ -30,9 +30,13 @@ STOPWORDS = {
 }
 
 
+import unicodedata
+
+
 def tokenize(text: str) -> set[str]:
-    """Tokenize and stem basic alphanumeric terms."""
-    clean = re.sub(r"[^\w\s]", " ", text.lower())
+    """Tokenize and stem basic alphanumeric terms with unicode diacritic folding."""
+    norm = unicodedata.normalize("NFKD", text).encode("ASCII", "ignore").decode("utf-8")
+    clean = re.sub(r"[^\w\s]", " ", norm.lower())
     words = clean.split()
     tokens = set()
     for w in words:
@@ -48,17 +52,27 @@ class ImageMatcher:
     """Matches slides to the most relevant documentary image assets with dynamic pacing."""
 
     @classmethod
-    def calculate_relevance(cls, slide_text: str, caption: str, topic_context: str = "") -> float:
-        """Calculate relevance score between slide text and image caption/evidence."""
+    def calculate_relevance(
+        cls,
+        slide_text: str,
+        caption: str,
+        topic_context: str = "",
+        slide_section: str = "",
+        image_section: str = "",
+        image_type: str = "",
+    ) -> float:
+        """Calculate relevance score between slide text, section provenance, and image metadata."""
         caption_lower = (caption or "").lower()
         topic_lower = (topic_context or "").lower()
+        slide_lower = (slide_text or "").lower()
 
         # Reject corporate stock photos for non-corporate subjects
         corporate_noise = {"office", "laptop", "handshake", "skyscraper", "suits", "businesswoman", "businessman", "meeting room", "conference table"}
         is_non_corporate_topic = any(w in topic_lower for w in (
             "history", "historical", "war", "ancient", "rome", "maratha", "empire", "dynasty",
             "health", "medical", "cardiology", "doctor", "patient", "biotech", "pharma",
-            "climate", "nature", "forest", "environment", "solar", "space", "astronomy", "art", "craft"
+            "climate", "nature", "forest", "environment", "solar", "space", "astronomy", "art", "craft",
+            "constitution", "parliament", "democracy", "civics"
         ))
         if is_non_corporate_topic and any(w in caption_lower for w in corporate_noise):
             return 0.0
@@ -66,28 +80,59 @@ class ImageMatcher:
         slide_tokens = tokenize(slide_text)
         caption_tokens = tokenize(caption)
 
-        if not slide_tokens or not caption_tokens:
+        if not slide_tokens and not caption_tokens:
             return 0.0
 
+        score = 0.0
+
+        # 1. Section Provenance Preservation (+4.0 bonus if from identical source section)
+        if slide_section and image_section:
+            sec_slide_tokens = tokenize(slide_section)
+            sec_img_tokens = tokenize(image_section)
+            if sec_slide_tokens & sec_img_tokens:
+                score += 4.0
+
+        # 2. Image Type to Slide Intent Matching
+        if image_type == "map" and any(w in slide_lower for w in ("map", "territory", "boundary", "expansion", "region", "geography", "timeline")):
+            score += 3.5
+        elif image_type == "portrait" and any(w in slide_lower for w in ("leader", "biography", "minister", "president", "shastri", "vajpayee", "ruler", "architect", "figure", "founder")):
+            score += 3.5
+        elif image_type == "diagram" and any(w in slide_lower for w in ("structure", "system", "parliament", "chambers", "bicameral", "houses", "framework", "composition")):
+            score += 3.0
+        elif image_type == "chart" and any(w in slide_lower for w in ("seats", "representation", "numbers", "data", "statistics", "percentage", "population")):
+            score += 3.0
+        elif (
+            image_type == "artefact"
+            or (image_type == "photograph" and any(w in caption_lower for w in ("monument", "statue", "sculpture", "building", "hall", "carving", "emblem", "architecture", "temple", "relic", "pillar")))
+        ) and any(w in slide_lower for w in ("sadan", "bhavan", "building", "hall", "monument", "constitution", "emblem", "carving", "architecture", "temple", "relic")):
+            score += 2.5
+
+        # 3. Keyword / Entity Token Overlap
         intersection = slide_tokens & caption_tokens
         if not intersection:
-            # Check for substring matches (e.g. "maurya" in "mauryan")
             sub_matches = 0
             for st in slide_tokens:
                 for ct in caption_tokens:
                     if (st in ct or ct in st) and len(min(st, ct, key=len)) >= 4:
                         sub_matches += 1
-            return sub_matches * 1.5
-
-        # Weight key domain entities higher
-        score = 0.0
-        for token in intersection:
-            if len(token) >= 6:
-                score += 3.0
-            elif len(token) >= 4:
-                score += 2.5
+            score += sub_matches * 1.5
+        elif len(intersection) == 1:
+            # Single keyword overlap alone must not trigger match without strong specificity (>= 7 chars)
+            token = next(iter(intersection))
+            if len(token) >= 7:
+                score += 2.0
+            elif len(token) >= 5:
+                score += 1.4  # Single 5-6 letter token (e.g. 'ruler') stays below 1.5 threshold
             else:
-                score += 1.0
+                score += 0.8
+        else:
+            for token in intersection:
+                if len(token) >= 6:
+                    score += 3.0
+                elif len(token) >= 4:
+                    score += 2.0
+                else:
+                    score += 1.0
 
         return score
 
@@ -112,6 +157,8 @@ class ImageMatcher:
                     "caption": a.caption or "",
                     "nearby_text": getattr(a, "nearby_text", "") or "",
                     "summary": getattr(a, "semantic_summary", "") or "",
+                    "image_type": getattr(a, "image_type", "photograph") or "photograph",
+                    "section": getattr(a, "section", "") or "",
                     "quality": getattr(a, "quality_score", 1.0),
                     "key": a.storage_key or "",
                 })
@@ -121,6 +168,8 @@ class ImageMatcher:
                     "caption": a.get("caption", ""),
                     "nearby_text": a.get("nearby_text", ""),
                     "summary": a.get("semantic_summary", ""),
+                    "image_type": a.get("image_type", "photograph"),
+                    "section": a.get("section", ""),
                     "quality": float(a.get("quality_score", 1.0)),
                     "key": a.get("storage_key", ""),
                 })
@@ -130,9 +179,9 @@ class ImageMatcher:
         if not assets_list:
             return
 
-        # Dynamic target image allocation count (aim for 30% to 50% of content slides)
+        # Dynamic target image allocation count (aim for 40% to 65% of content slides when rich visuals exist)
         total_slides = len(slides)
-        target_visual_count = min(len(assets_list), max(1, int((total_slides - 1) * 0.45)))
+        target_visual_count = min(len(assets_list), max(1, int((total_slides - 1) * 0.60)))
 
         assigned_slides: set[int] = set()
         assigned_assets: set[int] = set()
@@ -149,23 +198,45 @@ class ImageMatcher:
                 assigned_slides.add(s_idx)
                 assigned_assets.add(asset_index_by_id[existing_id])
 
+        NON_IMAGE_LAYOUTS = {
+            "comparison", "table", "chart", "timeline", "metrics", "metrics_grid",
+            "kpi", "matrix", "matrix_quadrant", "quote", "dark_quote", "closing"
+        }
+
+        def _is_ineligible(s: Any) -> bool:
+            if isinstance(s, SlideSpec):
+                fam = getattr(s.layout_family, "value", str(s.layout_family or "")).lower()
+                hint = str(s.layout_hint or "").lower()
+                if fam in ("comparison", "timeline", "table", "chart", "metrics_grid"):
+                    return True
+                if hint in NON_IMAGE_LAYOUTS:
+                    return True
+                if s.table_spec or s.chart_spec or s.diagram_spec:
+                    return True
+                return False
+            elif isinstance(s, dict):
+                hint = str(s.get("layoutHint") or s.get("layout_hint") or "").lower()
+                if hint in NON_IMAGE_LAYOUTS:
+                    return True
+                if s.get("table") or s.get("chart"):
+                    return True
+                return False
+            return False
+
         # 2. Score all candidate pairs (slide_idx, asset_idx)
         scored_pairs = []
         for s_idx, slide in enumerate(slides):
             if s_idx in assigned_slides:
                 continue
+            if _is_ineligible(slide):
+                continue
 
-            # Ineligible slides: explicit non-image layout hints (comparison, table, chart, matrix, timeline)
+            # Check slide text and section
             if isinstance(slide, SlideSpec):
-                if slide.table_spec or slide.chart_spec or slide.diagram_spec:
-                    continue
-                if slide.layout_family in (LayoutFamily.COMPARISON, LayoutFamily.MATRIX_QUADRANT, LayoutFamily.TIMELINE, LayoutFamily.TABLE_FOCUS, LayoutFamily.CHART_FOCUS):
-                    continue
+                slide_section = slide.section or ""
                 slide_text = f"{slide.headline} {slide.objective} {slide.takeaway} {' '.join(slide.bullets or [])}"
             else:
-                hint = str(slide.get("layoutHint") or slide.get("layout_hint") or "").lower()
-                if hint in ("comparison", "table", "table_focus", "chart", "chart_focus", "matrix", "matrix_quadrant", "timeline", "roadmap") or slide.get("table") or slide.get("chart"):
-                    continue
+                slide_section = slide.get("section", "") or slide.get("chapter", "")
                 bullets = normalize_bullet_items(slide.get("bullets"))
                 slide["bullets"] = bullets
                 slide_text = f"{slide.get('headline', '')} {slide.get('purpose', '')} {slide.get('takeaway', '')} {' '.join(bullets)}"
@@ -174,9 +245,15 @@ class ImageMatcher:
                 if a_idx in assigned_assets:
                     continue
                 evidence = f"{asset['caption']} {asset['nearby_text']} {asset['summary']}".strip()
-                score = cls.calculate_relevance(slide_text, evidence or asset["caption"], topic_context=topic_context)
+                score = cls.calculate_relevance(
+                    slide_text,
+                    evidence or asset["caption"],
+                    topic_context=topic_context,
+                    slide_section=slide_section,
+                    image_section=asset["section"],
+                    image_type=asset["image_type"],
+                )
 
-                # Pacing bonus: slightly favor even distribution across chapters
                 pacing_bonus = 0.5 if (s_idx % 2 == 1 or s_idx == 0) else 0.0
 
                 if score >= min_relevance_threshold:
@@ -187,16 +264,10 @@ class ImageMatcher:
 
         for _combined, raw_score, s_idx, a_idx in scored_pairs:
             if len(assigned_assets) >= target_visual_count and len(assigned_slides) >= max(2, target_visual_count):
-                # We reached our optimal ratio
                 break
 
             if s_idx in assigned_slides or a_idx in assigned_assets:
                 continue
-
-            # Prevent 2 consecutive slides from getting images if we have few images
-            if len(assets_list) < total_slides // 2:
-                if (s_idx - 1) in assigned_slides and (s_idx + 1) in assigned_slides:
-                    continue
 
             asset = assets_list[a_idx]
             slide = slides[s_idx]
@@ -223,11 +294,11 @@ class ImageMatcher:
             assigned_slides.add(s_idx)
             assigned_assets.add(a_idx)
             logger.info(
-                "Semantically matched Slide %s to asset '%s' (score=%.1f, caption='%s')",
-                s_idx + 1, asset['id'], raw_score, caption[:50]
+                "Semantically matched Slide %s to asset '%s' (type=%s, score=%.1f, caption='%s')",
+                s_idx + 1, asset['id'], asset.get('image_type'), raw_score, caption[:50]
             )
 
-        # 3. Fallback pass: ensure valid extracted images from source are distributed to text-heavy slides
+        # 3. Fallback pass: ensure valid extracted images from source are distributed to eligible slides
         if len(assigned_assets) < min(len(assets_list), target_visual_count):
             for a_idx, asset in enumerate(assets_list):
                 if a_idx in assigned_assets:
@@ -235,20 +306,38 @@ class ImageMatcher:
                 for s_idx, slide in enumerate(slides):
                     if s_idx in assigned_slides or s_idx == 0:
                         continue
+                    if _is_ineligible(slide):
+                        continue
+                    caption = asset["caption"] or asset["summary"] or "Source document visual reference"
                     if isinstance(slide, SlideSpec):
-                        if slide.table_spec or slide.chart_spec or slide.diagram_spec or slide.layout_family == LayoutFamily.TIMELINE:
+                        slide_text = f"{slide.headline} {slide.objective} {slide.takeaway} {' '.join(slide.bullets or [])}"
+                    else:
+                        slide_text = f"{slide.get('headline', '')} {slide.get('purpose', '')} {slide.get('takeaway', '')} {' '.join(normalize_bullet_items(slide.get('bullets')))}"
+                    evidence = f"{asset['caption']} {asset['nearby_text']} {asset['summary']}".strip()
+                    score = cls.calculate_relevance(
+                        slide_text,
+                        evidence or asset["caption"],
+                        topic_context=topic_context,
+                        slide_section=(slide.section if isinstance(slide, SlideSpec) else slide.get("section", "")),
+                        image_section=asset["section"],
+                        image_type=asset["image_type"],
+                    )
+                    if score < min_relevance_threshold:
+                        continue
+                    if isinstance(slide, SlideSpec):
+                        if slide.table_spec or slide.chart_spec or slide.diagram_spec:
                             continue
                         slide.image_artifact_id = asset["id"]
-                        slide.image_caption = asset["caption"] or asset["summary"] or "Source document visual reference"
+                        slide.image_caption = caption
                         if slide.layout_family in (LayoutFamily.TWO_COLUMN, LayoutFamily.CARD_GRID, LayoutFamily.HERO, LayoutFamily.SECTION_DIVIDER):
                             slide.layout_family = LayoutFamily.TEXT_IMAGE
                             slide.layout_hint = "text_image"
                     else:
                         hint = str(slide.get("layoutHint") or slide.get("layout_hint") or "").lower()
-                        if hint in ("comparison", "table", "chart", "timeline", "roadmap"):
+                        if hint in ("table", "chart"):
                             continue
                         slide["imageArtifactId"] = asset["id"]
-                        slide["imageCaption"] = asset["caption"] or asset["summary"] or "Source document visual reference"
+                        slide["imageCaption"] = caption
                         if hint in (None, "", "default", "standard", "two_column", "cards"):
                             slide["layoutHint"] = "text_image"
 

@@ -1,0 +1,18 @@
+{
+  "case_id": "case_024_healthcare",
+  "domain": "healthcare",
+  "source_type": "prompt_only",
+  "target_slides": 6,
+  "prompt": "6 slides digital health remote monitoring: wearable biosensors, telehealth adoption, and HIPAA compliance.",
+  "sources": [],
+  "expected_rules": {
+    "min_slides": 5,
+    "max_slides": 8,
+    "requires_timeline": false,
+    "requires_source_images": false,
+    "minimum_source_utilization": 0.0,
+    "maximum_critical_issues": 0,
+    "maximum_high_issues": 1,
+    "minimum_quality_score": 88.0
+  }
+}

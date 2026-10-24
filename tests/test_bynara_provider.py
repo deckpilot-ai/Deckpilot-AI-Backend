@@ -11,9 +11,9 @@ from app.models.provider import AIKey, AIProvider, AIProviderModel
 from app.services.provider_router import ProviderRouter
 
 
-def test_bynara_sync_environment_providers(db_session: Session):
+def test_bynara_sync_environment_providers(db_session: Session, monkeypatch: pytest.MonkeyPatch):
     """Verify Bynara provider and its curated free models are synchronized into the DB."""
-    # Ensure sync runs
+    monkeypatch.setattr(settings, "bynara_api_key", "sk-bynara-test-key")
     ProviderRouter.sync_environment_providers(db_session)
 
     provider = db_session.scalar(select(AIProvider).where(AIProvider.name == "bynara"))
@@ -55,8 +55,9 @@ def test_bynara_sync_environment_providers(db_session: Session):
     assert "stepfun-3.7-flash" not in model_ids
 
 
-def test_bynara_fetch_models_filters_to_free(db_session: Session):
+def test_bynara_fetch_models_filters_to_free(db_session: Session, monkeypatch: pytest.MonkeyPatch):
     """Verify fetch_provider_models for Bynara filters out paid models."""
+    monkeypatch.setattr(settings, "bynara_api_key", "sk-bynara-test-key")
     import asyncio
 
     mock_response_data = {

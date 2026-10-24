@@ -280,21 +280,60 @@ try {{
                         )
                     )
 
-                # Check for severely sparse content on standard slides
-                if total_content_density < 0.015:
+                # Check for severely sparse / underfilled content on standard slides
+                if total_content_density < 0.018:
                     issues.append(
                         ValidationIssue(
-                            checkpoint_id=CHECKPOINT_ID_BY_SLUG.get("excessive_blank_space", "QA-049"),
-                            severity=ValidationSeverity.MEDIUM,
+                            checkpoint_id=CHECKPOINT_ID_BY_SLUG.get("sparse_slide", "QA-059"),
+                            severity=ValidationSeverity.HIGH,
                             category=ValidationCategory.DESIGN,
                             slide_number=slide_number,
                             slide_id=sid,
-                            message=f"Slide {slide_number} has sparse content coverage ({total_content_density:.1%})",
-                            suggested_fix="Enrich slide with key takeaways, metric callouts, or structured bullet cards",
+                            message=f"Slide {slide_number} is severely underfilled ({total_content_density:.1%} content coverage)",
+                            suggested_fix="Enrich slide with key takeaways, metric callouts, or structured evidence points",
                             auto_fixable=True,
-                            repair_action="vary_structure",
+                            repair_action="expand_layout",
                         )
                     )
+                elif total_content_density > 0.48:
+                    issues.append(
+                        ValidationIssue(
+                            checkpoint_id=CHECKPOINT_ID_BY_SLUG.get("crowded_slide", "QA-060"),
+                            severity=ValidationSeverity.HIGH,
+                            category=ValidationCategory.DESIGN,
+                            slide_number=slide_number,
+                            slide_id=sid,
+                            message=f"Slide {slide_number} is overcrowded ({total_content_density:.1%} density) with excessive visual clutter",
+                            suggested_fix="Simplify slide content, increase margins, or split across two slides",
+                            auto_fixable=True,
+                            repair_action="simplify_layout",
+                        )
+                    )
+
+            # 3. Canvas Edge Clipping Check (check 3px outer border)
+            edge_margin = 4
+            edge_mask = np.zeros_like(content_mask, dtype=bool)
+            edge_mask[:edge_margin, :] = True
+            edge_mask[-edge_margin:, :] = True
+            edge_mask[:, :edge_margin] = True
+            edge_mask[:, -edge_margin:] = True
+            edge_clipping_pixels = int(np.sum(content_mask & edge_mask))
+
+            # Allow minor bleed on title or hero slides, but flag non-hero content clipping
+            if not (spec and spec.layout_family in _SPARSE_ALLOWED_LAYOUTS) and edge_clipping_pixels > 80:
+                issues.append(
+                    ValidationIssue(
+                        checkpoint_id=CHECKPOINT_ID_BY_SLUG.get("text_clipping", "QA-039"),
+                        severity=ValidationSeverity.CRITICAL if edge_clipping_pixels > 250 else ValidationSeverity.HIGH,
+                        category=ValidationCategory.GEOMETRY,
+                        slide_number=slide_number,
+                        slide_id=sid,
+                        message=f"Visual content clipping detected at slide canvas boundary ({edge_clipping_pixels} pixels touching edge)",
+                        suggested_fix="Constrain elements within 0.5\" safe canvas margins",
+                        auto_fixable=True,
+                        repair_action="constrain_bounds",
+                    )
+                )
 
             # 3. Text & Background Contrast Check
             # Grayscale luminance: Y = 0.299 R + 0.587 G + 0.114 B

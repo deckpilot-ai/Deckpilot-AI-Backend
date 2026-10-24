@@ -168,7 +168,7 @@ def test_qa_agent_detects_timeline_chronology_disorder():
 
     disorder_issues = [
         i for i in report.issues
-        if i.checkpoint_id == "QA-123" or "chronological" in i.message.lower()
+        if i.checkpoint_id == "QA-123" or "chronological sequence" in i.message.lower()
     ]
     assert len(disorder_issues) >= 1
     assert disorder_issues[0].severity == ValidationSeverity.HIGH

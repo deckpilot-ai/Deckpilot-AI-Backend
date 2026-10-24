@@ -1,0 +1,74 @@
+{
+  "theme_id": "federalism-editorial-v1",
+  "name": "Federalism Editorial",
+  "description": "Premium editorial and infographic presentation theme reverse-engineered from Federalism benchmark presentation. Combines Cambria serif titles, Calibri body, deep teal canvas, teal/orange accents, and warm cream cards.",
+  "slide": {
+    "width_inches": 13.333,
+    "height_inches": 7.500,
+    "aspect_ratio": "16:9",
+    "margins": {
+      "left": 0.70,
+      "right": 0.70,
+      "top": 0.55,
+      "bottom": 0.45
+    },
+    "content_bottom": 6.80,
+    "footer_top": 7.00
+  },
+  "fonts": {
+    "display": "Cambria",
+    "body": "Calibri",
+    "monospace": "Consolas"
+  },
+  "colors": {
+    "dark": "#0C3B39",
+    "dark_alt": "#11504C",
+    "primary_teal": "#0E7C7B",
+    "secondary_teal": "#16A085",
+    "accent_orange": "#E08A1E",
+    "negative_red": "#C63A28",
+    "pale_negative": "#F6E0DB",
+    "panel_teal": "#E9F3F1",
+    "warm_cream": "#F6EFE2",
+    "body_ink": "#1E2B2A",
+    "muted_text": "#6B7A78",
+    "text_on_dark": "#CFE7E3",
+    "ghost_teal": "#D8EAE7",
+    "border_teal": "#CFE0DD",
+    "border_warm": "#E6D8BF",
+    "white": "#FFFFFF"
+  },
+  "typography": {
+    "cover_title": { "preferred_pt": 56.0, "min_pt": 44.0, "max_pt": 62.0, "max_lines": 2 },
+    "slide_title": { "preferred_pt": 32.0, "min_pt": 26.0, "max_pt": 36.0, "max_lines": 2 },
+    "dark_section_title": { "preferred_pt": 38.0, "min_pt": 30.0, "max_pt": 42.0, "max_lines": 2 },
+    "card_title": { "preferred_pt": 15.5, "min_pt": 13.5, "max_pt": 17.5, "max_lines": 2 },
+    "lead_body": { "preferred_pt": 15.0, "min_pt": 13.0, "max_pt": 16.0 },
+    "standard_body": { "preferred_pt": 12.0, "min_pt": 10.5, "max_pt": 13.0 },
+    "kicker": { "preferred_pt": 12.5, "min_pt": 11.0, "max_pt": 13.5 },
+    "caption": { "preferred_pt": 10.5, "min_pt": 9.0, "max_pt": 11.5 },
+    "footer": { "preferred_pt": 9.5, "min_pt": 8.5, "max_pt": 10.0 },
+    "metric": { "preferred_pt": 34.0, "min_pt": 26.0, "max_pt": 44.0 }
+  },
+  "title_accent_bar": {
+    "x": 0.72,
+    "y": 1.72,
+    "width": 0.60,
+    "height": 0.06,
+    "color": "#E08A1E"
+  },
+  "shadows": {
+    "card": {
+      "blur_rad_emu": 114300,
+      "dist_emu": 38100,
+      "dir_deg": 5400000,
+      "color_hex": "000000",
+      "alpha_val": 18000
+    }
+  },
+  "layouts": [
+    "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F09", "F10",
+    "F11", "F12", "F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20",
+    "F21", "F22", "F23", "F24", "F25", "F26", "F27"
+  ]
+}

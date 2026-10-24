@@ -1,0 +1,10 @@
+{
+  "min_slides": 7,
+  "max_slides": 10,
+  "requires_timeline": true,
+  "requires_source_images": false,
+  "minimum_source_utilization": 0.0,
+  "maximum_critical_issues": 0,
+  "maximum_high_issues": 1,
+  "minimum_quality_score": 88.0
+}
